@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UDCSEF — Universal Deterministic Causal State Execution Fabric</title>
+<style>
+:root {
+    --bg: #07080b;
+    --bg2: #0d0f15;
+    --bg3: #12141c;
+    --border: rgba(255, 255, 255, 0.06);
+    --border2: rgba(255, 255, 255, 0.11);
+    --text: #e2e5ee;
+    --muted: #5a6070;
+    --accent: #4f8ef7;
+    --accent2: #7c3aed;
+    --green: #10d084;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+    --pink: #ec4899;
+    --mono: 'Courier New', monospace;
+    --disp: 'Arial', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    overflow: hidden;
+    height: 100vh;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(79, 142, 247, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79, 142, 247, 0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.shell {
+    display: grid;
+    grid-template-columns: 200px 1fr 280px;
+    grid-template-rows: 46px 1fr;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+.topbar {
+    grid-column: 1/-1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 18px;
+    background: rgba(7, 8, 11, 0.96);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(14px);
+}
+
+.topbar-brand {
+    font-family: var(--disp);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text);
+}
+
+.left-panel {
+    grid-row: 2;
+    grid-column: 1;
+    background: rgba(13, 15, 21, 0.5);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.panel-section {
+    padding: 8px 12px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 2px solid transparent;
+}
+
+.nav-item:hover {
+    background: rgba(79, 142, 247, 0.08);
+    color: var(--text);
+}
+
+.nav-item.active {
+    border-left-color: var(--accent);
+    background: rgba(79, 142, 247, 0.12);
+    color: var(--accent);
+}
+
+.nav-badge {
+    margin-left: auto;
+    font-size: 9px;
+    background: rgba(79, 142, 247, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.main {
+    grid-row: 2;
+    grid-column: 2;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.view {
+    display: none;
+}
+
+.view.active {
+    display: block;
+}
+
+.section-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    font-family: var(--disp);
+}
+
+.section-sub {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+}
+
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.card {
+    background: rgba(18, 20, 28, 0.8);
+    border: 1px solid var(--border);
+    padding: 14px;
+    border-radius: 6px;
+}
+
+.card-sm {
+    padding: 12px;
+    font-size: 11px;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+}
+
+.stat-label {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.stat-delta {
+    font-size: 9px;
+    margin-top: 4px;
+    color: var(--green);
+}
+
+.stat-delta.down {
+    color: var(--amber);
+}
+
+.btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(79, 142, 247, 0.1);
+    border: 1px solid rgba(79, 142, 247, 0.3);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background: rgba(79, 142, 247, 0.2);
+    border-color: rgba(79, 142, 247, 0.5);
+}
+
+.btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.btn.primary:hover {
+    background: #3d6bbf;
+}
+
+.btn.danger {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--red);
+}
+
+.btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.right-panel {
+    grid-row: 2;
+    grid-column: 3;
+    background: rgba(13, 15, 21, 0.5);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.log-entry {
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 2px solid var(--accent);
+    font-size: 9px;
+    color: var(--muted);
+    border-radius: 2px;
+}
+
+.log-entry.ok {
+    border-left-color: var(--green);
+    color: var(--green);
+}
+
+.log-entry.warn {
+    border-left-color: var(--amber);
+    color: var(--amber);
+}
+
+.log-entry.err {
+    border-left-color: var(--red);
+    color: var(--red);
+}
+
+@media (max-width: 1200px) {
+    .shell {
+        grid-template-columns: 160px 1fr 0;
+    }
+    .right-panel {
+        display: none;
+    }
+}
+
+@media (max-width: 800px) {
+    .shell {
+        grid-template-columns: 1fr;
+    }
+    .left-panel {
+        display: none;
+    }
+}
+
+.pipeline-trigger-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: linear-gradient(135deg, #4f8ef7 0%, #7c3aed 100%);
+    color: white;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-family: var(--disp);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(79, 142, 247, 0.3);
+    transition: all 0.3s ease;
+    z-index: 9999;
+    text-transform: uppercase;
+}
+
+.pipeline-trigger-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(79, 142, 247, 0.4);
+}
+
+.pipeline-trigger-btn.running {
+    background: linear-gradient(135deg, #10d084 0%, #06b6d4 100%);
+}
+
+.content-box {
+    background: rgba(18, 20, 28, 0.8);
+    border: 1px solid var(--border);
+    padding: 16px;
+    border-radius: 6px;
+}
+
+.log-container {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+    min-height: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 10px;
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+    <!-- TOPBAR -->
+    <div class="topbar">
+        <span class="topbar-brand">⬡ UDCSEF</span>
+        <span style="font-size:10px;color:var(--muted)">Universal Deterministic Causal State Execution Fabric</span>
+    </div>
+
+    <!-- LEFT NAV -->
+    <nav class="left-panel">
+        <div class="panel-section">Fabric</div>
+        <div class="nav-item active" onclick="navTo('fabric',this)">
+            <span style="width:13px">⬡</span> Execution Graph
+            <span class="nav-badge">Live</span>
+        </div>
+        <div class="nav-item" onclick="navTo('transform',this)">
+            <span style="width:13px">⟷</span> Data Transforms
+        </div>
+        <div class="nav-item" onclick="navTo('agents',this)">
+            <span style="width:13px">◉</span> Intelligence Agents
+            <span class="nav-badge" id="agent-badge">7</span>
+        </div>
+        <div class="nav-item" onclick="navTo('network',this)">
+            <span style="width:13px">◎</span> P2P Network
+            <span class="nav-badge" id="peer-badge">0</span>
+        </div>
+        <div class="nav-item" onclick="navTo('ai',this)">
+            <span style="width:13px">◆</span> AI Intelligence
+            <span class="nav-badge" id="model-badge">—</span>
+        </div>
+        <div class="panel-section" style="margin-top:6px">Monitor</div>
+        <div class="nav-item" onclick="navTo('telemetry',this)">
+            <span style="width:13px">📊</span> Telemetry
+        </div>
+        <div class="nav-item" onclick="navTo('causal',this)">
+            <span style="width:13px">📝</span> Causal Log
+        </div>
+        <div class="panel-section" style="margin-top:6px">Alpha</div>
+        <div class="nav-item" onclick="navTo('alpha',this)">
+            <span style="width:13px">✦</span> Alpha Engine
+            <span class="nav-badge" id="alpha-badge" style="background:rgba(239,68,68,0.15);color:var(--red)">0</span>
+        </div>
+        <div class="panel-section" style="margin-top:6px">Config</div>
+        <div class="nav-item" onclick="navTo('rules',this)">
+            <span style="width:13px">⚙</span> Determinism Rules
+        </div>
+    </nav>
+
+    <!-- MAIN VIEWS -->
+    <main class="main" id="main">
+
+        <!-- VIEW: EXECUTION GRAPH -->
+        <section class="view active" id="view-fabric">
+            <div class="section-header">
+                <span class="section-title">Execution Graph</span>
+                <span class="section-sub">real-time causal state propagation · vector clocks · Lamport time</span>
+            </div>
+            <div class="grid-4">
+                <div class="card card-sm">
+                    <div class="stat-value" style="color:var(--green)" id="stat-nodes">12</div>
+                    <div class="stat-label">Active Nodes</div>
+                    <div class="stat-delta up" id="stat-nodes-d">—</div>
+                </div>
+                <div class="card card-sm">
+                    <div class="stat-value" style="color:var(--accent)" id="stat-events">0</div>
+                    <div class="stat-label">Total Events</div>
+                    <div class="stat-delta up">↑ causal chain growing</div>
+                </div>
+                <div class="card card-sm">
+                    <div class="stat-value" style="color:var(--cyan)" id="stat-msgs">0</div>
+                    <div class="stat-label">Messages Sent</div>
+                    <div class="stat-delta up" id="stat-msgs-d">—</div>
+                </div>
+                <div class="card card-sm">
+                    <div class="stat-value" style="color:var(--amber)" id="stat-lamport">0</div>
+                    <div class="stat-label">Lamport T</div>
+                    <div class="stat-delta down">↓ deterministic</div>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn primary" onclick="runFabric()">▶ Execute</button>
+                <button class="btn" onclick="pauseFabric()">⏸ Pause</button>
+                <button class="btn" onclick="resetFabric()">↺ Reset</button>
+                <button class="btn" onclick="addFabricNode()">＋ Node</button>
+                <button class="btn" onclick="removeFabricNode()">− Node</button>
+                <button class="btn" onclick="broadcastAll()">⇝ Broadcast</button>
+                <button class="btn danger" onclick="injectFault()">⚡ Fault</button>
+                <button class="btn" onclick="exportState()">↓ Export</button>
+                <button class="btn" onclick="exportToAttackCmd()" style="background:rgba(80,230,130,0.08);border-color:rgba(80,230,130,0.35);color:#4eff91;">⚔ Attack Cmd</button>
+                <span id="fabric-status" style="margin-left:auto;font-size:9px;color:var(--muted)">IDLE</span>
+            </div>
+            <div class="content-box">
+                <div style="font-size:11px;font-weight:700;margin-bottom:8px;">Execution Timeline</div>
+                <div class="log-container" id="execution-log">
+                    <div class="log-entry ok">✓ Fabric initialized with 12 nodes</div>
+                    <div class="log-entry">Ready to execute deterministic causal protocol</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: DATA TRANSFORMS -->
+        <section class="view" id="view-transform">
+            <div class="section-header">
+                <span class="section-title">Data Transforms</span>
+                <span class="section-sub">stateless data pipelines · schema evolution · versioning</span>
+            </div>
+            <div class="content-box">
+                <p style="margin-bottom:12px;">Transform pipelines for deterministic state evolution across nodes.</p>
+                <button class="btn primary" onclick="runTransform()">▶ Run Transform</button>
+            </div>
+        </section>
+
+        <!-- VIEW: AGENTS -->
+        <section class="view" id="view-agents">
+            <div class="section-header">
+                <span class="section-title">Intelligence Agents</span>
+                <span class="section-sub">autonomous decision-making · reinforcement learning · policy optimization</span>
+            </div>
+            <div class="content-box">
+                <div id="agents-list"></div>
+            </div>
+        </section>
+
+        <!-- VIEW: NETWORK -->
+        <section class="view" id="view-network">
+            <div class="section-header">
+                <span class="section-title">P2P Network</span>
+                <span class="section-sub">peer discovery · message routing · consensus coordination</span>
+            </div>
+            <div class="content-box">
+                <p>P2P network topology and peer-to-peer message passing.</p>
+                <button class="btn primary" onclick="runNetwork()">▶ Start Network</button>
+            </div>
+        </section>
+
+        <!-- VIEW: AI INTELLIGENCE -->
+        <section class="view" id="view-ai">
+            <div class="section-header">
+                <span class="section-title">AI Intelligence</span>
+                <span class="section-sub">language models · embeddings · inference cache</span>
+            </div>
+            <div class="content-box">
+                <p>AI model integration and inference endpoints.</p>
+                <button class="btn primary" onclick="runAI()">▶ Initialize AI</button>
+            </div>
+        </section>
+
+        <!-- VIEW: TELEMETRY -->
+        <section class="view" id="view-telemetry">
+            <div class="section-header">
+                <span class="section-title">Telemetry</span>
+                <span class="section-sub">metrics collection · observability · performance monitoring</span>
+            </div>
+            <div class="content-box">
+                <p>Real-time performance metrics and monitoring.</p>
+            </div>
+        </section>
+
+        <!-- VIEW: CAUSAL LOG -->
+        <section class="view" id="view-causal">
+            <div class="section-header">
+                <span class="section-title">Causal Log</span>
+                <span class="section-sub">append-only event log · causality tracking · replay</span>
+            </div>
+            <div class="content-box">
+                <div class="log-container" id="causal-log">
+                    <div class="log-entry ok">✓ Causal log initialized</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: ALPHA ENGINE -->
+        <section class="view" id="view-alpha">
+            <div class="section-header">
+                <span class="section-title">Alpha Engine</span>
+                <span class="section-sub">vulnerability detection · exploit generation · security analysis</span>
+            </div>
+            <div class="content-box">
+                <button class="btn primary" onclick="runAlpha()">▶ Run Alpha Analysis</button>
+                <div class="log-container" id="alpha-log" style="margin-top:12px;">
+                    <div class="log-entry">Alpha engine ready</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: DETERMINISM RULES -->
+        <section class="view" id="view-rules">
+            <div class="section-header">
+                <span class="section-title">Determinism Rules</span>
+                <span class="section-sub">invariants · constraints · verification rules</span>
+            </div>
+            <div class="content-box">
+                <p>Define and enforce determinism rules across the fabric.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- RIGHT PANEL: LOGS -->
+    <aside class="right-panel">
+        <div style="font-size:11px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">System Log</div>
+        <div class="log-container" id="system-log" style="flex:1;">
+            <div class="log-entry ok">✓ UDCSEF initialized</div>
+            <div class="log-entry ok">✓ Fabric ready</div>
+        </div>
+    </aside>
+</div>
+
+<script>
+// ───────────────────────────────────────────────────────────────────
+// UDCSEF CORE FUNCTIONS
+// ───────────────────────────────────────────────────────────────────
+
+let fabricState = {
+    running: false,
+    nodes: 12,
+    events: 0,
+    messages: 0,
+    lamportTime: 0
+};
+
+function logEntry(type, msg) {
+    const log = document.getElementById('system-log');
+    if (!log) return;
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.textContent = msg;
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+}
+
+function navTo(viewName, element) {
+    // Hide all views
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    
+    // Show selected view
+    const view = document.getElementById(`view-${viewName}`);
+    if (view) view.classList.add('active');
+    
+    // Highlight nav item
+    if (element) element.classList.add('active');
+}
+
+function runFabric() {
+    fabricState.running = true;
+    document.getElementById('fabric-status').textContent = 'RUNNING';
+    logEntry('ok', '▶ Fabric execution started');
+    fabricState.events++;
+    updateStats();
+}
+
+function pauseFabric() {
+    fabricState.running = false;
+    document.getElementById('fabric-status').textContent = 'PAUSED';
+    logEntry('warn', '⏸ Fabric paused');
+}
+
+function resetFabric() {
+    fabricState = { running: false, nodes: 12, events: 0, messages: 0, lamportTime: 0 };
+    document.getElementById('fabric-status').textContent = 'IDLE';
+    logEntry('ok', '↺ Fabric reset to genesis state');
+    updateStats();
+}
+
+function addFabricNode() {
+    fabricState.nodes++;
+    logEntry('ok', `＋ Node added (total: ${fabricState.nodes})`);
+    updateStats();
+}
+
+function removeFabricNode() {
+    if (fabricState.nodes > 1) {
+        fabricState.nodes--;
+        logEntry('warn', `− Node removed (total: ${fabricState.nodes})`);
+        updateStats();
+    }
+}
+
+function broadcastAll() {
+    fabricState.messages++;
+    logEntry('ok', `⇝ Broadcast sent to all ${fabricState.nodes} nodes`);
+    updateStats();
+}
+
+function injectFault() {
+    logEntry('err', '⚡ Fault injected — simulating network partition');
+}
+
+function exportState() {
+    const state = JSON.stringify(fabricState, null, 2);
+    const blob = new Blob([state], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fabric-state.json';
+    a.click();
+    logEntry('ok', '↓ State exported');
+}
+
+function exportToAttackCmd() {
+    logEntry('ok', '⚔ Fabric state exported to Attack Command');
+}
+
+function runTransform() {
+    logEntry('ok', '▶ Data transform pipeline executed');
+}
+
+function runNetwork() {
+    logEntry('ok', '▶ P2P network initialized');
+}
+
+function runAI() {
+    logEntry('ok', '▶ AI model loaded');
+}
+
+function runAlpha() {
+    logEntry('ok', '▶ Alpha analysis started');
+    logEntry('ok', '  • Scanning for determinism violations');
+    logEntry('warn', '  • Found 2 potential issues');
+    logEntry('ok', '✓ Analysis complete');
+}
+
+function updateStats() {
+    document.getElementById('stat-nodes').textContent = fabricState.nodes;
+    document.getElementById('stat-events').textContent = fabricState.events;
+    document.getElementById('stat-msgs').textContent = fabricState.messages;
+    document.getElementById('stat-lamport').textContent = fabricState.lamportTime;
+}
+
+// Initialize
+updateStats();
+logEntry('ok', '✓ UDCSEF fabric initialized');
+logEntry('ok', `✓ ${fabricState.nodes} nodes ready`);
+</script>
+
+</body>
+</html>

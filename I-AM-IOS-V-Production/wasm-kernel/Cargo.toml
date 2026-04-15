@@ -1,0 +1,23 @@
+[package]
+name = "rekernel_kernel"
+version = "3.2.0"
+edition = "2021"
+
+[[bin]]
+name = "rekernel_kernel"
+path = "src/main.rs"
+
+[lib]
+name = "rekernel_kernel"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+serde     = { version = "1", features = ["derive"], default-features = false }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+sha2      = { version = "0.10", default-features = false }
+
+[profile.release]
+opt-level = "z"
+lto       = true
+strip     = true

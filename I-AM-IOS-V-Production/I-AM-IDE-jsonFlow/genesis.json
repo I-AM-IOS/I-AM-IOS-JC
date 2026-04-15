@@ -1,0 +1,225 @@
+{
+  "jsonflow_spec": "1.1.0",
+  "name": "Genesis/JSONFlow",
+  "version": "1.0.0",
+  "description": "System-compliant Genesis event-sourced module spec for the JSONFlow compilation pipeline. Defines the canonical 3-stage pipeline: NL → Genesis Module → JSONFlow IR → Multi-Language Code.",
+  "module_type": "genesis_pipeline",
+  "pipeline_stages": {
+    "stage_1": {
+      "id": "genesis",
+      "label": "Genesis Module",
+      "description": "Natural language input → deterministic Genesis JSON module via LLM (Ollama/Claude). Enforces all 11 canonical invariants.",
+      "input": { "type": "string", "description": "Natural language app description" },
+      "output": { "type": "object", "description": "Genesis module JSON conforming to canonical schema" },
+      "enforced": true
+    },
+    "stage_2": {
+      "id": "jsonflow",
+      "label": "JSONFlow IR",
+      "description": "Genesis module → JSONFlow Intermediate Representation (deterministic compiler, no LLM). Produces deriveState, scheduleNextAction, computeSignals, emitEvents programs.",
+      "input": { "type": "object", "description": "Genesis module JSON" },
+      "output": { "type": "array", "items": { "type": "object" }, "description": "Array of JSONFlow program objects" },
+      "enforced": true
+    },
+    "stage_3": {
+      "id": "code",
+      "label": "Code Output",
+      "description": "JSONFlow IR → target language code (Python, JavaScript, TypeScript, Rust, Go, Java, C#, Swift, Kotlin).",
+      "input": { "type": "object", "description": "JSONFlow program object" },
+      "output": { "type": "string", "description": "Target language source code" },
+      "enforced": true
+    }
+  },
+  "derived_state": {
+    "description": "Full deterministic state derived by replaying the event log. Tracks all module entities, counters, and signal values.",
+    "structure": {
+      "value": "::derived_state",
+      "type": "array",
+      "enforced": true,
+      "items": {
+        "type": "object",
+        "required": ["id", "timestamp"],
+        "properties": {
+          "id":        { "type": "number" },
+          "timestamp": { "type": "number" }
+        }
+      }
+    }
+  },
+  "emitted_events": {
+    "description": "Canonical sequence of events emitted by the Genesis module reducers. Order is deterministic given identical event log.",
+    "structure": {
+      "value": "::emitted_events",
+      "type": "array",
+      "enforced": true,
+      "items": {
+        "type": "object",
+        "required": ["event_type", "args"],
+        "properties": {
+          "event_type": { "type": "string" },
+          "args":       { "type": "object" }
+        }
+      }
+    }
+  },
+  "events": {
+    "ModuleCreated": {
+      "type": "event",
+      "ordering_key": "module_id",
+      "enforced": true,
+      "description": "Emitted when a new Genesis module is successfully compiled from natural language.",
+      "schema": {
+        "type": "object",
+        "required": ["module_id", "module_type", "name", "timestamp"],
+        "properties": {
+          "module_id":   { "type": "number" },
+          "module_type": { "type": "string" },
+          "name":        { "type": "string" },
+          "timestamp":   { "type": "number" }
+        }
+      }
+    },
+    "JSONFlowCompiled": {
+      "type": "event",
+      "ordering_key": "module_id",
+      "enforced": true,
+      "description": "Emitted when a Genesis module is compiled to JSONFlow IR programs.",
+      "schema": {
+        "type": "object",
+        "required": ["module_id", "program_count", "timestamp"],
+        "properties": {
+          "module_id":     { "type": "number" },
+          "program_count": { "type": "number" },
+          "timestamp":     { "type": "number" }
+        }
+      }
+    },
+    "CodeCompiled": {
+      "type": "event",
+      "ordering_key": "module_id",
+      "enforced": true,
+      "description": "Emitted when a JSONFlow program is compiled to target language code.",
+      "schema": {
+        "type": "object",
+        "required": ["module_id", "language", "function_name", "timestamp"],
+        "properties": {
+          "module_id":     { "type": "number" },
+          "language":      { "type": "string" },
+          "function_name": { "type": "string" },
+          "timestamp":     { "type": "number" }
+        }
+      }
+    },
+    "ValidationFailed": {
+      "type": "event",
+      "ordering_key": "module_id",
+      "enforced": true,
+      "description": "Emitted when a Genesis module fails canonical deterministic validation.",
+      "schema": {
+        "type": "object",
+        "required": ["module_id", "reason", "timestamp"],
+        "properties": {
+          "module_id": { "type": "number" },
+          "reason":    { "type": "string" },
+          "timestamp": { "type": "number" }
+        }
+      }
+    }
+  },
+  "reducers": {
+    "deriveState": {
+      "description": "Replay eventLog to build deterministic pipeline state. Tracks module count, compilation stages reached, and language usage.",
+      "structure": {
+        "value": "::reducers.deriveState",
+        "type": "function",
+        "parameters": [{ "name": "eventLog", "type": "array" }],
+        "returns": { "type": "object" },
+        "enforced": true
+      }
+    }
+  },
+  "signal_functions": {
+    "energy": {
+      "description": "Rate of ModuleCreated events in the last 100 events relative to total.",
+      "formula": "count(ModuleCreated, window=100) / max(1, total_events)",
+      "range": [0, 1],
+      "structure": {
+        "value": "::signal_functions.energy",
+        "type": "function",
+        "parameters": [{ "name": "eventLog", "type": "array" }],
+        "returns": { "type": "number" },
+        "enforced": true
+      }
+    },
+    "decay": {
+      "description": "Staleness of the pipeline — how long since the last compilation event.",
+      "formula": "1 - (events_since_last_compile / log_length)",
+      "range": [0, 1],
+      "structure": {
+        "value": "::signal_functions.decay",
+        "type": "function",
+        "parameters": [{ "name": "eventLog", "type": "array" }],
+        "returns": { "type": "number" },
+        "enforced": true
+      }
+    },
+    "priority": {
+      "description": "Combined pipeline priority signal weighted by energy and freshness.",
+      "formula": "(energy * 0.6) + ((1 - decay) * 0.4)",
+      "range": [0, 1],
+      "structure": {
+        "value": "::signal_functions.priority",
+        "type": "function",
+        "parameters": [{ "name": "eventLog", "type": "array" }],
+        "returns": { "type": "number" },
+        "enforced": true
+      }
+    }
+  },
+  "schedulers": {
+    "scheduleNextAction": {
+      "description": "Select next pipeline action based on current stage and signal values. Returns one of: RunGenesis | CompileJSONFlow | CompileCode | Idle.",
+      "structure": {
+        "value": "::schedulers.scheduleNextAction",
+        "type": "function",
+        "parameters": [
+          { "name": "state",    "type": "object" },
+          { "name": "eventLog", "type": "array"  }
+        ],
+        "returns": { "type": "string" },
+        "enforced": true
+      }
+    }
+  },
+  "invariants": [
+    "Replay(state) == Live(state)",
+    "No hidden or mutable state outside the log",
+    "All outputs traceable to explicit events",
+    "Signals are functions of history, not stored values",
+    "Same input sequence → identical execution path",
+    "Same event log → identical emitted event sequence",
+    "Every event has a deterministic total ordering key",
+    "Reducers are pure functions of (state, event)",
+    "Schedulers are pure functions of event history with deterministic tie-breaking",
+    "Signal functions are pure functions of event history",
+    "Given the same event log, emitted event sequence is identical"
+  ],
+  "outputs": {
+    "derived_state":    { "type": "array",  "enforced": true },
+    "emitted_events":   { "type": "array",  "enforced": true },
+    "ENFORCED_OUTPUTS": { "type": "object", "enforced": true },
+    "canonical_module": { "type": "object", "enforced": true }
+  },
+  "dependencies": [
+    { "name": "Genesis/Hashing",    "version": "1.0.0" },
+    { "name": "Genesis/Addressing", "version": "1.0.0" }
+  ],
+  "ide_config": {
+    "description": "Configuration for the JSONFlow Genesis IDE (Remix-style interface)",
+    "panels": ["explorer", "editor", "chat", "output"],
+    "tabs": ["genesis", "jsonflow", "code", "test", "terminal"],
+    "languages": ["python", "javascript", "typescript", "rust", "go", "java", "csharp", "swift", "kotlin"],
+    "theme": "dark",
+    "font": "IBM Plex Mono"
+  }
+}
