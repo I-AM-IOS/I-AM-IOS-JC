@@ -1,0 +1,22 @@
+{
+  "name": "sovereign-compute-network",
+  "version": "5.0.0",
+  "description": "I-AM-IOS v5 — Sovereign substrate: deterministic event-driven OS with rekernel, WASM kernel, JSONFlow, P2P fabric, and sovereign app suite",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start":           "node server.js",
+    "dev":             "node --watch server.js",
+    "build:rekernel":  "cd rekernel && npx tsc -p tsconfig.json 2>&1 || true",
+    "build:dmr":       "cd dmr-upgrade && npx tsc -p tsconfig.json 2>&1 || true",
+    "build":           "npm run build:rekernel && npm run build:dmr",
+    "test":            "node test-complete-system.js",
+    "test:kernel":     "node test-kernel.js",
+    "build:wasm":      "cd wasm-kernel && cargo build --release --target wasm32-unknown-unknown",
+    "test:wasm":       "cd wasm-kernel && cargo test",
+    "setup":           "rustup target add wasm32-unknown-unknown",
+    "check":           "node --input-type=module --eval \"import('./sovereign-network.js').then(m => console.log('[check] sovereign-network.js imports OK', Object.keys(m)))\""
+  },
+  "engines": { "node": ">=20.0.0" },
+  "license": "Sovereign OS Community License"
+}

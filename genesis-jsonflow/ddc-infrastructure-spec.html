@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<!--
+  ddc-infrastructure-spec.html
+  DDC Infrastructure Specification — Density · Decay · Convergence architecture reference
+
+  Copyright (c) 2026 Sovereign OS Contributors
+
+  This file is part of Sovereign Net OS / DDC Infrastructure.
+  Licensed under the Sovereign OS Community License (LICENSE-COMMUNITY).
+  Commercial use requires a separate Commercial License (LICENSE-COMMERCIAL).
+
+  Core invariant: VM_stateₙ = deriveState(eventLog[0…n])
+
+  Retain this notice in all copies and derivative works.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDC Infrastructure — Density · Decay · Convergence</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap');
+
+:root {
+  --bg:      #060810;
+  --bg2:     #0b0e18;
+  --bg3:     #111420;
+  --bg4:     #181c2c;
+  --bg5:     #1f2438;
+  --txt:     #d4d8f0;
+  --txt2:    #6a7190;
+  --border:  rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.12);
+  --acc:     #4af0c4;
+  --acc2:    #00c896;
+  --acc-dim: rgba(74,240,196,0.12);
+  --heat:    #f97316;
+  --heat-dim:rgba(249,115,22,0.12);
+  --cold:    #5c7cfa;
+  --cold-dim:rgba(92,124,250,0.12);
+  --err:     #f43f5e;
+  --warn:    #fbbf24;
+  --ok:      #40c057;
+  --r:       10px;
+  --rl:      16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── LAYOUT ─────────────────────────────────────────────────────────────────── */
+
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+/* ── SIDEBAR ────────────────────────────────────────────────────────────────── */
+
+nav {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  padding: 28px 0 28px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-logo {
+  padding: 0 22px 28px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.nav-logo-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--acc);
+}
+
+.nav-logo-mark svg {
+  width: 28px; height: 28px; flex-shrink: 0;
+}
+
+.nav-subtitle {
+  font-size: 11px;
+  color: var(--txt2);
+  margin-top: 4px;
+  font-style: italic;
+  font-family: 'Fraunces', serif;
+}
+
+.nav-section-label {
+  padding: 10px 22px 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--txt2);
+  opacity: .6;
+}
+
+nav a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 22px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--txt2);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: all .2s;
+}
+
+nav a:hover {
+  color: var(--txt);
+  background: var(--bg3);
+  border-left-color: var(--border2);
+}
+
+nav a.active {
+  color: var(--acc);
+  background: var(--acc-dim);
+  border-left-color: var(--acc);
+}
+
+nav a .nav-num {
+  margin-left: auto;
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--txt2);
+  opacity: .5;
+}
+
+/* ── MAIN ───────────────────────────────────────────────────────────────────── */
+
+main {
+  min-width: 0;
+  padding: 0 0 120px;
+}
+
+/* ── HERO ───────────────────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  padding: 72px 64px 60px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 80% at 80% 50%, rgba(74,240,196,0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 20% 80%, rgba(92,124,250,0.05) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.hero-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--acc);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-eyebrow::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 1px;
+  background: var(--acc);
+}
+
+.hero h1 {
+  font-family: 'Fraunces', serif;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  color: var(--txt);
+  max-width: 640px;
+  margin-bottom: 20px;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--acc);
+}
+
+.hero-lead {
+  font-size: 16px;
+  color: var(--txt2);
+  max-width: 560px;
+  line-height: 1.65;
+  margin-bottom: 32px;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  border: 1px solid;
+}
+
+.tag-acc   { color: var(--acc);  border-color: rgba(74,240,196,.3);  background: var(--acc-dim); }
+.tag-heat  { color: var(--heat); border-color: rgba(249,115,22,.3);  background: var(--heat-dim); }
+.tag-cold  { color: var(--cold); border-color: rgba(92,124,250,.3);  background: var(--cold-dim); }
+.tag-muted { color: var(--txt2); border-color: var(--border2); background: var(--bg3); }
+
+/* ── SECTIONS ───────────────────────────────────────────────────────────────── */
+
+.section {
+  padding: 60px 64px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section:last-child { border-bottom: none; }
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 36px;
+}
+
+.section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--acc);
+  background: var(--acc-dim);
+  border: 1px solid rgba(74,240,196,.25);
+  border-radius: 6px;
+  padding: 4px 8px;
+  letter-spacing: .06em;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.section h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--txt);
+  line-height: 1.2;
+  letter-spacing: -.01em;
+}
+
+.section h2 small {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--txt2);
+  letter-spacing: 0;
+  margin-top: 4px;
+  font-style: normal;
+}
+
+h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--txt);
+  margin: 32px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+h3::before {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 14px;
+  background: var(--acc);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+p {
+  color: var(--txt2);
+  margin-bottom: 16px;
+  max-width: 680px;
+}
+
+p strong { color: var(--txt); font-weight: 600; }
+p code, li code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: var(--acc);
+}
+
+/* ── CODE BLOCKS ────────────────────────────────────────────────────────────── */
+
+.codeblock {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  overflow: hidden;
+  margin: 20px 0;
+}
+
+.codeblock-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+
+.codeblock-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--txt2);
+  font-weight: 500;
+}
+
+.codeblock-lang {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--acc);
+  background: var(--acc-dim);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.codeblock pre {
+  padding: 18px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--txt);
+  overflow-x: auto;
+  tab-size: 2;
+}
+
+.c-kw  { color: #5c7cfa; }
+.c-fn  { color: #4af0c4; }
+.c-str { color: #fbbf24; }
+.c-cmt { color: #4a5060; font-style: italic; }
+.c-num { color: #f97316; }
+.c-op  { color: #f43f5e; }
+
+/* ── FORMULA / INVARIANT BLOCKS ─────────────────────────────────────────────── */
+
+.formula {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--acc);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 16px 20px;
+  margin: 16px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--txt);
+  letter-spacing: .01em;
+}
+
+.formula .f-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--acc);
+  margin-bottom: 6px;
+}
+
+.formula .f-eq {
+  font-size: 15px;
+  color: var(--acc);
+  font-weight: 500;
+}
+
+.formula .f-sub {
+  font-size: 11px;
+  color: var(--txt2);
+  margin-top: 6px;
+}
+
+.invariant {
+  background: rgba(92,124,250,0.06);
+  border: 1px solid rgba(92,124,250,0.2);
+  border-left: 3px solid var(--cold);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--txt);
+}
+
+.invariant .inv-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--cold);
+  margin-bottom: 6px;
+}
+
+/* ── GRID CARDS ──────────────────────────────────────────────────────────────── */
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+
+.card:hover { border-color: var(--border2); }
+
+.card-icon {
+  font-size: 22px;
+  margin-bottom: 12px;
+}
+
+.card h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--txt);
+  margin-bottom: 6px;
+}
+
+.card p {
+  font-size: 12px;
+  color: var(--txt2);
+  margin: 0;
+  max-width: 100%;
+  line-height: 1.55;
+}
+
+.card-accent-line {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+
+/* ── SIGNAL BAR ─────────────────────────────────────────────────────────────── */
+
+.signal-demo {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  padding: 24px;
+  margin: 24px 0;
+}
+
+.signal-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0;
+}
+
+.signal-label {
+  width: 72px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--txt2);
+  flex-shrink: 0;
+}
+
+.signal-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--bg4);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.signal-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease;
+}
+
+.bar-energy   { background: linear-gradient(90deg, var(--heat), #fbbf24); }
+.bar-decay    { background: linear-gradient(90deg, var(--cold), #8b5cf6); }
+.bar-priority { background: linear-gradient(90deg, var(--acc), var(--acc2)); }
+
+.signal-val {
+  width: 36px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--txt);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── FLOW DIAGRAM ────────────────────────────────────────────────────────────── */
+
+.flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 20px 0;
+  row-gap: 8px;
+}
+
+.flow-node {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  color: var(--txt);
+  white-space: nowrap;
+}
+
+.flow-node.acc   { border-color: rgba(74,240,196,.4); color: var(--acc);  background: var(--acc-dim); }
+.flow-node.heat  { border-color: rgba(249,115,22,.4); color: var(--heat); background: var(--heat-dim); }
+.flow-node.cold  { border-color: rgba(92,124,250,.4); color: var(--cold); background: var(--cold-dim); }
+
+.flow-arrow {
+  color: var(--txt2);
+  font-size: 14px;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ── TABLE ──────────────────────────────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 13px;
+}
+
+th {
+  background: var(--bg3);
+  color: var(--txt2);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--txt2);
+  vertical-align: top;
+}
+
+td:first-child {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--acc);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+tr:last-child td { border-bottom: none; }
+
+/* ── VM DIAGRAM ──────────────────────────────────────────────────────────────── */
+
+.vm-cluster {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr;
+  gap: 0;
+  align-items: center;
+  margin: 24px 0;
+}
+
+.vm-box {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--rl);
+  padding: 20px;
+}
+
+.vm-box-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--acc);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.vm-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.vm-field-key {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--txt2);
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 80px;
+}
+
+.vm-field-val {
+  color: var(--txt);
+  line-height: 1.4;
+}
+
+.vm-arrow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.vm-arrow-line {
+  width: 1px;
+  flex: 1;
+  background: var(--border2);
+}
+
+.vm-arrow-head {
+  font-size: 16px;
+  color: var(--acc);
+}
+
+.vm-event-pill {
+  background: var(--acc-dim);
+  border: 1px solid rgba(74,240,196,.3);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--acc);
+  font-weight: 700;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  letter-spacing: .04em;
+}
+
+/* ── CALLOUT ────────────────────────────────────────────────────────────────── */
+
+.callout {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 16px 20px;
+  margin: 20px 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+.callout p {
+  font-size: 13px;
+  color: var(--txt2);
+  margin: 0;
+  max-width: 100%;
+}
+
+.callout p strong { color: var(--txt); }
+
+.callout.acc   { border-color: rgba(74,240,196,.25);  background: var(--acc-dim); }
+.callout.heat  { border-color: rgba(249,115,22,.25);  background: var(--heat-dim); }
+.callout.cold  { border-color: rgba(92,124,250,.25);  background: var(--cold-dim); }
+
+/* ── MODULE SCHEMA DISPLAY ───────────────────────────────────────────────────── */
+
+.schema-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.schema-field:last-child { border-bottom: none; }
+
+.sf-key {
+  width: 160px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--acc);
+  flex-shrink: 0;
+}
+
+.sf-type {
+  width: 70px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--heat);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.sf-desc {
+  font-size: 12px;
+  color: var(--txt2);
+  line-height: 1.5;
+}
+
+.sf-required {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: .06em;
+  color: var(--err);
+  background: rgba(244,63,94,.1);
+  border: 1px solid rgba(244,63,94,.25);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sf-optional {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: .06em;
+  color: var(--txt2);
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── LAVA LAMP VIZ ───────────────────────────────────────────────────────────── */
+
+.lava-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--rl);
+  overflow: hidden;
+  margin: 24px 0;
+  background: var(--bg);
+  height: 200px;
+  position: relative;
+}
+
+.lava-label {
+  position: absolute;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 6px;
+  z-index: 2;
+}
+
+.lava-label.outside {
+  top: 12px; left: 12px;
+  color: var(--heat);
+  background: var(--heat-dim);
+  border: 1px solid rgba(249,115,22,.3);
+}
+
+.lava-label.inside {
+  top: 12px; right: 12px;
+  color: var(--acc);
+  background: var(--acc-dim);
+  border: 1px solid rgba(74,240,196,.3);
+}
+
+.lava-divider {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border2);
+  z-index: 1;
+}
+
+.lava-divider-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--txt2);
+  white-space: nowrap;
+  z-index: 3;
+}
+
+canvas#lavaCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  nav { position: static; height: auto; }
+  .hero, .section { padding: 36px 24px; }
+  .hero h1 { font-size: 36px; }
+  .vm-cluster { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ── SIDEBAR ──────────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="13" stroke="#4af0c4" stroke-width="1.5" stroke-dasharray="3 2"/>
+        <circle cx="14" cy="14" r="5" fill="#4af0c4" opacity=".8"/>
+        <circle cx="14" cy="8"  r="2" fill="#4af0c4" opacity=".4"/>
+        <circle cx="20" cy="17" r="2.5" fill="#f97316" opacity=".6"/>
+        <circle cx="8"  cy="18" r="1.5" fill="#5c7cfa" opacity=".5"/>
+      </svg>
+      DDC / Planespace
+    </div>
+    <div class="nav-subtitle">Density · Decay · Convergence</div>
+  </div>
+
+  <div class="nav-section-label">Core Theory</div>
+  <a href="#model">The DDC Model</a>
+  <a href="#physics">Signal Physics</a>
+  <a href="#vm">VM Layer</a>
+
+  <div class="nav-section-label">Spec Schema</div>
+  <a href="#module-schema">Module Schema</a>
+  <a href="#signal-functions">Signal Functions</a>
+  <a href="#event-routing">Event Routing</a>
+
+  <div class="nav-section-label">Infrastructure</div>
+  <a href="#kernel">Kernel Integration</a>
+  <a href="#app-builder">App Builder</a>
+  <a href="#sovereign">Sovereign Net OS</a>
+
+  <div class="nav-section-label">Reference</div>
+  <a href="#api">API Reference</a>
+  <a href="#invariants">Invariants</a>
+  <a href="#glossary">Glossary</a>
+</nav>
+
+<!-- ── MAIN ─────────────────────────────────────────────────────────────────── -->
+<main>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">Architecture Specification · v1.0</div>
+  <h1>Density · Decay · <em>Convergence</em></h1>
+  <p class="hero-lead">A formal model for building deterministic, event-sourced systems where nodes
+  self-organize through excited density, natural decay, and emergent convergence — the lava lamp
+  as architecture.</p>
+  <div class="hero-tags">
+    <span class="tag tag-acc">Event-Sourced VMs</span>
+    <span class="tag tag-heat">Excitement → Density</span>
+    <span class="tag tag-cold">Decay → Separation</span>
+    <span class="tag tag-muted">Sovereign Net OS</span>
+    <span class="tag tag-muted">Planespace App Builder</span>
+    <span class="tag tag-muted">DIK Integration</span>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §1 THE MODEL -->
+<div class="section" id="model">
+  <div class="section-header">
+    <span class="section-num">§ 01</span>
+    <h2>The DDC Model
+      <small>Outside is chaos. Inside is determinism. The boundary is the event.</small>
+    </h2>
+  </div>
+
+  <p>A VM inside any computer is a controlled execution layer: its own state, its own rules, its own
+  input stream — isolated from the host. The DDC model maps this to a physics metaphor drawn from
+  lava lamps: <strong>excitement accumulates into density</strong>, density drives convergence,
+  and time causes decay.</p>
+
+  <div class="lava-frame">
+    <canvas id="lavaCanvas"></canvas>
+    <div class="lava-label outside">outside / chaos</div>
+    <div class="lava-label inside">inside / determinism</div>
+    <div class="lava-divider"></div>
+    <div class="lava-divider-label">event boundary</div>
+  </div>
+
+  <div class="callout heat">
+    <span class="callout-icon">🌋</span>
+    <p><strong>The lava lamp principle:</strong> Entropy happens outside the VM. It is captured as
+    an event at the boundary. Once inside, it becomes fixed, immutable, and replayable.
+    <code>outside(chaos) → event → inside(determinism)</code></p>
+  </div>
+
+  <h3>The Five-Layer Reduction</h3>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-accent-line" style="background:linear-gradient(90deg,#f97316,#fbbf24)"></div>
+      <div class="card-icon">🌍</div>
+      <h4>Host System</h4>
+      <p>Physical machine. Non-deterministic. Source of entropy. Network, time, user input — all
+      exist here before capture.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:linear-gradient(90deg,#4af0c4,#00c896)"></div>
+      <div class="card-icon">📦</div>
+      <h4>VM (Module)</h4>
+      <p>Deterministic runtime. Isolated state. Its only source of truth is its own
+      <code>eventLog</code>. No hidden channels.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:linear-gradient(90deg,#5c7cfa,#8b5cf6)"></div>
+      <div class="card-icon">📋</div>
+      <h4>eventLog</h4>
+      <p>Append-only, immutable. The VM's memory. Every state is a pure projection of this log
+      from position 0 to n.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:linear-gradient(90deg,#f43f5e,#be123c)"></div>
+      <div class="card-icon">⚙️</div>
+      <h4>deriveState</h4>
+      <p>Pure function. No I/O. <code>state = f(eventLog[0…n])</code>. The VM's CPU. Same log
+      always produces same state.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:linear-gradient(90deg,#fbbf24,#d97706)"></div>
+      <div class="card-icon">📡</div>
+      <h4>render / effects</h4>
+      <p>Outputs only. DOM, network, metrics. Never feeds back into state directly — they emit
+      new events at the boundary.</p>
+    </div>
+  </div>
+
+  <div class="formula">
+    <div class="f-label">Core Invariant</div>
+    <div class="f-eq">VM_stateₙ = deriveState(eventLog[0…n])</div>
+    <div class="f-sub">Nothing else is allowed to influence state. No globals. No ambient reads. No shared memory.</div>
+  </div>
+
+  <h3>Properties You Get For Free</h3>
+  <p>Because state is a pure function of the log:</p>
+  <table>
+    <tr>
+      <th>Property</th>
+      <th>What it means</th>
+      <th>How DDC provides it</th>
+    </tr>
+    <tr>
+      <td>Isolation</td>
+      <td>No hidden side effects</td>
+      <td>Each VM has its own eventLog. No shared state between VMs.</td>
+    </tr>
+    <tr>
+      <td>Replay</td>
+      <td>Same log → same result</td>
+      <td><code>deriveState</code> is pure. rulesVersion pins semantics.</td>
+    </tr>
+    <tr>
+      <td>Versioning</td>
+      <td>Rules can change</td>
+      <td><code>rulesVersion</code> tag lets the same log replay under different logic.</td>
+    </tr>
+    <tr>
+      <td>Audit</td>
+      <td>Full history is inspectable</td>
+      <td>eventLog is the only source of truth. Every transition is recorded.</td>
+    </tr>
+    <tr>
+      <td>Composition</td>
+      <td>VMs talk without coupling</td>
+      <td>Communication = events crossing VM boundaries via the event router.</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §2 SIGNAL PHYSICS -->
+<div class="section" id="physics">
+  <div class="section-header">
+    <span class="section-num">§ 02</span>
+    <h2>Signal Physics
+      <small>Energy · Decay · Priority — the three observables of a live node.</small>
+    </h2>
+  </div>
+
+  <p>Every module in the DDC system exposes three computed scalar signals, derived purely from its
+  <code>eventLog</code>. Together they describe whether a node is hot, cooling, or ready to
+  converge with another.</p>
+
+  <div class="signal-demo" id="signalDemo">
+    <div style="font-size:11px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;font-family:'JetBrains Mono',monospace;">
+      Live signal state — Task Manager module
+    </div>
+    <div class="signal-row">
+      <span class="signal-label">energy</span>
+      <div class="signal-bar-wrap"><div class="signal-bar bar-energy" id="barEnergy" style="width:78%"></div></div>
+      <span class="signal-val" id="valEnergy">0.78</span>
+    </div>
+    <div class="signal-row">
+      <span class="signal-label">decay</span>
+      <div class="signal-bar-wrap"><div class="signal-bar bar-decay" id="barDecay" style="width:62%"></div></div>
+      <span class="signal-val" id="valDecay">0.62</span>
+    </div>
+    <div class="signal-row">
+      <span class="signal-label">priority</span>
+      <div class="signal-bar-wrap"><div class="signal-bar bar-priority" id="barPriority" style="width:71%"></div></div>
+      <span class="signal-val" id="valPriority">0.71</span>
+    </div>
+  </div>
+
+  <h3>Energy</h3>
+  <p>Energy measures <strong>how active a module is right now</strong> relative to its total
+  history. It rises when domain-primary events fire, and normalises against log length to
+  stay bounded.</p>
+
+  <div class="formula">
+    <div class="f-label">Energy Formula</div>
+    <div class="f-eq">energy = count(primaryEvents, window=100) / max(1, totalEvents)</div>
+    <div class="f-sub">Range [0, 1]. Clipped. Each module defines what counts as a "primary" event in its schema.</div>
+  </div>
+
+  <p>Example — Task Manager: primary events are <code>TaskCreated</code> and
+  <code>TaskCompleted</code>. A burst of completions spikes energy. A quiet period after a
+  burst lets it fall.</p>
+
+  <h3>Decay</h3>
+  <p>Decay measures <strong>recency</strong> — how long since the last significant activity.
+  A freshly-active node has decay near 1.0. A stale node trends toward 0.</p>
+
+  <div class="formula">
+    <div class="f-label">Decay Formula</div>
+    <div class="f-eq">decay = 1 − (eventsSince_lastPrimary / log_length)</div>
+    <div class="f-sub">Range [0, 1]. As time passes without activity, eventsSince grows and decay falls.</div>
+  </div>
+
+  <div class="callout cold">
+    <span class="callout-icon">❄️</span>
+    <p><strong>This is the lava lamp's cooling mechanism.</strong> When a blob receives no excitement,
+    its density falls (decay → 0) and it separates from active blobs. When re-excited, density rises
+    and it can converge again.</p>
+  </div>
+
+  <h3>Priority</h3>
+  <p>Priority is the <strong>composite scheduling weight</strong> — used by routers, queues, and
+  orchestrators to decide which module to wake, which VM to schedule, which node to route to.
+  Each module may tune its own weighting coefficients in the schema.</p>
+
+  <div class="formula">
+    <div class="f-label">Priority Formula (default)</div>
+    <div class="f-eq">priority = (energy × 0.6) + ((1 − decay) × 0.4)</div>
+    <div class="f-sub">Coefficients are tunable per module: some are decay-dominant (0.5/0.5), some energy-dominant (0.7/0.3).</div>
+  </div>
+
+  <table>
+    <tr>
+      <th>Module type</th>
+      <th>Energy weight</th>
+      <th>Decay weight</th>
+      <th>Rationale</th>
+    </tr>
+    <tr>
+      <td>Task Manager</td>
+      <td>0.6</td>
+      <td>0.4</td>
+      <td>Active work matters more than age</td>
+    </tr>
+    <tr>
+      <td>Messaging</td>
+      <td>0.5</td>
+      <td>0.5</td>
+      <td>Recency equally important</td>
+    </tr>
+    <tr>
+      <td>CRM</td>
+      <td>0.6</td>
+      <td>0.4</td>
+      <td>Activity-weighted</td>
+    </tr>
+    <tr>
+      <td>E-Commerce</td>
+      <td>0.7</td>
+      <td>0.3</td>
+      <td>Order bursts are the signal</td>
+    </tr>
+    <tr>
+      <td>Identity</td>
+      <td>0.5</td>
+      <td>0.5</td>
+      <td>Staleness is a security signal</td>
+    </tr>
+  </table>
+
+  <h3>Convergence</h3>
+  <p>Two VMs converge when their combined priority exceeds a routing threshold and their
+  <code>correlationId</code> namespaces overlap. This is not a merge — each VM keeps its own
+  log. Convergence means they start exchanging events via the router.</p>
+
+  <div class="formula">
+    <div class="f-label">Convergence Condition</div>
+    <div class="f-eq">converge(VM_a, VM_b) iff priority_a > θ AND priority_b > θ AND overlap(correlationSpace_a, correlationSpace_b)</div>
+    <div class="f-sub">θ is the convergence threshold, typically 0.5. Overlap means they share a common causal ancestor.</div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §3 VM LAYER -->
+<div class="section" id="vm">
+  <div class="section-header">
+    <span class="section-num">§ 03</span>
+    <h2>VM Layer
+      <small>Each module is its own isolated execution boundary.</small>
+    </h2>
+  </div>
+
+  <p>The VM layer formalises the isolation contract. Each VM is a triple:
+  <strong>(eventLog, deriveState, signalFunctions)</strong>. Multiple VMs communicate only
+  through the event router — never through shared memory, never through direct calls.</p>
+
+  <div class="vm-cluster">
+    <div class="vm-box">
+      <div class="vm-box-title">VM₁ — Task Manager</div>
+      <div class="vm-field">
+        <span class="vm-field-key">eventLog</span>
+        <span class="vm-field-val">[ TaskCreated, TaskCompleted… ]</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">deriveState</span>
+        <span class="vm-field-val">pure f(log) → { byEntity, violations }</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">energy</span>
+        <span class="vm-field-val">0.78  ████████░░</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">decay</span>
+        <span class="vm-field-val">0.62  ██████░░░░</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">priority</span>
+        <span class="vm-field-val">0.71  ███████░░░</span>
+      </div>
+    </div>
+
+    <div class="vm-arrow-col">
+      <div class="vm-arrow-line"></div>
+      <div class="vm-event-pill">EVENT</div>
+      <div class="vm-arrow-head">→</div>
+      <div class="vm-event-pill">EVENT</div>
+      <div class="vm-arrow-line"></div>
+    </div>
+
+    <div class="vm-box">
+      <div class="vm-box-title">VM₂ — Messaging</div>
+      <div class="vm-field">
+        <span class="vm-field-key">eventLog</span>
+        <span class="vm-field-val">[ MessageSent, ConversationCreated… ]</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">deriveState</span>
+        <span class="vm-field-val">pure f(log) → { threads, unread }</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">energy</span>
+        <span class="vm-field-val">0.44  ████░░░░░░</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">decay</span>
+        <span class="vm-field-val">0.81  ████████░░</span>
+      </div>
+      <div class="vm-field">
+        <span class="vm-field-key">priority</span>
+        <span class="vm-field-val">0.59  █████░░░░░</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout acc">
+    <span class="callout-icon">🔗</span>
+    <p><strong>Communication is intrinsic, not add-on.</strong> When VM₁ emits an event with
+    a target module, the router appends it to VM₂'s eventLog with a <code>causationId</code>
+    pointing back to the originating event. The mechanism is identical to internal state changes
+    — no new abstraction required.</p>
+  </div>
+
+  <h3>Scaled to N VMs</h3>
+
+  <div class="flow">
+    <span class="flow-node heat">entropy source</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node acc">event (boundary)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node">VM₁.eventLog</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node acc">router event</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node">VM₂.eventLog</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node acc">router event</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node">VM₃.eventLog</span>
+  </div>
+
+  <p>Each hop preserves:</p>
+  <ul style="color:var(--txt2);font-size:13px;padding-left:20px;margin:12px 0;">
+    <li style="margin-bottom:6px;"><strong style="color:var(--txt)">correlationId</strong> — identifies the originating causal chain (same across all VMs)</li>
+    <li style="margin-bottom:6px;"><strong style="color:var(--txt)">causationId</strong> — points to the specific event that triggered this one (traceable per hop)</li>
+    <li style="margin-bottom:6px;"><strong style="color:var(--txt)">rulesVersion</strong> — pins which deriveState semantics apply at each VM</li>
+    <li><strong style="color:var(--txt)">sig</strong> — ECDSA P-256 signature of the originating identity (from Sovereign OS kernel)</li>
+  </ul>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §4 MODULE SCHEMA -->
+<div class="section" id="module-schema">
+  <div class="section-header">
+    <span class="section-num">§ 04</span>
+    <h2>Module Schema
+      <small>The complete field contract every DDC module must satisfy.</small>
+    </h2>
+  </div>
+
+  <p>A DDC module is a JSON object that declares its identity, event vocabulary, state shape, and
+  signal functions. The App Builder validates and code-generates from this schema. The Sovereign OS
+  kernel uses it to bootstrap VMs at runtime.</p>
+
+  <div class="codeblock">
+    <div class="codeblock-hdr">
+      <span class="codeblock-title">DDC Module Schema — canonical shape</span>
+      <span class="codeblock-lang">JSON</span>
+    </div>
+    <pre>{
+  <span class="c-str">"module_id"</span>:       <span class="c-str">"Genesis/tasks"</span>,
+  <span class="c-str">"module_name"</span>:     <span class="c-str">"Task Manager"</span>,
+  <span class="c-str">"version"</span>:         <span class="c-str">"1.0.0"</span>,
+  <span class="c-str">"rulesVersion"</span>:    <span class="c-num">1</span>,
+
+  <span class="c-cmt">// ── Event vocabulary ───────────────────────────────────────</span>
+  <span class="c-str">"events"</span>: {
+    <span class="c-str">"TaskCreated"</span>:   { <span class="c-str">"primary"</span>: <span class="c-kw">true</span>  },
+    <span class="c-str">"TaskCompleted"</span>: { <span class="c-str">"primary"</span>: <span class="c-kw">true</span>  },
+    <span class="c-str">"TaskDeleted"</span>:   { <span class="c-str">"primary"</span>: <span class="c-kw">false</span> }
+  },
+
+  <span class="c-cmt">// ── Domain invariants (plain English + machine-checkable) ──</span>
+  <span class="c-str">"invariants"</span>: [
+    <span class="c-str">"A task cannot be completed before it is created"</span>,
+    <span class="c-str">"A deleted task cannot receive further events"</span>
+  ],
+
+  <span class="c-cmt">// ── State shape (output of deriveState) ────────────────────</span>
+  <span class="c-str">"state_shape"</span>: {
+    <span class="c-str">"byEntity"</span>:   <span class="c-str">"Map&lt;entityId, EntityState&gt;"</span>,
+    <span class="c-str">"okCount"</span>:    <span class="c-str">"number"</span>,
+    <span class="c-str">"warnCount"</span>:  <span class="c-str">"number"</span>,
+    <span class="c-str">"errCount"</span>:   <span class="c-str">"number"</span>,
+    <span class="c-str">"violations"</span>: <span class="c-str">"InvariantViolation[]"</span>
+  },
+
+  <span class="c-cmt">// ── Signal functions (the DDC physics layer) ───────────────</span>
+  <span class="c-str">"signal_functions"</span>: {
+    <span class="c-str">"energy"</span>: {
+      <span class="c-str">"description"</span>: <span class="c-str">"Rate of primary events in window"</span>,
+      <span class="c-str">"formula"</span>:     <span class="c-str">"count(primary, window=100) / max(1, total)"</span>,
+      <span class="c-str">"range"</span>:       [<span class="c-num">0</span>, <span class="c-num">1</span>],
+      <span class="c-str">"structure"</span>:  { <span class="c-str">"type"</span>: <span class="c-str">"function"</span>, <span class="c-str">"params"</span>: [<span class="c-str">"eventLog"</span>], <span class="c-str">"returns"</span>: <span class="c-str">"number"</span>, <span class="c-str">"enforced"</span>: <span class="c-kw">true</span> }
+    },
+    <span class="c-str">"decay"</span>: {
+      <span class="c-str">"description"</span>: <span class="c-str">"Recency since last primary event"</span>,
+      <span class="c-str">"formula"</span>:     <span class="c-str">"1 - (eventsSince / log_length)"</span>,
+      <span class="c-str">"range"</span>:       [<span class="c-num">0</span>, <span class="c-num">1</span>],
+      <span class="c-str">"structure"</span>:  { <span class="c-str">"type"</span>: <span class="c-str">"function"</span>, <span class="c-str">"params"</span>: [<span class="c-str">"eventLog"</span>], <span class="c-str">"returns"</span>: <span class="c-str">"number"</span>, <span class="c-str">"enforced"</span>: <span class="c-kw">true</span> }
+    },
+    <span class="c-str">"priority"</span>: {
+      <span class="c-str">"description"</span>: <span class="c-str">"Composite scheduling weight"</span>,
+      <span class="c-str">"formula"</span>:     <span class="c-str">"(energy * 0.6) + ((1 - decay) * 0.4)"</span>,
+      <span class="c-str">"range"</span>:       [<span class="c-num">0</span>, <span class="c-num">1</span>],
+      <span class="c-str">"structure"</span>:  { <span class="c-str">"type"</span>: <span class="c-str">"function"</span>, <span class="c-str">"params"</span>: [<span class="c-str">"eventLog"</span>], <span class="c-str">"returns"</span>: <span class="c-str">"number"</span>, <span class="c-str">"enforced"</span>: <span class="c-kw">true</span> }
+    }
+  },
+
+  <span class="c-cmt">// ── Emitted events (cross-VM outputs) ──────────────────────</span>
+  <span class="c-str">"emitted_events"</span>: [
+    { <span class="c-str">"event_type"</span>: <span class="c-str">"TaskCompleted"</span>, <span class="c-str">"args"</span>: { <span class="c-str">"entityId"</span>: <span class="c-str">"string"</span> } }
+  ]
+}</pre>
+  </div>
+
+  <h3>Required Fields</h3>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:20px;margin:16px 0;">
+    <div class="schema-field">
+      <span class="sf-key">module_id</span>
+      <span class="sf-type">string</span>
+      <span class="sf-desc">Namespace/name. Dot or slash-separated. E.g. <code>Genesis/tasks</code>. Must be unique within the system.</span>
+      <span class="sf-required">required</span>
+    </div>
+    <div class="schema-field">
+      <span class="sf-key">module_name</span>
+      <span class="sf-type">string</span>
+      <span class="sf-desc">Human-readable display name.</span>
+      <span class="sf-required">required</span>
+    </div>
+    <div class="schema-field">
+      <span class="sf-key">rulesVersion</span>
+      <span class="sf-type">number</span>
+      <span class="sf-desc">Integer. Pinned version of <code>deriveState</code> semantics. Increment when rules change. Replay must specify a version.</span>
+      <span class="sf-required">required</span>
+    </div>
+    <div class="schema-field">
+      <span class="sf-key">events</span>
+      <span class="sf-type">object</span>
+      <span class="sf-desc">Map of event type names to descriptors. Each descriptor must declare <code>primary: boolean</code>.</span>
+      <span class="sf-required">required</span>
+    </div>
+    <div class="schema-field">
+      <span class="sf-key">signal_functions</span>
+      <span class="sf-type">object</span>
+      <span class="sf-desc">Must contain <code>energy</code>, <code>decay</code>, and <code>priority</code>. Each with <code>formula</code>, <code>range</code>, and <code>structure.enforced:true</code>.</span>
+      <span class="sf-required">required</span>
+    </div>
+    <div class="schema-field">
+      <span class="sf-key">invariants</span>
+      <span class="sf-type">string[]</span>
+      <span class="sf-desc">1–3 plain-English domain invariants. Used by the App Builder to validate event sequence logic.</span>
+      <span class="sf-optional">optional</span>
+    </div>
+    <div class="schema-field">
+      <span class="sf-key">state_shape</span>
+      <span class="sf-type">object</span>
+      <span class="sf-desc">Describes the output shape of <code>deriveState</code>. Used for static validation and code generation.</span>
+      <span class="sf-optional">optional</span>
+    </div>
+    <div class="schema-field">
+      <span class="sf-key">emitted_events</span>
+      <span class="sf-type">array</span>
+      <span class="sf-desc">Events this VM may produce for other VMs. Defines the cross-VM communication contract.</span>
+      <span class="sf-optional">optional</span>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §5 SIGNAL FUNCTIONS -->
+<div class="section" id="signal-functions">
+  <div class="section-header">
+    <span class="section-num">§ 05</span>
+    <h2>Signal Functions — Implementation
+      <small>How energy, decay, and priority are computed from the eventLog at runtime.</small>
+    </h2>
+  </div>
+
+  <p>Signal functions are pure functions that take an <code>eventLog</code> array and return a
+  scalar in [0, 1]. They are called by the orchestrator on every scheduler tick and by the router
+  to make convergence decisions.</p>
+
+  <div class="codeblock">
+    <div class="codeblock-hdr">
+      <span class="codeblock-title">signal_functions.js — canonical runtime implementation</span>
+      <span class="codeblock-lang">JS</span>
+    </div>
+    <pre><span class="c-cmt">/**
+ * Compute energy for a module's eventLog.
+ * energy = how much primary-event activity has occurred recently.
+ */</span>
+<span class="c-kw">function</span> <span class="c-fn">computeEnergy</span>(eventLog, primaryTypes, window <span class="c-op">=</span> <span class="c-num">100</span>) {
+  <span class="c-kw">const</span> total    <span class="c-op">=</span> eventLog.length;
+  <span class="c-kw">if</span> (total <span class="c-op">===</span> <span class="c-num">0</span>) <span class="c-kw">return</span> <span class="c-num">0</span>;
+  <span class="c-kw">const</span> slice     <span class="c-op">=</span> eventLog.slice(<span class="c-op">-</span>window);
+  <span class="c-kw">const</span> primary   <span class="c-op">=</span> slice.filter(e <span class="c-op">=></span> primaryTypes.has(e.type)).length;
+  <span class="c-kw">const</span> denom     <span class="c-op">=</span> Math.max(<span class="c-num">1</span>, total);
+  <span class="c-kw">return</span> Math.min(<span class="c-num">1.0</span>, Math.max(<span class="c-num">0.0</span>, primary <span class="c-op">/</span> denom));
+}
+
+<span class="c-cmt">/**
+ * Compute decay for a module's eventLog.
+ * decay = recency — falls toward 0 as the log goes quiet.
+ */</span>
+<span class="c-kw">function</span> <span class="c-fn">computeDecay</span>(eventLog, primaryTypes) {
+  <span class="c-kw">const</span> total  <span class="c-op">=</span> eventLog.length;
+  <span class="c-kw">if</span> (total <span class="c-op">===</span> <span class="c-num">0</span>) <span class="c-kw">return</span> <span class="c-num">0</span>;
+  <span class="c-kw">let</span> lastPos <span class="c-op">=</span> <span class="c-op">-</span><span class="c-num">1</span>;
+  <span class="c-kw">for</span> (<span class="c-kw">let</span> i <span class="c-op">=</span> total <span class="c-op">-</span> <span class="c-num">1</span>; i <span class="c-op">>=</span> <span class="c-num">0</span>; i<span class="c-op">--</span>) {
+    <span class="c-kw">if</span> (primaryTypes.has(eventLog[i].type)) { lastPos <span class="c-op">=</span> i; <span class="c-kw">break</span>; }
+  }
+  <span class="c-kw">if</span> (lastPos <span class="c-op">=== -</span><span class="c-num">1</span>) <span class="c-kw">return</span> <span class="c-num">0</span>;
+  <span class="c-kw">const</span> eventsSince <span class="c-op">=</span> total <span class="c-op">-</span> <span class="c-num">1</span> <span class="c-op">-</span> lastPos;
+  <span class="c-kw">const</span> decay       <span class="c-op">=</span> <span class="c-num">1.0</span> <span class="c-op">-</span> (eventsSince <span class="c-op">/</span> Math.max(<span class="c-num">1</span>, total));
+  <span class="c-kw">return</span> Math.min(<span class="c-num">1.0</span>, Math.max(<span class="c-num">0.0</span>, decay));
+}
+
+<span class="c-cmt">/**
+ * Compute priority — the composite scheduling weight.
+ * Weights are module-defined in the schema.
+ */</span>
+<span class="c-kw">function</span> <span class="c-fn">computePriority</span>(energy, decay, w <span class="c-op">=</span> { e: <span class="c-num">0.6</span>, d: <span class="c-num">0.4</span> }) {
+  <span class="c-kw">return</span> Math.min(<span class="c-num">1.0</span>, (energy <span class="c-op">*</span> w.e) <span class="c-op">+</span> ((<span class="c-num">1</span> <span class="c-op">-</span> decay) <span class="c-op">*</span> w.d));
+}
+
+<span class="c-cmt">/** Top-level: compute all three signals for a module at once. */</span>
+<span class="c-kw">function</span> <span class="c-fn">computeSignals</span>(mod, eventLog) {
+  <span class="c-kw">const</span> primaryTypes <span class="c-op">=</span> <span class="c-kw">new</span> Set(
+    Object.entries(mod.events)
+      .filter(([, v]) <span class="c-op">=></span> v.primary)
+      .map(([k]) <span class="c-op">=></span> k)
+  );
+  <span class="c-kw">const</span> w      <span class="c-op">=</span> mod.signal_functions.priority.weights <span class="c-op">||</span> { e: <span class="c-num">0.6</span>, d: <span class="c-num">0.4</span> };
+  <span class="c-kw">const</span> energy <span class="c-op">=</span> <span class="c-fn">computeEnergy</span>(eventLog, primaryTypes);
+  <span class="c-kw">const</span> decay  <span class="c-op">=</span> <span class="c-fn">computeDecay</span>(eventLog, primaryTypes);
+  <span class="c-kw">return</span> { energy, decay, priority: <span class="c-fn">computePriority</span>(energy, decay, w) };
+}</pre>
+  </div>
+
+  <div class="invariant">
+    <div class="inv-title">Signal Invariant</div>
+    All three signal functions must be <strong>pure</strong> — they read only their
+    <code>eventLog</code> argument and return a scalar. No external reads. No Date.now(). No
+    random. Given the same log, they must always return the same values.
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §6 EVENT ROUTING -->
+<div class="section" id="event-routing">
+  <div class="section-header">
+    <span class="section-num">§ 06</span>
+    <h2>Event Routing
+      <small>How excitement crosses VM boundaries without breaking determinism.</small>
+    </h2>
+  </div>
+
+  <p>The event router is the connective tissue of the DDC system. It enforces the architectural
+  rule: no shared memory, no direct function calls between VMs. The only inter-VM mechanism
+  is an event appended to a target's log.</p>
+
+  <div class="codeblock">
+    <div class="codeblock-hdr">
+      <span class="codeblock-title">event-router.js — canonical cross-VM event envelope</span>
+      <span class="codeblock-lang">JS</span>
+    </div>
+    <pre><span class="c-cmt">/**
+ * Route an event from one VM to another.
+ * The router is the ONLY path for inter-VM communication.
+ *
+ * Invariant: VM_stateₙ = deriveState(eventLog[0…n])
+ * must hold for all VMs at all times.
+ */</span>
+<span class="c-kw">function</span> <span class="c-fn">routeEvent</span>(targetVM, event) {
+  <span class="c-kw">const</span> entry <span class="c-op">=</span> Object.freeze({
+    id:            <span class="c-fn">makeEntryId</span>(event),
+    ts:            Date.now(),         <span class="c-cmt">// wall time — display only</span>
+    clock:         targetVM.clock<span class="c-op">++</span>,   <span class="c-cmt">// logical clock — canonical ordering</span>
+    type:          event.type,
+    origin:        event.origin,       <span class="c-cmt">// source VM's module_id</span>
+    payload:       event.payload,
+    sig:           event.sig,          <span class="c-cmt">// ECDSA P-256 from originating identity</span>
+    correlationId: event.correlationId,<span class="c-cmt">// same chain across all VMs</span>
+    causationId:   event.id,           <span class="c-cmt">// the specific event that triggered this</span>
+    status:        <span class="c-str">"ok"</span>,
+    cost:          <span class="c-fn">computeCost</span>(event)
+  });
+
+  targetVM.eventLog.push(entry);       <span class="c-cmt">// append only — never mutate existing</span>
+  targetVM.state <span class="c-op">=</span> <span class="c-fn">deriveState</span>(targetVM.eventLog);
+  targetVM.signals <span class="c-op">=</span> <span class="c-fn">computeSignals</span>(targetVM.schema, targetVM.eventLog);
+  <span class="c-fn">emitEffects</span>(targetVM, entry);        <span class="c-cmt">// render / network / metrics</span>
+}
+
+<span class="c-cmt">/**
+ * The router decides which VMs to notify based on:
+ * 1. Explicit targetModule in payload
+ * 2. Convergence: VMs with overlapping correlationId space + priority > θ
+ */</span>
+<span class="c-kw">function</span> <span class="c-fn">dispatch</span>(sourceVM, event, allVMs, θ <span class="c-op">=</span> <span class="c-num">0.5</span>) {
+  <span class="c-cmt">// Explicit routing</span>
+  <span class="c-kw">if</span> (event.targetModule) {
+    <span class="c-kw">const</span> target <span class="c-op">=</span> allVMs.get(event.targetModule);
+    <span class="c-kw">if</span> (target) <span class="c-fn">routeEvent</span>(target, event);
+    <span class="c-kw">return</span>;
+  }
+
+  <span class="c-cmt">// Convergence routing — excitement attracts excited nodes</span>
+  <span class="c-kw">for</span> (<span class="c-kw">const</span> [id, vm] <span class="c-op">of</span> allVMs) {
+    <span class="c-kw">if</span> (id <span class="c-op">===</span> sourceVM.schema.module_id) <span class="c-kw">continue</span>;
+    <span class="c-kw">if</span> (vm.signals.priority <span class="c-op"><</span> θ) <span class="c-kw">continue</span>;
+    <span class="c-kw">if</span> (<span class="c-fn">correlationOverlap</span>(sourceVM, vm, event)) {
+      <span class="c-fn">routeEvent</span>(vm, event);
+    }
+  }
+}</pre>
+  </div>
+
+  <h3>Causal Traceability</h3>
+  <p>Every cross-VM event carries two IDs that let you reconstruct the full causal graph of
+  any system state:</p>
+  <table>
+    <tr><th>Field</th><th>Value</th><th>What it lets you do</th></tr>
+    <tr>
+      <td>correlationId</td>
+      <td>Same string across all events in one logical operation</td>
+      <td>Find all events caused by a single user action across all VMs</td>
+    </tr>
+    <tr>
+      <td>causationId</td>
+      <td>The <code>id</code> of the specific event that triggered this one</td>
+      <td>Reconstruct the causal tree hop by hop</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §7 KERNEL -->
+<div class="section" id="kernel">
+  <div class="section-header">
+    <span class="section-num">§ 07</span>
+    <h2>Kernel Integration
+      <small>How DDC maps onto the Sovereign Net OS Absolute Kernel v4.</small>
+    </h2>
+  </div>
+
+  <p>The Sovereign OS kernel (v4) already implements the DDC model's core invariants. The
+  mapping is direct:</p>
+
+  <table>
+    <tr><th>DDC concept</th><th>Kernel v4 equivalent</th><th>Location</th></tr>
+    <tr>
+      <td>eventLog</td>
+      <td><code>#history</code> (append-only, frozen entries)</td>
+      <td>kernel.js: <code>_record()</code></td>
+    </tr>
+    <tr>
+      <td>deriveState</td>
+      <td><code>reduce(state, entry) → Delta</code></td>
+      <td>kernel.js: pure reducer, no I/O</td>
+    </tr>
+    <tr>
+      <td>applyDelta (effects)</td>
+      <td><code>_applyDelta(delta)</code> — sole write path</td>
+      <td>kernel.js: Delta ops (set/delete/dagSet…)</td>
+    </tr>
+    <tr>
+      <td>entropy → event</td>
+      <td><code>SigPipeline.verify → dispatch(event)</code></td>
+      <td>kernel.js: external input enters only here</td>
+    </tr>
+    <tr>
+      <td>VM isolation</td>
+      <td>Separate kernel instances per module (planned) or sandboxed <code>new Function()</code></td>
+      <td>kernel.js + Code Editor sandbox</td>
+    </tr>
+    <tr>
+      <td>signal functions</td>
+      <td><code>module.signal_functions</code> in module schemas</td>
+      <td>index1.html: MODULE_SCHEMAS</td>
+    </tr>
+    <tr>
+      <td>correlationId / causationId</td>
+      <td>Event envelope fields (canonical)</td>
+      <td>kernel.js: <code>makeEntry()</code></td>
+    </tr>
+    <tr>
+      <td>rulesVersion</td>
+      <td><code>RULES_VERSION</code> constant</td>
+      <td>App Builder: generated app code</td>
+    </tr>
+    <tr>
+      <td>DIK spatial runtime</td>
+      <td>UI inputs become signed, replayable transactions</td>
+      <td>src/browser/dik/kernel.js</td>
+    </tr>
+  </table>
+
+  <div class="callout acc">
+    <span class="callout-icon">🔄</span>
+    <p><strong>The kernel's v4 causality inversion is DDC-native.</strong> In v4, <code>_record()</code>
+    is called <em>before</em> handler execution. The log is causal, not observational. This is
+    exactly the DDC invariant: the log drives state, not the other way around.</p>
+  </div>
+
+  <h3>Kernel Dispatch Pipeline</h3>
+
+  <div class="flow" style="flex-direction:column;align-items:flex-start;gap:0;">
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span class="flow-node heat">External Input (UI / Network / IPC)</span>
+    </div>
+    <div style="padding-left:20px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:12px;margin:2px 0;">↓ entropy enters here</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span class="flow-node">SigPipeline.verify(sig)</span>
+    </div>
+    <div style="padding-left:20px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:12px;margin:2px 0;">↓ only signed events proceed</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span class="flow-node">kernel.dispatch(event)</span>
+    </div>
+    <div style="padding-left:20px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:12px;margin:2px 0;">↓ cost metering</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span class="flow-node">_record(entry) → IMMUTABLE, FROZEN ← before any state write</span>
+    </div>
+    <div style="padding-left:20px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:12px;margin:2px 0;">↓ pure function</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span class="flow-node">reduce(state, entry) → Delta</span>
+    </div>
+    <div style="padding-left:20px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:12px;margin:2px 0;">↓ sole write path</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span class="flow-node acc">_applyDelta(delta) → new state</span>
+    </div>
+    <div style="padding-left:20px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:12px;margin:2px 0;">↓ outputs only</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+      <span class="flow-node">emit effects (IPFS / network / UI / signal update)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §8 APP BUILDER -->
+<div class="section" id="app-builder">
+  <div class="section-header">
+    <span class="section-num">§ 08</span>
+    <h2>App Builder / Spec Builder
+      <small>How the lava lamp concept becomes a runnable app scaffold.</small>
+    </h2>
+  </div>
+
+  <p>The Planespace App Builder is the DDC system's <strong>spec-to-running-VM pipeline</strong>.
+  Given a natural-language description and a module schema, it produces a fully hydrated,
+  self-contained HTML app that embodies the DDC invariants: an immutable eventLog, a pure
+  <code>deriveState</code>, and live signal functions.</p>
+
+  <h3>The App Builder as DDC itself</h3>
+
+  <div class="callout heat">
+    <span class="callout-icon">💡</span>
+    <p><strong>The App Builder is itself a DDC system.</strong> The user's prompt is the entropy
+    source. It is injected as a single event. Ollama's generation is the deterministic reduction
+    (given seed=42). The hydrated template is the rendered state. The download button is the
+    emitted effect.</p>
+  </div>
+
+  <div class="flow">
+    <span class="flow-node heat">user prompt (entropy)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node acc">event: AppBuildRequested</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node">Ollama (deriveState)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node acc">JSON data (delta)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node">hydrateTemplate(data)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-node acc">rendered HTML (effect)</span>
+  </div>
+
+  <h3>Generated App Structure</h3>
+  <p>Every app generated by the App Builder contains these fixed DDC components, regardless of
+  domain:</p>
+
+  <div class="codeblock">
+    <div class="codeblock-hdr">
+      <span class="codeblock-title">Generated app — structural skeleton</span>
+      <span class="codeblock-lang">JS</span>
+    </div>
+    <pre><span class="c-cmt">// ── Constants (pinned by rulesVersion) ────────────────────────────────</span>
+<span class="c-kw">const</span> RULES_VERSION <span class="c-op">=</span> <span class="c-num">1</span>;
+
+<span class="c-cmt">// ── The VM's memory — append only, never mutate ───────────────────────</span>
+<span class="c-kw">var</span> eventLog <span class="c-op">=</span> [ <span class="c-cmt">/* seed events from spec */</span> ];
+
+<span class="c-cmt">// ── Layer 1: deriveState — pure, no I/O ──────────────────────────────</span>
+<span class="c-kw">function</span> <span class="c-fn">deriveState</span>(log, rulesVersion) {
+  <span class="c-kw">var</span> byEntity    <span class="c-op">=</span> {};
+  <span class="c-kw">var</span> violations  <span class="c-op">=</span> [];
+  <span class="c-cmt">// … entity state machines, invariant checks …</span>
+  <span class="c-kw">return</span> { byEntity, violations, rulesVersion, log };
+}
+
+<span class="c-cmt">// ── Layer 2: project — deriveState → view model ───────────────────────</span>
+<span class="c-kw">function</span> <span class="c-fn">project</span>(state) {
+  <span class="c-kw">return</span> {
+    total:    Object.keys(state.byEntity).length,
+    okCount:  <span class="c-cmt">/*…*/</span>,
+    energy:   <span class="c-fn">computeEnergy</span>(state.log),
+    decay:    <span class="c-fn">computeDecay</span>(state.log),
+    priority: <span class="c-fn">computePriority</span>(energy, decay)
+  };
+}
+
+<span class="c-cmt">// ── Layer 3: render — projection → DOM ───────────────────────────────</span>
+<span class="c-kw">function</span> <span class="c-fn">render</span>(view) { <span class="c-cmt">/* update DOM from view model */</span> }
+
+<span class="c-cmt">// ── Entry point — rebuild full state from log on every change ────────</span>
+<span class="c-fn">render</span>(<span class="c-fn">project</span>(<span class="c-fn">deriveState</span>(eventLog)));
+
+<span class="c-cmt">// ── Dispatch — the only way to change state ───────────────────────────</span>
+<span class="c-kw">function</span> <span class="c-fn">dispatch</span>(type, payload) {
+  <span class="c-kw">var</span> evt <span class="c-op">=</span> {
+    type, payload,
+    entityId:      payload.entityId,
+    correlationId: <span class="c-str">"COR-"</span> <span class="c-op">+</span> Date.now(),
+    causationId:   eventLog.at(<span class="c-op">-</span><span class="c-num">1</span>)<span class="c-op">?</span>.entityId <span class="c-op">||</span> <span class="c-kw">null</span>,
+    time:          <span class="c-kw">new</span> Date().toISOString()
+  };
+  eventLog.push(evt);    <span class="c-cmt">// append only</span>
+  <span class="c-fn">render</span>(<span class="c-fn">project</span>(<span class="c-fn">deriveState</span>(eventLog)));
+}</pre>
+  </div>
+
+  <h3>Spec Builder Input Contract</h3>
+  <p>The App Builder accepts a Module Schema (§04) as input. When a schema is provided,
+  the generated app's event vocabulary, state shape, and signal function weights are pinned
+  to the schema's definitions. Without a schema, the LLM infers them from the description.</p>
+
+  <table>
+    <tr><th>Input field</th><th>Maps to DDC concept</th><th>Required</th></tr>
+    <tr><td>App Name</td><td>module_name</td><td>Yes</td></tr>
+    <tr><td>Description</td><td>domain invariants (inferred)</td><td>Yes</td></tr>
+    <tr><td>Module Schema</td><td>Full module schema §04</td><td>No (LLM infers)</td></tr>
+    <tr><td>Preset template</td><td>State shape + render structure</td><td>Auto-selected</td></tr>
+  </table>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §9 SOVEREIGN -->
+<div class="section" id="sovereign">
+  <div class="section-header">
+    <span class="section-num">§ 09</span>
+    <h2>Sovereign Net OS Integration
+      <small>DDC as the operating model of a decentralised, browser-native OS.</small>
+    </h2>
+  </div>
+
+  <p>Sovereign Net OS is the runtime that hosts DDC VMs in a fully decentralised, peer-to-peer
+  environment. Every capability in the OS — identity, messaging, code editor, file storage,
+  marketplace — maps to a DDC module with its own eventLog, deriveState, and signal functions.</p>
+
+  <h3>Module Map</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-accent-line" style="background:var(--acc)"></div>
+      <div class="card-icon">🪪</div>
+      <h4>Genesis/identity</h4>
+      <p>ECDSA P-256 DIDs. Primary events: IdentityCreated, IdentityUpdated. Decay = staleness (security signal).</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:var(--cold)"></div>
+      <div class="card-icon">💬</div>
+      <h4>Genesis/messaging</h4>
+      <p>AES-256-GCM encrypted channels. Primary: MessageSent. Energy = message rate. Decay = thread silence.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:var(--heat)"></div>
+      <div class="card-icon">📋</div>
+      <h4>Genesis/tasks</h4>
+      <p>Collaborative task management. Priority: energy-dominant (0.6/0.4). Convergence drives cross-user assignment.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:var(--warn)"></div>
+      <div class="card-icon">🛒</div>
+      <h4>Genesis/ecommerce</h4>
+      <p>P2P marketplace. Primary: OrderPlaced. Energy-dominant (0.7/0.3). High-energy modules get priority routing.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:var(--ok)"></div>
+      <div class="card-icon">💻</div>
+      <h4>Code Editor</h4>
+      <p>Merkle-DAG versioning. Each commit is an event. rulesVersion pins the merge semantics for that branch.</p>
+    </div>
+    <div class="card">
+      <div class="card-accent-line" style="background:var(--err)"></div>
+      <div class="card-icon">🕸️</div>
+      <h4>Network / DIK</h4>
+      <p>BroadcastChannel mesh. Every peer interaction flows through DIK → signed transaction → kernel dispatch.</p>
+    </div>
+  </div>
+
+  <h3>Peer-to-Peer DDC</h3>
+  <p>In Sovereign Net OS, each browser tab (or Electron node) is a host running its own set of
+  DDC VMs. Cross-peer event routing uses BroadcastChannel (same machine) or WebRTC/WebSocket
+  (across nodes), with the same envelope: <code>correlationId</code>, <code>causationId</code>,
+  <code>sig</code>.</p>
+
+  <div class="formula">
+    <div class="f-label">Multi-Peer Invariant</div>
+    <div class="f-eq">peer_state(node_k) = deriveState(eventLog_k[0…n])</div>
+    <div class="f-sub">Each peer maintains its own canonical log. CRDT sync reconciles divergent logs via deterministic LCA merge.</div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §10 API REFERENCE -->
+<div class="section" id="api">
+  <div class="section-header">
+    <span class="section-num">§ 10</span>
+    <h2>API Reference
+      <small>The minimal surface area of a DDC-compliant module.</small>
+    </h2>
+  </div>
+
+  <table>
+    <tr><th>Function</th><th>Signature</th><th>Contract</th></tr>
+    <tr>
+      <td>deriveState</td>
+      <td><code>f(log, rulesVersion?) → State</code></td>
+      <td>Pure. No I/O. Deterministic. Same log → same state.</td>
+    </tr>
+    <tr>
+      <td>project</td>
+      <td><code>f(State) → ViewModel</code></td>
+      <td>Pure. Produces render-ready data including signal values.</td>
+    </tr>
+    <tr>
+      <td>render</td>
+      <td><code>f(ViewModel) → void</code></td>
+      <td>Side effect only. Never writes back to state or log.</td>
+    </tr>
+    <tr>
+      <td>dispatch</td>
+      <td><code>f(type, payload) → void</code></td>
+      <td>Appends to eventLog, re-derives state, triggers render.</td>
+    </tr>
+    <tr>
+      <td>computeSignals</td>
+      <td><code>f(schema, log) → {energy, decay, priority}</code></td>
+      <td>Pure. Called by orchestrator on scheduler tick.</td>
+    </tr>
+    <tr>
+      <td>routeEvent</td>
+      <td><code>f(targetVM, event) → void</code></td>
+      <td>Appends to target's log. Only cross-VM write path.</td>
+    </tr>
+    <tr>
+      <td>replay</td>
+      <td><code>f(log, rulesVersion) → State</code></td>
+      <td>Identical to deriveState. Reference implementation for audit.</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §11 INVARIANTS -->
+<div class="section" id="invariants">
+  <div class="section-header">
+    <span class="section-num">§ 11</span>
+    <h2>System Invariants
+      <small>Rules that cannot be broken without leaving the DDC model.</small>
+    </h2>
+  </div>
+
+  <div class="invariant">
+    <div class="inv-title">I-1 · State Derivation</div>
+    <strong>VM_stateₙ = deriveState(eventLog[0…n])</strong><br>
+    No external reads. No ambient globals. No time. No randomness. The log is the only
+    input to state.
+  </div>
+
+  <div class="invariant">
+    <div class="inv-title">I-2 · Append-Only Log</div>
+    Events are never mutated, reordered, or deleted after recording. History is immutable.
+    Correction events are new appends, not retroactive edits.
+  </div>
+
+  <div class="invariant">
+    <div class="inv-title">I-3 · Pure Signal Functions</div>
+    <code>energy</code>, <code>decay</code>, and <code>priority</code> are pure functions of
+    the eventLog. Same log → same signals. They never call Date.now() or Math.random().
+  </div>
+
+  <div class="invariant">
+    <div class="inv-title">I-4 · No Hidden Channels</div>
+    VMs communicate only through the event router. No shared memory. No direct function calls
+    across VM boundaries. No global state.
+  </div>
+
+  <div class="invariant">
+    <div class="inv-title">I-5 · Entropy at the Boundary</div>
+    Non-deterministic inputs (user events, network data, time, lava lamp entropy) are captured
+    at the VM boundary as events. Once inside, they are fixed and replayable.
+  </div>
+
+  <div class="invariant">
+    <div class="inv-title">I-6 · rulesVersion Pins Semantics</div>
+    <code>deriveState</code> with <code>rulesVersion=N</code> always produces the same output
+    for the same log. Changing business rules requires incrementing rulesVersion, not silently
+    modifying existing logic.
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── §12 GLOSSARY -->
+<div class="section" id="glossary">
+  <div class="section-header">
+    <span class="section-num">§ 12</span>
+    <h2>Glossary</h2>
+  </div>
+
+  <table>
+    <tr><th>Term</th><th>Definition</th></tr>
+    <tr><td>DDC</td><td>Density · Decay · Convergence. The architectural model described in this document.</td></tr>
+    <tr><td>VM</td><td>Execution boundary with its own eventLog, deriveState, and signal functions. Not a hardware VM — a logical isolation unit.</td></tr>
+    <tr><td>eventLog</td><td>Append-only, immutable array of frozen event entries. The VM's only source of truth.</td></tr>
+    <tr><td>deriveState</td><td>Pure function: log → state. The VM's CPU. No side effects.</td></tr>
+    <tr><td>energy</td><td>Signal [0,1]. Rate of primary events. Measures how active a module is.</td></tr>
+    <tr><td>decay</td><td>Signal [0,1]. Recency of last primary event. Falls toward 0 as activity stops.</td></tr>
+    <tr><td>priority</td><td>Signal [0,1]. Composite scheduling weight. Drives routing and convergence decisions.</td></tr>
+    <tr><td>convergence</td><td>Two VMs begin exchanging events when both have priority > θ and overlapping correlation spaces.</td></tr>
+    <tr><td>correlationId</td><td>Identifies a logical operation spanning multiple VMs. Same string on all causally-linked events.</td></tr>
+    <tr><td>causationId</td><td>The <code>id</code> of the specific event that caused this one. Enables hop-by-hop causal reconstruction.</td></tr>
+    <tr><td>rulesVersion</td><td>Integer that pins deriveState semantics. Increment on rule changes. Required for deterministic replay.</td></tr>
+    <tr><td>host system</td><td>Physical machine. Non-deterministic. Source of entropy.</td></tr>
+    <tr><td>entropy source</td><td>Any non-deterministic input: user action, network data, hardware RNG. Lives outside the VM.</td></tr>
+    <tr><td>Delta</td><td>Kernel v4 structure: a list of typed ops that is the only path to writing state.</td></tr>
+    <tr><td>DIK</td><td>Deterministic Interaction Kernel. Sovereign OS component that makes UI inputs signed, replayable transactions.</td></tr>
+    <tr><td>primary event</td><td>Module-defined event type that counts toward energy. Declared in the module schema.</td></tr>
+    <tr><td>signal_functions</td><td>Schema field declaring the energy, decay, and priority computation contracts for a module.</td></tr>
+  </table>
+</div>
+
+</main>
+</div>
+
+<script>
+// ── Lava lamp canvas ──────────────────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('lavaCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width  = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const W = () => canvas.width;
+  const H = () => canvas.height;
+
+  // Blobs — left half = hot/excited, right half = cold/settled
+  const blobs = [
+    { x: W()*0.2, y: H()*0.5, vx:  0.3, vy: -0.5, r: 28, phase: 0,    side: 'hot'  },
+    { x: W()*0.3, y: H()*0.7, vx: -0.2, vy:  0.4, r: 20, phase: 1.2,  side: 'hot'  },
+    { x: W()*0.15,y: H()*0.3, vx:  0.4, vy:  0.3, r: 16, phase: 2.4,  side: 'hot'  },
+    { x: W()*0.7, y: H()*0.4, vx:  0.1, vy: -0.2, r: 26, phase: 0.5,  side: 'cold' },
+    { x: W()*0.8, y: H()*0.65,vx: -0.3, vy:  0.3, r: 18, phase: 1.8,  side: 'cold' },
+  ];
+
+  let t = 0;
+
+  function step() {
+    t += 0.012;
+    ctx.clearRect(0, 0, W(), H());
+
+    blobs.forEach(b => {
+      // Constrain to own half
+      const minX = b.side === 'hot' ? 20 : W()*0.52;
+      const maxX = b.side === 'hot' ? W()*0.46 : W() - 20;
+
+      b.x += b.vx;
+      b.y += b.vy + Math.sin(t + b.phase) * 0.4;
+
+      if (b.x - b.r < minX) { b.x = minX + b.r; b.vx = Math.abs(b.vx); }
+      if (b.x + b.r > maxX) { b.x = maxX - b.r; b.vx = -Math.abs(b.vx); }
+      if (b.y - b.r < 20)   { b.y = 20 + b.r;   b.vy = Math.abs(b.vy); }
+      if (b.y + b.r > H()-20){ b.y = H()-20-b.r; b.vy = -Math.abs(b.vy); }
+
+      const pulse = 0.85 + 0.15 * Math.sin(t * 2 + b.phase);
+      const r2 = b.r * pulse;
+
+      const grd = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r2 * 2);
+      if (b.side === 'hot') {
+        grd.addColorStop(0,   'rgba(249,115,22,0.7)');
+        grd.addColorStop(0.5, 'rgba(251,191,36,0.3)');
+        grd.addColorStop(1,   'rgba(249,115,22,0)');
+      } else {
+        grd.addColorStop(0,   'rgba(74,240,196,0.6)');
+        grd.addColorStop(0.5, 'rgba(92,124,250,0.25)');
+        grd.addColorStop(1,   'rgba(74,240,196,0)');
+      }
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, r2 * 2, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(step);
+  }
+
+  step();
+})();
+
+// ── Signal bars animation ─────────────────────────────────────────────────────
+(function() {
+  let t = 0;
+  function tick() {
+    t += 0.008;
+    const e = 0.5  + 0.3  * Math.sin(t * 1.3);
+    const d = 0.4  + 0.35 * Math.sin(t * 0.7 + 1.1);
+    const p = (e * 0.6) + ((1 - d) * 0.4);
+
+    const bE = document.getElementById('barEnergy');
+    const bD = document.getElementById('barDecay');
+    const bP = document.getElementById('barPriority');
+    const vE = document.getElementById('valEnergy');
+    const vD = document.getElementById('valDecay');
+    const vP = document.getElementById('valPriority');
+
+    if (bE) { bE.style.width = (e*100).toFixed(1) + '%'; vE.textContent = e.toFixed(2); }
+    if (bD) { bD.style.width = (d*100).toFixed(1) + '%'; vD.textContent = d.toFixed(2); }
+    if (bP) { bP.style.width = (p*100).toFixed(1) + '%'; vP.textContent = p.toFixed(2); }
+
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+// ── Active nav highlight ──────────────────────────────────────────────────────
+(function() {
+  const sections = document.querySelectorAll('.section[id], .hero[id]');
+  const links = document.querySelectorAll('nav a');
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => {
+          l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id);
+        });
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(s => obs.observe(s));
+})();
+</script>
+</body>
+</html>

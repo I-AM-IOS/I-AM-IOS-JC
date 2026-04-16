@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target":              "ESNext",
+    "module":              "ESNext",
+    "moduleResolution":    "bundler",
+    "outDir":              "../dmr-dist",
+    "rootDir":             "src",
+    "declaration":         true,
+    "declarationDir":      "../dmr-dist",
+    "strict":              true,
+    "esModuleInterop":     true,
+    "skipLibCheck":        true,
+    "noEmitOnError":       false
+  },
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../dmr-dist"
+  ]
+}
