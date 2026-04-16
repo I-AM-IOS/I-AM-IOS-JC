@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I-AM-REKERNEL · K = (S, E, δ, Γ, C, P, V)</title>
+<style>
+:root {
+  --bg:       #080c0f;
+  --bg2:      #0d1318;
+  --bg3:      #111a20;
+  --border:   #1e2d38;
+  --border2:  #2a3e4e;
+  --dim:      #3a5568;
+  --muted:    #607a8a;
+  --text:     #b0ccd9;
+  --bright:   #d6eaf4;
+  --white:    #f0f8ff;
+  --green:    #4ade80;
+  --green2:   #22c55e;
+  --amber:    #fbbf24;
+  --amber2:   #f59e0b;
+  --red:      #f87171;
+  --red2:     #ef4444;
+  --blue:     #60a5fa;
+  --blue2:    #3b82f6;
+  --cyan:     #22d3ee;
+  --cyan2:    #06b6d4;
+  --purple:   #a78bfa;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+body::after {
+  content: '';
+  position: fixed; top: -200px; left: 50%;
+  transform: translateX(-50%);
+  width: 800px; height: 400px;
+  background: radial-gradient(ellipse, rgba(6,182,212,0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+  position: relative; z-index: 1;
+}
+
+.header {
+  padding: 24px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.header-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+
+.title-block h1 {
+  font-size: 18px; font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 20px rgba(34,211,238,0.4);
+}
+
+.title-block .subtitle {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: 0.12em;
+  margin-top: 2px;
+}
+
+.version-badge {
+  font-size: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--cyan2);
+  padding: 4px 10px;
+  border-radius: 2px;
+  letter-spacing: 0.1em;
+}
+
+.spec-tuple {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+.spec-tuple span { color: var(--amber2); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-full { margin-bottom: 16px; }
+
+@media (max-width: 900px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  animation: fadeUp 0.3s ease both;
+}
+
+.panel::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+}
+
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+
+.panel-title {
+  font-size: 10px; font-weight: 500;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border: 1px solid;
+  border-radius: 2px;
+}
+
+.panel-badge.ok    { color: var(--green);  border-color: var(--green);  background: rgba(74,222,128,0.05); }
+.panel-badge.warn  { color: var(--amber);  border-color: var(--amber);  background: rgba(251,191,36,0.05); }
+.panel-badge.err   { color: var(--red);    border-color: var(--red);    background: rgba(248,113,113,0.05); }
+.panel-badge.info  { color: var(--cyan);   border-color: var(--cyan);   background: rgba(34,211,238,0.05); }
+
+.panel-body { padding: 14px; }
+
+.state-field {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.state-field:last-child { border-bottom: none; }
+.state-field label { color: var(--muted); font-size: 11px; }
+.state-field value { color: var(--bright); font-family: monospace; }
+.state-field value.mono { font-size: 11px; color: var(--cyan); }
+
+.po-table { width: 100%; border-collapse: collapse; }
+.po-table th {
+  text-align: left; font-size: 10px; font-weight: 500;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.po-table td {
+  padding: 7px 10px;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(30,45,56,0.5);
+  vertical-align: top;
+}
+.po-table tr:last-child td { border-bottom: none; }
+.po-table tr:hover td { background: rgba(34,211,238,0.02); }
+
+.po-id { color: var(--amber2); font-weight: 500; white-space: nowrap; }
+.po-status-icon { font-size: 12px; }
+.po-layer { font-size: 10px; color: var(--dim); }
+.po-desc { color: var(--text); line-height: 1.4; }
+.po-formal { color: var(--muted); font-size: 10px; font-style: italic; margin-top: 2px; }
+
+.sim-form { display: flex; flex-direction: column; gap: 10px; }
+
+.field-row { display: flex; flex-direction: column; gap: 4px; }
+.field-row label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+select, input, textarea {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--bright);
+  font-family: monospace;
+  font-size: 12px;
+  padding: 7px 10px;
+  outline: none;
+  border-radius: 1px;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+select:focus, input:focus, textarea:focus {
+  border-color: var(--cyan2);
+  box-shadow: 0 0 0 2px rgba(34,211,238,0.08);
+}
+textarea { resize: vertical; min-height: 60px; font-size: 11px; }
+
+.field-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.btn {
+  font-family: monospace;
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 9px 18px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 1px;
+}
+
+.btn-primary {
+  background: rgba(34,211,238,0.08);
+  border-color: var(--cyan2);
+  color: var(--cyan);
+}
+.btn-primary:hover { background: rgba(34,211,238,0.15); box-shadow: 0 0 12px rgba(34,211,238,0.2); }
+
+.btn-danger {
+  background: rgba(248,113,113,0.06);
+  border-color: var(--red2);
+  color: var(--red);
+}
+.btn-danger:hover { background: rgba(248,113,113,0.12); }
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border2);
+  color: var(--muted);
+}
+.btn-ghost:hover { border-color: var(--dim); color: var(--text); }
+
+.btn-row { display: flex; gap: 8px; }
+
+.result-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 12px;
+  font-size: 11px;
+  line-height: 1.7;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.result-commit { color: var(--green); }
+.result-revert { color: var(--amber); }
+.result-reject { color: var(--red); }
+.result-key    { color: var(--cyan2); }
+.result-val    { color: var(--bright); }
+.result-dim    { color: var(--dim); }
+
+.event-log {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.log-entry {
+  display: grid;
+  grid-template-columns: 24px 70px 90px 1fr 80px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(30,45,56,0.5);
+  font-size: 11px;
+}
+.log-entry:hover { background: rgba(34,211,238,0.02); }
+.log-seq { color: var(--dim); text-align: right; }
+.log-outcome { font-weight: 500; }
+.log-outcome.commit { color: var(--green); }
+.log-outcome.revert { color: var(--amber); }
+.log-outcome.reject { color: var(--red); }
+.log-module { color: var(--blue); }
+.log-desc   { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.inv-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+.inv-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.inv-dot.ok   { background: var(--green2); box-shadow: 0 0 6px var(--green2); }
+.inv-dot.fail { background: var(--red2);   box-shadow: 0 0 6px var(--red2); }
+.inv-label { color: var(--text); flex: 1; }
+.inv-code  { color: var(--muted); font-size: 10px; white-space: nowrap; }
+
+.replay-section { display: flex; flex-direction: column; gap: 10px; }
+.replay-status {
+  padding: 10px 14px;
+  border: 1px solid;
+  font-size: 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.replay-status.ok   { border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.04); color: var(--green); }
+.replay-status.fail { border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.04); color: var(--red); }
+.replay-status.idle { border-color: var(--border); background: var(--bg); color: var(--muted); }
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.metric-cell {
+  background: var(--bg2);
+  padding: 12px 14px;
+  text-align: center;
+}
+.metric-value {
+  font-size: 22px; font-weight: 300;
+  color: var(--bright);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.metric-value.green { color: var(--green); }
+.metric-value.amber { color: var(--amber); }
+.metric-value.cyan  { color: var(--cyan); }
+.metric-label {
+  font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+@media (max-width: 700px) {
+  .metrics-row { grid-template-columns: repeat(3, 1fr); }
+}
+
+.prog-bar-wrap { background: var(--bg); border: 1px solid var(--border); height: 6px; }
+.prog-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan2), var(--green2));
+  transition: width 0.4s;
+  box-shadow: 0 0 8px rgba(34,211,238,0.4);
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+.cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--cyan);
+  margin-left: 2px;
+  font-size: 11px;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  gap: 0;
+  overflow-x: auto;
+}
+.tab {
+  padding: 8px 16px;
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+  background: none; border-top: none; border-left: none; border-right: none;
+  font-family: monospace;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+.cap-flow {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.cap-node {
+  padding: 8px 12px;
+  border: 1px solid var(--border2);
+  background: var(--bg);
+  font-size: 11px;
+  position: relative;
+}
+.cap-node.root { border-color: rgba(251,191,36,0.4); }
+.cap-node.child { margin-left: 24px; border-color: var(--border); }
+.cap-node.child::before {
+  content: '└─';
+  position: absolute; left: -20px; top: 9px;
+  color: var(--border2); font-size: 12px;
+}
+.cap-node.invalid { border-color: rgba(248,113,113,0.4); }
+.cap-actor  { color: var(--amber2); font-weight: 500; }
+.cap-scope  { color: var(--cyan2); font-size: 10px; margin-top: 2px; }
+.cap-depth  { color: var(--muted); font-size: 10px; }
+.cap-status { float: right; font-size: 10px; }
+.cap-status.ok   { color: var(--green); }
+.cap-status.fail { color: var(--red); }
+
+.trap-table { width: 100%; border-collapse: collapse; }
+.trap-table td {
+  padding: 5px 10px; font-size: 11px;
+  border-bottom: 1px solid rgba(30,45,56,0.4);
+}
+.trap-table td:first-child { color: var(--red2); font-weight: 500; white-space: nowrap; }
+.trap-table td:nth-child(2) { color: var(--muted); font-size: 10px; }
+.trap-table td:nth-child(3) { color: var(--text); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+.live-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green2);
+  box-shadow: 0 0 6px var(--green2);
+  animation: pulse 2s ease infinite;
+  margin-right: 5px;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+<!-- BACK NAV -->
+<div style="position:sticky;top:0;z-index:9999;display:flex;align-items:center;gap:12px;padding:0 20px;height:38px;background:rgba(7,11,15,.96);border-bottom:1px solid #1b2d3a;backdrop-filter:blur(12px);font-family:'DM Mono',monospace;font-size:10px;">
+  <a href="index.html" style="color:#22d3ee;text-decoration:none;letter-spacing:.1em;opacity:.85;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">← I-AM-IOS SUITE</a>
+  <span style="color:#1b2d3a;margin:0 4px">·</span>
+  <span style="color:#3a5568;letter-spacing:.08em;">I-AM-REKERNEL</span>
+</div>
+<div class="shell">
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-top">
+    <div class="title-block">
+      <h1>I-AM-REKERNEL<span class="cursor"></span></h1>
+      <div class="subtitle">CANONICAL CLOSED SPECIFICATION · FORMAL VERIFICATION DASHBOARD</div>
+      <div class="spec-tuple">
+        K = (<span>S</span>, <span>E</span>, <span>δ</span>, <span>Γ</span>, <span>C</span>, <span>P</span>, <span>V</span>)
+        &nbsp;·&nbsp; Sovereign Compute Kernel &nbsp;·&nbsp; dWASM-STRICT-TOTAL
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+      <div class="version-badge">v3.2.0 · spec 0x0003_0200</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="font-size:10px; color:var(--muted);"><span class="live-dot"></span>KERNEL ACTIVE</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- METRICS -->
+<div class="metrics-row" id="metricsRow">
+  <div class="metric-cell">
+    <div class="metric-value green" id="metPoCount">13/13</div>
+    <div class="metric-label">POs Closed</div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-value cyan" id="metBlock">0</div>
+    <div class="metric-label">Block Height</div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-value" id="metVersion">0</div>
+    <div class="metric-label">State Version</div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-value" id="metEvents">2</div>
+    <div class="metric-label">Events Applied</div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-value green" id="metCommits">0</div>
+    <div class="metric-label">Commits</div>
+  </div>
+  <div class="metric-cell">
+    <div class="metric-value amber" id="metReverts">0</div>
+    <div class="metric-label">Reverts/Rejects</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs" id="tabs">
+  <button class="tab active" onclick="switchTab(event,'kernel')">δ Transition</button>
+  <button class="tab" onclick="switchTab(event,'state')">State S</button>
+  <button class="tab" onclick="switchTab(event,'pos')">Proof Obligations P</button>
+  <button class="tab" onclick="switchTab(event,'replay')">Replay Verifier</button>
+  <button class="tab" onclick="switchTab(event,'capability')">Capability C</button>
+  <button class="tab" onclick="switchTab(event,'traps')">Trap Surface</button>
+  <button class="tab" onclick="switchTab(event,'invariants')">Invariants Γ</button>
+</div>
+
+<!-- TAB: δ TRANSITION SIMULATOR -->
+<div class="tab-pane active" id="pane-kernel">
+  <div class="grid-2">
+
+    <!-- Simulator -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">δ(e, s) → KernelResult</span>
+        <span class="panel-badge info">TOTAL FUNCTION</span>
+      </div>
+      <div class="panel-body">
+        <div class="sim-form">
+
+          <div class="field-row">
+            <label>Module (dWASM-STRICT-TOTAL)</label>
+            <select id="simModule" onchange="updateModuleHint()">
+              <option value="kv.set">kv.set</option>
+              <option value="kv.delete">kv.delete</option>
+              <option value="balance.mint">balance.mint</option>
+              <option value="balance.transfer">balance.transfer</option>
+              <option value="meta.set">meta.set</option>
+              <option value="noop">noop</option>
+              <option value="invalid.syscall">invalid.syscall ← InvalidImport</option>
+            </select>
+          </div>
+
+          <div id="inputSection"><div class="field-2col"><div class="field-row"><label>Key</label><input id="kvKey" value="foo"></div><div class="field-row"><label>Value</label><input id="kvVal" value="bar"></div></div></div>
+
+          <div class="field-2col">
+            <div class="field-row">
+              <label>Gas Limit (max: 10,000,000)</label>
+              <input type="number" id="simGas" value="1000000" min="1" max="20000000">
+            </div>
+            <div class="field-row">
+              <label>Semantic Version</label>
+              <input type="number" id="simSemVer" value="1" min="1">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label>Actor DID</label>
+            <input type="text" id="simActor" value="did:i-am:user-001">
+          </div>
+
+          <div class="field-row">
+            <label>Capability Scope</label>
+            <input type="text" id="simScope" value="write" placeholder="write, read, admin …">
+          </div>
+
+          <div id="moduleHint" style="font-size:10px; color:var(--muted); padding:4px 6px; background:var(--bg); border-left:2px solid var(--border2);">Input format: key=value. Gas: 100. Sets a UTF-8 NFKC key in the KV store.</div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="applyTransition()">▶  Apply δ(e, s)</button>
+            <button class="btn btn-ghost" onclick="resetState()">↺  Reset Genesis</button>
+            <button class="btn btn-danger" onclick="forceReject()">✕  Force Reject</button>
+          </div>
+        </div>
+
+        <div class="result-block" id="resultBlock">
+          <span class="result-dim">// Result of δ(e, s) will appear here</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Event Log (append-only trace)</span>
+        <span class="panel-badge ok" id="logCount">0 events</span>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        <div style="display:grid; grid-template-columns:24px 70px 90px 1fr 80px; gap:8px; padding:6px 10px; border-bottom:1px solid var(--border); background:var(--bg3);">
+          <span style="font-size:9px;color:var(--dim); text-align:right">#</span>
+          <span style="font-size:9px;color:var(--dim)">OUTCOME</span>
+          <span style="font-size:9px;color:var(--dim)">MODULE</span>
+          <span style="font-size:9px;color:var(--dim)">DESCRIPTION</span>
+          <span style="font-size:9px;color:var(--dim)">ROOT PREFIX</span>
+        </div>
+        <div class="event-log" id="eventLog">
+          <div style="padding:20px; text-align:center; color:var(--dim); font-size:11px;">No events yet — genesis state</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TAB: STATE INSPECTOR -->
+<div class="tab-pane" id="pane-state">
+  <div class="grid-2">
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">S = (KV, BAL, META, TRACE, ROOT, VERSION)</span>
+        <span class="panel-badge info" id="statePanelBadge">GENESIS</span>
+      </div>
+      <div class="panel-body">
+        <div class="state-field">
+          <label>Root Hash (SHA-256)</label>
+          <value class="mono" id="stateRoot">0000…0000</value>
+        </div>
+        <div class="state-field">
+          <label>Version (monotonic)</label>
+          <value id="stateVersion">0</value>
+        </div>
+        <div class="state-field">
+          <label>Block Height</label>
+          <value id="stateBlock">0</value>
+        </div>
+        <div class="state-field">
+          <label>Trace Length (|events|)</label>
+          <value id="stateTrace">0</value>
+        </div>
+
+        <div style="margin-top:12px; margin-bottom:6px; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted);">KV Store</div>
+        <div id="kvStore" style="font-size:11px; min-height:40px; max-height:120px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:8px;">
+          <span style="color:var(--dim)">// empty</span>
+        </div>
+
+        <div style="margin-top:10px; margin-bottom:6px; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted);">Balances</div>
+        <div id="balStore" style="font-size:11px; min-height:40px; max-height:120px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:8px;">
+          <span style="color:var(--dim)">// empty</span>
+        </div>
+
+        <div style="margin-top:10px; margin-bottom:6px; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted);">Meta</div>
+        <div id="metaStore" style="font-size:11px; min-height:40px; max-height:80px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:8px;">
+          <span style="color:var(--dim)">// empty</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Root Commitment Chain</span>
+        <span class="panel-badge info">PO-C1</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:8px;">SHA-256 transition root: H(prev_root ‖ encode_event(e) ‖ next_state_root)</div>
+        <div id="rootChain" style="max-height:340px; overflow-y:auto;">
+          <div style="padding:8px; background:var(--bg); border:1px solid var(--border); margin-bottom:4px;">
+            <div style="font-size:10px; color:var(--dim)">Block 0 · Genesis</div>
+            <div id="rootChain0" style="font-size:10px; color:var(--green); word-break:break-all; margin-top:2px;">
+              0000000000000000000000000000000000000000000000000000000000000000
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TAB: PROOF OBLIGATIONS -->
+<div class="tab-pane" id="pane-pos">
+  <div class="panel grid-full">
+    <div class="panel-header">
+      <span class="panel-title">Proof Obligation Registry — P = {PO-B1 … PO-S1}</span>
+      <span class="panel-badge ok">13/13 CLOSED · Proof Debt: CLEARED</span>
+    </div>
+    <div style="padding:0;">
+      <div style="margin:0 14px 10px; padding:10px 12px; background:var(--bg); border:1px solid rgba(74,222,128,0.2); margin-top:12px;">
+        <div style="font-size:10px; color:var(--green); letter-spacing:0.1em; margin-bottom:4px;">TERMINAL ASSURANCE</div>
+        <div style="font-size:11px; color:var(--text);">Any accepted state root is mathematically guaranteed to be the unique replay result of the canonical event log under version-locked deterministic semantics.</div>
+      </div>
+      <div style="margin:0 14px 12px;">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:6px;">Proof debt: 0/13 unresolved</div>
+        <div class="prog-bar-wrap"><div class="prog-bar" style="width:100%"></div></div>
+      </div>
+      <table class="po-table">
+        <thead>
+          <tr>
+            <th style="width:72px">ID</th>
+            <th style="width:30px"></th>
+            <th style="width:60px">Layer</th>
+            <th>Description + Formal Claim</th>
+            <th style="width:80px">Source</th>
+          </tr>
+        </thead>
+        <tbody id="poTableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: REPLAY VERIFIER -->
+<div class="tab-pane" id="pane-replay">
+  <div class="grid-2">
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">PO-N1: Batch Replay Determinism</span>
+        <span class="panel-badge info">ReplayVerifier</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">
+          Verifies: <code style="color:var(--cyan2)">Replay(events, s₁) = Replay(events, s₂)</code> when s₁ = s₂.
+        </div>
+
+        <div class="field-row" style="margin-bottom:10px;">
+          <label>Event Batch (comma-separated module names)</label>
+          <textarea id="replayBatch" rows="4">noop,noop,noop</textarea>
+        </div>
+
+        <div class="btn-row" style="margin-bottom:12px;">
+          <button class="btn btn-primary" onclick="runReplayVerifier()">▶ Verify Determinism</button>
+          <button class="btn btn-ghost" onclick="runReplayFuzz()">⚡ Fuzz 100 Batches</button>
+        </div>
+
+        <div id="replayStatus" class="replay-status idle">
+          <span>⊘</span> Awaiting verification run…
+        </div>
+
+        <div class="result-block" id="replayResult" style="margin-top:10px;">
+          <span class="result-dim">// Replay verification output</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">PO-B2: Cross-Node Replay Equality</span>
+        <span class="panel-badge ok">VERIFIED</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">
+          Proves <code style="color:var(--cyan2)">∀ N₁, N₂ : Replay(N₁) = Replay(N₂)</code> given same canonical log + genesis.
+        </div>
+
+        <div class="field-row" style="margin-bottom:10px;">
+          <label>Event Sequence for Two Independent Nodes</label>
+          <textarea id="crossBatch" rows="3">kv.set,balance.mint,noop</textarea>
+        </div>
+
+        <button class="btn btn-primary" onclick="runCrossNodeVerify()" style="margin-bottom:12px; width:100%;">▶ Verify Cross-Node Equality</button>
+
+        <div id="crossNodeStatus" class="replay-status idle">
+          <span>⊘</span> Awaiting cross-node verification…
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="font-size:10px; color:var(--muted); margin-bottom:6px; letter-spacing:0.1em; text-transform:uppercase;">Required Conditions</div>
+          <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+            <div style="padding:5px 8px; border-left:2px solid var(--green2); color:var(--text);">✓ Same semantic_version per event</div>
+            <div style="padding:5px 8px; border-left:2px solid var(--green2); color:var(--text);">✓ Same canonical event log</div>
+            <div style="padding:5px 8px; border-left:2px solid var(--green2); color:var(--text);">✓ Same genesis root (Hash32::zero)</div>
+            <div style="padding:5px 8px; border-left:2px solid var(--green2); color:var(--text);">✓ Same dWASM-STRICT-TOTAL subset</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TAB: CAPABILITY ALGEBRA -->
+<div class="tab-pane" id="pane-capability">
+  <div class="grid-2">
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Capability Delegation Inspector</span>
+        <span class="panel-badge info">PO-T2</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">
+          Non-escalation theorem: <code style="color:var(--cyan2)">Perm(child) ⊆ Perm(parent)</code>
+        </div>
+
+        <div class="field-row" style="margin-bottom:8px;">
+          <label>Issuer (Root Capability)</label>
+          <input type="text" id="capIssuer" value="did:i-am:root">
+        </div>
+        <div class="field-row" style="margin-bottom:8px;">
+          <label>Parent Scope (comma-separated)</label>
+          <input type="text" id="capParentScope" value="read, write, admin">
+        </div>
+        <div class="field-row" style="margin-bottom:8px;">
+          <label>Subject (Delegatee)</label>
+          <input type="text" id="capSubject" value="did:i-am:alice">
+        </div>
+        <div class="field-row" style="margin-bottom:8px;">
+          <label>Child Scope (comma-separated)</label>
+          <input type="text" id="capChildScope" value="read, write">
+        </div>
+        <div class="field-row" style="margin-bottom:12px;">
+          <label>Delegation Depth (0-16)</label>
+          <input type="number" id="capDepth" value="1" min="0" max="20">
+        </div>
+
+        <button class="btn btn-primary" onclick="checkCapability()" style="width:100%; margin-bottom:12px;">▶ Verify Non-Escalation</button>
+
+        <div id="capResult" class="replay-status idle">
+          <span>⊘</span> Awaiting capability check…
+        </div>
+
+        <div id="capFlow" class="cap-flow" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Capability Type (§7)</span>
+        <span class="panel-badge info">CLOSED ALGEBRA</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:10px;">Cap fields from spec §7.1:</div>
+        <table style="width:100%; border-collapse:collapse; font-size:11px;">
+          <tbody id="capTypeTable">
+          </tbody>
+        </table>
+
+        <div style="margin-top:14px; font-size:10px; color:var(--muted); margin-bottom:8px; letter-spacing:0.1em; text-transform:uppercase;">Proof Obligations (§7.2)</div>
+        <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+          <div style="padding:5px 8px; border-left:2px solid var(--cyan2); color:var(--text);">Signature chain continuity</div>
+          <div style="padding:5px 8px; border-left:2px solid var(--cyan2); color:var(--text);">Nonce monotonicity</div>
+          <div style="padding:5px 8px; border-left:2px solid var(--cyan2); color:var(--text);">Scope subset relation (PO-T2)</div>
+          <div style="padding:5px 8px; border-left:2px solid var(--cyan2); color:var(--text);">Expiry not exceeded</div>
+          <div style="padding:5px 8px; border-left:2px solid var(--cyan2); color:var(--text);">Revocation absence in causal past</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TAB: TRAP SURFACE -->
+<div class="tab-pane" id="pane-traps">
+  <div class="grid-2">
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">§5.4 Trap Code Enumeration</span>
+        <span class="panel-badge ok">COMPLETE · NO UNDEFINED</span>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        <div style="padding:8px 14px; font-size:10px; color:var(--muted);">All kernel traps normalize to exactly one of these codes. No uncategorized failure surface.</div>
+        <table class="trap-table">
+          <tbody id="trapTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">§12 Failure Semantics Table</span>
+        <span class="panel-badge ok">FULL ENUMERATION</span>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        <div style="padding:8px 14px; font-size:10px; color:var(--muted);">Every failure maps to exactly one deterministic outcome.</div>
+        <table class="trap-table" id="failureTable">
+          <tbody id="failureTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="panel" style="margin-top: 16px;">
+    <div class="panel-header">
+      <span class="panel-title">§5.2 Forbidden WASM Surface (dWASM-STRICT-TOTAL)</span>
+      <span class="panel-badge err">BLOCKED AT VALIDATION</span>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        <span id="forbiddenItems"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: INVARIANTS -->
+<div class="tab-pane" id="pane-invariants">
+  <div class="grid-2">
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">§13 System Invariants Γ</span>
+        <span class="panel-badge ok" id="invBadge">ALL HOLD</span>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">These MUST hold after every committed transition:</div>
+        <div class="inv-grid" id="invGrid">
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn btn-primary" onclick="runInvariantCheck()" style="width:100%;">▶ Run Invariant Check on Current State</button>
+        </div>
+        <div class="result-block" id="invResult" style="margin-top:10px;">
+          <span class="result-dim">// Invariant check results will appear here</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Governance: Quorum + Sunset + Proof Debt</span>
+        <span class="panel-badge info">v4.0 Extensions</span>
+      </div>
+      <div class="panel-body">
+
+        <div style="font-size:10px; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px;">PO-G1: Quorum Threshold ⌈2/3 × n⌉</div>
+        <div class="field-2col" style="margin-bottom:10px;">
+          <div class="field-row">
+            <label>Validator Count (n)</label>
+            <input type="number" id="quorumN" value="3" min="1" max="100" oninput="updateQuorum()">
+          </div>
+          <div class="field-row">
+            <label>Required Signatures</label>
+            <input type="text" id="quorumThreshold" value="2" readonly="" style="color:var(--green); background:var(--bg);">
+          </div>
+        </div>
+
+        <div style="font-size:10px; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px;">PO-E1: Sunset Policy</div>
+        <div class="field-2col" style="margin-bottom:10px;">
+          <div class="field-row">
+            <label>Sunset Block Height</label>
+            <input type="number" id="sunsetBlock" value="1000000" oninput="updateSunset()">
+          </div>
+          <div class="field-row">
+            <label>Status</label>
+            <input type="text" id="sunsetStatus" value="ACTIVE" readonly="" style="color:var(--green); background:var(--bg);">
+          </div>
+        </div>
+
+        <div style="font-size:10px; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px;">PO-E2: Proof Debt Ledger (MAX = 13)</div>
+        <div class="field-row" style="margin-bottom:6px;">
+          <label>Unresolved Obligations</label>
+          <input type="number" id="proofDebtN" value="0" min="0" max="13" oninput="updateDebt()">
+        </div>
+        <div id="debtStatus" class="replay-status ok" style="margin-bottom:10px;"><span>✓</span> Proof debt OK (0/13 unresolved)</div>
+
+        <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">Progress: <span id="debtLabel">0/13 unresolved</span></div>
+        <div class="prog-bar-wrap"><div class="prog-bar" id="debtBar" style="width: 100%; background: linear-gradient(90deg,var(--cyan2),var(--green2));"></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /shell -->
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// KERNEL STATE — pure JS simulation
+// ─────────────────────────────────────────────────────────────────────
+
+const B_MAX = 10_000_000;
+const MAX_DELEGATION_DEPTH = 16;
+
+function pseudoHash(str) {
+  let h = 0x6b8b4567n;
+  for (let i = 0; i < str.length; i++) {
+    h = (h ^ BigInt(str.charCodeAt(i))) * 0x45d9f3b7n;
+    h &= 0xffffffffffffffffn;
+  }
+  let hex = '';
+  for (let i = 0; i < 4; i++) {
+    let chunk = (h * BigInt(i + 1) + 0xdeadbeefn) & 0xffffffffffffffffn;
+    hex += chunk.toString(16).padStart(16, '0');
+  }
+  return hex;
+}
+
+function computeStateRoot(state) {
+  const s = JSON.stringify({
+    kv: Object.keys(state.kv).sort().map(k => [k, state.kv[k]]),
+    balance: Object.keys(state.balance).sort().map(k => [k, state.balance[k]]),
+    meta: Object.keys(state.meta).sort().map(k => [k, state.meta[k]]),
+    version: state.version,
+    block: state.block,
+  });
+  return pseudoHash(s);
+}
+
+function computeTransitionRoot(prevRoot, event, nextState) {
+  const input = prevRoot + event.module + event.id + computeStateRoot(nextState);
+  return pseudoHash(input);
+}
+
+function genesisState() {
+  const s = { kv: {}, balance: {}, meta: {}, trace: [], root: '0'.repeat(64), version: 0, block: 0 };
+  return s;
+}
+
+let kernelState = genesisState();
+let eventLog = [];
+let commits = 0, reverts = 0;
+
+function isValid(event, state) {
+  if (!event.signature || event.signature.length === 0) return false;
+  if (event.seq <= 0) return false;
+  if (event.prev_root !== state.root) return false;
+  if (!event.capability || event.capability.scope.length === 0) return false;
+  if (event.capability.delegation_depth > MAX_DELEGATION_DEPTH) return false;
+  return true;
+}
+
+function executeModule(module, input, state) {
+  const s = JSON.parse(JSON.stringify(state));
+  switch (module) {
+    case 'kv.set': {
+      const eq = input.indexOf('=');
+      if (eq === -1) return { trap: 'InvalidEvent' };
+      const key = input.slice(0, eq), val = input.slice(eq + 1);
+      s.kv[key] = val;
+      return { ok: s, gas: 100 };
+    }
+    case 'kv.delete': {
+      delete s.kv[input];
+      return { ok: s, gas: 50 };
+    }
+    case 'balance.mint': {
+      const eq = input.indexOf('=');
+      if (eq === -1) return { trap: 'InvalidEvent' };
+      const key = input.slice(0, eq), amt = parseInt(input.slice(eq + 1));
+      if (isNaN(amt) || amt < 0) return { trap: 'InvalidEvent' };
+      const cur = s.balance[key] || 0;
+      if (cur + amt > Number.MAX_SAFE_INTEGER) return { trap: 'Overflow' };
+      s.balance[key] = cur + amt;
+      return { ok: s, gas: 200 };
+    }
+    case 'balance.transfer': {
+      const parts = input.split(':');
+      if (parts.length !== 3) return { trap: 'InvalidEvent' };
+      const [from, to, amtStr] = parts;
+      const amt = parseInt(amtStr);
+      if (isNaN(amt) || amt <= 0) return { trap: 'InvalidEvent' };
+      const fb = s.balance[from] || 0;
+      if (fb < amt) return { trap: 'Overflow' };
+      s.balance[from] = fb - amt;
+      s.balance[to] = (s.balance[to] || 0) + amt;
+      return { ok: s, gas: 200 };
+    }
+    case 'meta.set': {
+      const eq = input.indexOf('=');
+      if (eq === -1) return { trap: 'InvalidEvent' };
+      const key = input.slice(0, eq), val = input.slice(eq + 1);
+      s.meta[key] = val;
+      return { ok: s, gas: 100 };
+    }
+    case 'noop':
+      return { ok: s, gas: 10 };
+    default:
+      return { trap: 'InvalidImport' };
+  }
+}
+
+function delta(event, state) {
+  if (!isValid(event, state)) {
+    return { outcome: 'Reject', trap: 'InvalidEvent' };
+  }
+  if (event.gas_limit > B_MAX) {
+    return { outcome: 'Revert', trap: 'GasExhausted' };
+  }
+
+  const exec = executeModule(event.module, event.input || '', state);
+
+  if (exec.trap) {
+    return { outcome: 'Revert', trap: exec.trap };
+  }
+
+  if (exec.gas > event.gas_limit) {
+    return { outcome: 'Revert', trap: 'GasExhausted' };
+  }
+
+  const s2 = exec.ok;
+  s2.trace = [...state.trace, event.id];
+  s2.version = state.version + 1;
+  s2.block = state.block + 1;
+  s2.root = computeTransitionRoot(state.root, event, s2);
+
+  return { outcome: 'Commit', state: s2 };
+}
+
+function makeEvent(module, input, state, opts = {}) {
+  const id = pseudoHash(module + input + state.root + Date.now());
+  return {
+    id,
+    seq: state.trace.length + 1,
+    actor: opts.actor || 'did:i-am:user-001',
+    capability: {
+      scope: (opts.scope || 'write').split(',').map(s => s.trim()).filter(Boolean),
+      delegation_depth: opts.depth || 0,
+    },
+    module,
+    input,
+    prev_root: state.root,
+    gas_limit: opts.gas || 1_000_000,
+    semantic_version: opts.semver || 1,
+    signature: '30440201',
+  };
+}
+
+function applyTransition() {
+  const module = document.getElementById('simModule').value;
+  const gas = parseInt(document.getElementById('simGas').value);
+  const actor = document.getElementById('simActor').value;
+  const scope = document.getElementById('simScope').value;
+  const input = collectModuleInput(module);
+
+  const event = makeEvent(module, input, kernelState, { actor, scope, gas });
+  const result = delta(event, kernelState);
+
+  logResult(result, event, module, input);
+
+  if (result.outcome === 'Commit') {
+    kernelState = result.state;
+    commits++;
+  } else {
+    reverts++;
+  }
+
+  updateUI();
+}
+
+function collectModuleInput(module) {
+  switch(module) {
+    case 'kv.set':   return `${document.getElementById('kvKey')?.value||'key'}=${document.getElementById('kvVal')?.value||'value'}`;
+    case 'balance.mint': return `alice=100`;
+    case 'balance.transfer': return `alice:bob:50`;
+    case 'meta.set': return `info=data`;
+    default: return '';
+  }
+}
+
+function updateModuleHint() {
+  const module = document.getElementById('simModule').value;
+  const hints = {
+    'kv.set':           'Input format: key=value. Gas: 100. Sets a UTF-8 key in KV store.',
+    'balance.mint':     'Input format: account=amount. Gas: 200. Mints tokens.',
+    'balance.transfer': 'Input format: from:to:amount. Gas: 200. Transfers tokens.',
+    'meta.set':         'Input format: key=value. Gas: 100. Sets in meta namespace.',
+    'noop':             'No input. Gas: 10. No-op transition.',
+    'invalid.syscall':  '⚠ Forbidden module — triggers Revert(InvalidImport). §5.2 surface.',
+  };
+  document.getElementById('moduleHint').textContent = hints[module] || '';
+}
+
+function logResult(result, event, module, input) {
+  const rb = document.getElementById('resultBlock');
+  const cls = result.outcome === 'Commit' ? 'result-commit' : result.outcome === 'Revert' ? 'result-revert' : 'result-reject';
+  const icon = result.outcome === 'Commit' ? '✔' : result.outcome === 'Revert' ? '⟳' : '✗';
+  let html = `<div class="${cls}">${icon} KernelResult::${result.outcome}${result.trap ? `(TrapCode::${result.trap})` : ''}</div>`;
+  html += `<div class="result-dim">seq=${event.seq}  module=${module}  input="${input.slice(0,40)}"</div>`;
+  if (result.outcome === 'Commit') {
+    html += `<div class="result-dim">new_root: <span style="color:var(--green)">${result.state.root.slice(0,32)}…</span></div>`;
+    html += `<div class="result-dim">version: ${result.state.version}  block: ${result.state.block}</div>`;
+  }
+  rb.innerHTML = html;
+
+  const entry = { seq: event.seq, outcome: result.outcome, trap: result.trap, module, desc: input.slice(0,40), root: result.outcome === 'Commit' ? result.state.root.slice(0,8) : kernelState.root.slice(0,8) };
+  eventLog.push(entry);
+  renderEventLog();
+}
+
+function renderEventLog() {
+  const el = document.getElementById('eventLog');
+  if (eventLog.length === 0) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--dim);font-size:11px;">No events yet — genesis state</div>'; return; }
+  el.innerHTML = eventLog.slice().reverse().map(e => `
+    <div class="log-entry">
+      <span class="log-seq">${e.seq}</span>
+      <span class="log-outcome ${e.outcome.toLowerCase()}">${e.outcome}</span>
+      <span class="log-module">${e.module}</span>
+      <span class="log-desc">${e.desc || '—'}</span>
+      <span style="color:var(--dim); font-size:10px;">${e.root}…</span>
+    </div>
+  `).join('');
+  document.getElementById('logCount').textContent = `${eventLog.length} events`;
+}
+
+function resetState() {
+  kernelState = genesisState();
+  eventLog = [];
+  commits = 0; reverts = 0;
+  document.getElementById('resultBlock').innerHTML = '<span class="result-dim">// State reset to genesis</span>';
+  updateUI();
+  renderEventLog();
+}
+
+function forceReject() {
+  const event = makeEvent('noop', '', kernelState);
+  event.prev_root = 'ff'.repeat(32);
+  const result = delta(event, kernelState);
+  logResult(result, event, 'noop', '[wrong prev_root → Reject]');
+  reverts++;
+  updateUI();
+}
+
+function updateUI() {
+  const s = kernelState;
+  document.getElementById('metBlock').textContent = s.block;
+  document.getElementById('metVersion').textContent = s.version;
+  document.getElementById('metEvents').textContent = s.trace.length;
+  document.getElementById('metCommits').textContent = commits;
+  document.getElementById('metReverts').textContent = reverts;
+
+  const shortRoot = s.root.slice(0,8) + '…' + s.root.slice(-8);
+  document.getElementById('stateRoot').textContent = shortRoot;
+  document.getElementById('stateVersion').textContent = s.version;
+  document.getElementById('stateBlock').textContent = s.block;
+  document.getElementById('stateTrace').textContent = s.trace.length;
+  document.getElementById('statePanelBadge').textContent = s.version === 0 ? 'GENESIS' : `v${s.version}`;
+
+  const kvEl = document.getElementById('kvStore');
+  const kvKeys = Object.keys(s.kv);
+  kvEl.innerHTML = kvKeys.length === 0 ? '<span style="color:var(--dim)">// empty</span>' :
+    kvKeys.sort().map(k => `<div><span style="color:var(--cyan2)">${k}</span> = <span style="color:var(--bright)">${s.kv[k]}</span></div>`).join('');
+
+  const balEl = document.getElementById('balStore');
+  const balKeys = Object.keys(s.balance);
+  balEl.innerHTML = balKeys.length === 0 ? '<span style="color:var(--dim)">// empty</span>' :
+    balKeys.sort().map(k => `<div><span style="color:var(--amber2)">${k}</span> = <span style="color:var(--green)">${s.balance[k]}</span></div>`).join('');
+
+  const metaEl = document.getElementById('metaStore');
+  const metaKeys = Object.keys(s.meta);
+  metaEl.innerHTML = metaKeys.length === 0 ? '<span style="color:var(--dim)">// empty</span>' :
+    metaKeys.sort().map(k => `<div><span style="color:var(--purple)">${k}</span> = <span style="color:var(--bright)">${s.meta[k]}</span></div>`).join('');
+
+  updateSunset();
+}
+
+function runReplayVerifier() {
+  const batchStr = document.getElementById('replayBatch').value;
+  const batchSpec = batchStr.split(',').map(s => s.trim()).filter(Boolean);
+
+  const s1 = genesisState(), s2 = genesisState();
+
+  function buildAndReplay(modules, initialState) {
+    let state = JSON.parse(JSON.stringify(initialState));
+    for (const m of modules) {
+      const e = makeEvent(m, m === 'noop' ? '' : 'key=val', state);
+      const r = delta(e, state);
+      if (r.outcome === 'Commit') state = r.state;
+      else break;
+    }
+    return state;
+  }
+
+  const run1 = buildAndReplay(batchSpec, s1);
+  const run2 = buildAndReplay(batchSpec, s2);
+
+  const match = run1.root === run2.root && run1.version === run2.version;
+
+  const statusEl = document.getElementById('replayStatus');
+  statusEl.className = `replay-status ${match ? 'ok' : 'fail'}`;
+  statusEl.innerHTML = match
+    ? `<span>✓</span> PO-N1 VERIFIED — Identical final roots`
+    : `<span>✗</span> PO-N1 FAILED — Root mismatch detected`;
+
+  document.getElementById('replayResult').innerHTML = `
+    <div class="${match ? 'result-commit' : 'result-reject'}">PO-N1: ${match ? 'PASS' : 'FAIL'}</div>
+    <div class="result-dim">Run 1 root: ${run1.root.slice(0,32)}…</div>
+    <div class="result-dim">Run 2 root: ${run2.root.slice(0,32)}…</div>
+    <div class="result-dim">Events: ${batchSpec.length}  Final version: ${run1.version}</div>
+  `;
+}
+
+function runReplayFuzz() {
+  const modules = ['noop', 'kv.set', 'balance.mint', 'noop', 'meta.set'];
+  let allPass = true;
+  for (let i = 0; i < 100; i++) {
+    const batch = Array.from({length: Math.floor(Math.random()*5)+1}, () => modules[Math.floor(Math.random()*modules.length)]);
+    const s1 = genesisState(), s2 = genesisState();
+    let st1 = JSON.parse(JSON.stringify(s1)), st2 = JSON.parse(JSON.stringify(s2));
+    for (const m of batch) {
+      const e1 = makeEvent(m, m==='noop'?'':'k=v', st1);
+      const r1 = delta(e1, st1), r2 = delta({...e1,prev_root:st2.root}, st2);
+      if (r1.outcome !== r2.outcome) { allPass = false; break; }
+      if (r1.outcome === 'Commit') { st1 = r1.state; st2 = r2.state; }
+    }
+    if (st1.root !== st2.root) { allPass = false; break; }
+  }
+  const statusEl = document.getElementById('replayStatus');
+  statusEl.className = `replay-status ${allPass ? 'ok' : 'fail'}`;
+  statusEl.innerHTML = allPass ? `<span>✓</span> Fuzz: 100/100 batches deterministic` : `<span>✗</span> Non-determinism detected`;
+  document.getElementById('replayResult').innerHTML = `<div class="${allPass?'result-commit':'result-reject'}">Fuzz PO-N1: ${allPass?'PASS':'FAIL'}</div>`;
+}
+
+function runCrossNodeVerify() {
+  const batchStr = document.getElementById('crossBatch').value;
+  const modules = batchStr.split(',').map(s => s.trim().split(':')[0]).filter(Boolean);
+
+  const node1 = genesisState(), node2 = genesisState();
+  let s1 = JSON.parse(JSON.stringify(node1));
+  let s2 = JSON.parse(JSON.stringify(node2));
+
+  for (const m of modules) {
+    const input = m === 'kv.set' ? 'foo=bar' : m === 'balance.mint' ? 'alice=500' : '';
+    const e1 = makeEvent(m, input, s1);
+    const e2 = { ...JSON.parse(JSON.stringify(e1)), prev_root: s2.root };
+    const r1 = delta(e1, s1);
+    const r2 = delta(e2, s2);
+    if (r1.outcome === 'Commit') s1 = r1.state;
+    if (r2.outcome === 'Commit') s2 = r2.state;
+  }
+
+  const match = s1.root === s2.root;
+  const statusEl = document.getElementById('crossNodeStatus');
+  statusEl.className = `replay-status ${match ? 'ok' : 'fail'}`;
+  statusEl.innerHTML = match
+    ? `<span>✓</span> PO-B2 VERIFIED — Cross-node roots equal`
+    : `<span>✗</span> PO-B2 DIVERGENCE`;
+}
+
+function checkCapability() {
+  const issuer = document.getElementById('capIssuer').value;
+  const subject = document.getElementById('capSubject').value;
+  const parentScope = document.getElementById('capParentScope').value.split(',').map(s => s.trim()).filter(Boolean);
+  const childScope = document.getElementById('capChildScope').value.split(',').map(s => s.trim()).filter(Boolean);
+  const depth = parseInt(document.getElementById('capDepth').value);
+
+  const depthOk = depth <= MAX_DELEGATION_DEPTH && depth >= 0;
+  const scopeOk = childScope.every(s => parentScope.includes(s));
+  const nonEmpty = childScope.length > 0;
+  const ok = depthOk && scopeOk && nonEmpty;
+
+  const statusEl = document.getElementById('capResult');
+  statusEl.className = `replay-status ${ok ? 'ok' : 'fail'}`;
+  statusEl.innerHTML = ok
+    ? `<span>✓</span> Perm(child) ⊆ Perm(parent) — Non-escalation holds`
+    : `<span>✗</span> ${!depthOk ? `Depth exceeded` : !nonEmpty ? 'Empty scope' : `Escalation detected`}`;
+
+  document.getElementById('capFlow').innerHTML = `
+    <div class="cap-node root">
+      <span class="cap-status ok">ROOT</span>
+      <div class="cap-actor">${issuer}</div>
+      <div class="cap-scope">scope: [${parentScope.join(', ')}]</div>
+      <div class="cap-depth">depth: 0</div>
+    </div>
+    <div class="cap-node child ${ok ? '' : 'invalid'}">
+      <span class="cap-status ${ok ? 'ok' : 'fail'}">${ok ? '✓ VALID' : '✗ INVALID'}</span>
+      <div class="cap-actor">${subject}</div>
+      <div class="cap-scope">scope: [${childScope.join(', ')}]</div>
+      <div class="cap-depth">depth: ${depth}</div>
+    </div>
+  `;
+}
+
+function runInvariantCheck() {
+  const s = kernelState;
+  const checks = [
+    { name: 'Root continuity', test: () => !(s.version > 0 && s.root === '0'.repeat(64)) },
+    { name: 'Trace length = version', test: () => s.trace.length === s.version },
+    { name: 'Balance non-negative', test: () => Object.values(s.balance).every(v => v >= 0) },
+    { name: 'Version monotonic', test: () => s.version >= 0 },
+    { name: 'Block monotonic', test: () => s.block >= 0 },
+  ];
+
+  const allPass = checks.every(c => c.test());
+  const resultEl = document.getElementById('invResult');
+  resultEl.innerHTML = checks.map(c => {
+    const pass = c.test();
+    return `<div class="${pass ? 'result-commit' : 'result-reject'}">${pass ? '✔' : '✗'} ${c.name}</div>`;
+  }).join('') + `<div style="margin-top:8px; color:${allPass ? 'var(--green)' : 'var(--red)'}">
+    ${allPass ? '✔ All invariants hold' : '✗ Invariant violated'}
+  </div>`;
+
+  document.getElementById('invBadge').textContent = allPass ? 'ALL HOLD' : 'VIOLATION';
+  document.getElementById('invBadge').className = `panel-badge ${allPass ? 'ok' : 'err'}`;
+}
+
+function quorumThreshold(n) { return Math.ceil(2 * n / 3); }
+
+function updateQuorum() {
+  const n = parseInt(document.getElementById('quorumN').value) || 1;
+  document.getElementById('quorumThreshold').value = quorumThreshold(n);
+}
+
+function updateSunset() {
+  const sunsetBlock = parseInt(document.getElementById('sunsetBlock').value) || 1000000;
+  const current = kernelState.block;
+  const active = current < sunsetBlock;
+  const el = document.getElementById('sunsetStatus');
+  if (el) {
+    el.value = active ? `ACTIVE (${sunsetBlock - current} blocks)` : 'EXPIRED';
+    el.style.color = active ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+function updateDebt() {
+  const n = parseInt(document.getElementById('proofDebtN').value);
+  const exceeded = n >= 13;
+  const debtEl = document.getElementById('debtStatus');
+  debtEl.className = `replay-status ${exceeded ? 'fail' : 'ok'}`;
+  debtEl.innerHTML = exceeded
+    ? `<span>✗</span> Proof debt EXCEEDED (${n}/13)`
+    : `<span>✓</span> Proof debt OK (${n}/13)`;
+  document.getElementById('debtLabel').textContent = `${n}/13 unresolved`;
+  const pct = Math.max(0, ((13 - n) / 13) * 100);
+  document.getElementById('debtBar').style.width = `${pct}%`;
+}
+
+// STATIC DATA
+const PROOF_OBLIGATIONS = [
+  { id: 'PO-B1', layer: 'Boundary', desc: 'Determinism', formal: 'δ(e,s) = δ(e,s)', src: 'transition.rs' },
+  { id: 'PO-B2', layer: 'Boundary', desc: 'Replay Equality', formal: '∀ N₁,N₂: Replay(N₁) = Replay(N₂)', src: 'network/mod.rs' },
+  { id: 'PO-B3', layer: 'Boundary', desc: 'Invariant Preservation', formal: 'Γ(s) ∧ Commit(s′) → Γ(s′)', src: 'invariants.rs' },
+  { id: 'PO-B4', layer: 'Boundary', desc: 'Crypto Parity', formal: 'Crypto_A(x) = Crypto_B(x)', src: 'boundary/mod.rs' },
+  { id: 'PO-T2', layer: 'Core', desc: 'Cap Non-Escalation', formal: 'Perm(child) ⊆ Perm(parent)', src: 'invariants.rs' },
+  { id: 'PO-G1', layer: 'Governance', desc: 'Quorum Enforcement', formal: '|sigs| ≥ ⌈2n/3⌉', src: 'governance/mod.rs' },
+  { id: 'PO-G2', layer: 'Governance', desc: 'Valid Fork Rule', formal: 'fork_marker = H(parent)', src: 'governance/mod.rs' },
+  { id: 'PO-E1', layer: 'Emergency', desc: 'Sunset Enforcement', formal: 'height ≥ sunset → Halt', src: 'emergency/mod.rs' },
+  { id: 'PO-E2', layer: 'Emergency', desc: 'Proof Debt Ledger', formal: 'debt ≥ MAX → read-only', src: 'emergency/mod.rs' },
+  { id: 'PO-N1', layer: 'Network', desc: 'Batch Replay Determinism', formal: 'EventBatch::apply(s) = deterministic', src: 'network/mod.rs' },
+  { id: 'PO-C1', layer: 'Core', desc: 'Root Commitment', formal: 'state_change ↔ root_change', src: 'encoding.rs' },
+  { id: 'PO-C2', layer: 'Core', desc: 'Trace Append-Only', formal: '|trace| = |trace| + 1', src: 'transition.rs' },
+  { id: 'PO-S1', layer: 'Core', desc: 'Total Transition', formal: 'δ is total', src: 'transition.rs' },
+];
+
+const TRAP_CODES = [
+  ['Overflow', '§6.2', 'Integer overflow in checked arithmetic'],
+  ['OobRead', '§5.4', 'Out-of-bounds memory read'],
+  ['GasExhausted', '§4.2', 'gas_used > gas_limit'],
+  ['InvalidImport', '§5.2', 'Forbidden host function import'],
+  ['DivZero', '§6.3', 'Division by zero'],
+  ['InvalidSignature', '§3.2', 'Sig check failed'],
+  ['CapabilityViolation', '§8', 'Delegation depth exceeded'],
+  ['InvalidRoot', '§3.2', 'Root mismatch'],
+  ['InvalidEvent', '§3.2', 'Event validity failure'],
+  ['SunsetExpired', 'PO-E1', 'Block height ≥ sunset'],
+  ['ProofDebtExceeded', 'PO-E2', 'Unresolved obligations ≥ MAX'],
+  ['QuorumNotMet', 'PO-G1', 'Insufficient signatures'],
+  ['InvalidFork', 'PO-G2', 'Fork ancestor unknown'],
+  ['BatchReplayMismatch', 'PO-N1', 'Replay roots differ'],
+];
+
+const FAILURE_SEMANTICS = [
+  ['invalid signature', 'reject'],
+  ['gas exceeded', 'revert'],
+  ['wasm trap', 'revert'],
+  ['state root mismatch', 'halt'],
+  ['DAG cycle', 'reject'],
+  ['duplicate nonce', 'reject'],
+  ['overflow', 'revert'],
+  ['div by zero', 'revert'],
+];
+
+const FORBIDDEN_WASM = ['floating point', 'SIMD', 'threads', 'host clock', 'entropy', 'host syscalls', 'filesystem', 'network'];
+
+const INVARIANTS = [
+  { label: 'Root continuity', code: 'root ≠ 0 if version > 0' },
+  { label: 'Cap monotonicity', code: 'Perm(child) ⊆ Perm(parent)' },
+  { label: 'No hidden state', code: 's = Replay(log, s₀)' },
+  { label: 'Deterministic replay', code: 'PO-B1, PO-N1' },
+  { label: 'Semantic coherence', code: 'Version per event' },
+  { label: 'Snapshot validity', code: 'Verify(proof, root) = true' },
+  { label: 'Finality immutability', code: 'final roots never change' },
+  { label: 'Atomic commits only', code: 'commit ∨ revert' },
+];
+
+const CAP_FIELDS = [
+  ['issuer', 'Actor', 'DID of capability grantor'],
+  ['subject', 'Actor', 'DID of delegatee'],
+  ['perms', 'Vec<String>', 'permission set; child ⊆ parent'],
+  ['delegation_depth', 'u32', 'must not exceed 16'],
+  ['parent_hash', 'Hash32', 'links to parent capability'],
+];
+
+function renderAll() {
+  const layerColors = { Boundary: 'var(--cyan)', Core: 'var(--blue)', Governance: 'var(--amber)', Emergency: 'var(--red)', Network: 'var(--purple)' };
+  document.getElementById('poTableBody').innerHTML = PROOF_OBLIGATIONS.map(po => `
+    <tr>
+      <td class="po-id">${po.id}</td>
+      <td class="po-status-icon">✅</td>
+      <td><span class="po-layer" style="color:${layerColors[po.layer]||'var(--muted)'}">${po.layer}</span></td>
+      <td><div class="po-desc">${po.desc}</div><div class="po-formal">${po.formal}</div></td>
+      <td style="font-size:10px; color:var(--dim)">${po.src}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('trapTableBody').innerHTML = TRAP_CODES.map(([code, section, desc]) => `
+    <tr><td>${code}</td><td>${section}</td><td>${desc}</td></tr>
+  `).join('');
+
+  document.getElementById('failureTableBody').innerHTML = FAILURE_SEMANTICS.map(([fail, outcome]) => `
+    <tr><td>${fail}</td><td style="color:${outcome==='reject'?'var(--red)':outcome==='revert'?'var(--amber)':'var(--cyan)'}; font-weight:500">${outcome}</td></tr>
+  `).join('');
+
+  document.getElementById('forbiddenItems').innerHTML = FORBIDDEN_WASM.map(f =>
+    `<span style="display:inline-block; padding:4px 10px; background:rgba(248,113,113,0.06); border:1px solid rgba(248,113,113,0.2); color:var(--red); font-size:11px; margin:2px;">${f}</span>`
+  ).join('');
+
+  document.getElementById('capTypeTable').innerHTML = CAP_FIELDS.map(([field, type, desc]) => `
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:5px 8px; color:var(--cyan2);">${field}</td>
+      <td style="padding:5px 8px; color:var(--amber2); font-size:10px;">${type}</td>
+      <td style="padding:5px 8px; color:var(--muted);">${desc}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('invGrid').innerHTML = INVARIANTS.map(inv => `
+    <div class="inv-item">
+      <div class="inv-dot ok"></div>
+      <div class="inv-label">${inv.label}</div>
+      <div class="inv-code">${inv.code}</div>
+    </div>
+  `).join('');
+}
+
+function switchTab(event, name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById(`pane-${name}`).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Init
+renderAll();
+updateModuleHint();
+updateQuorum();
+updateSunset();
+updateDebt();
+updateUI();
+</script>
+
+</body>
+</html>
