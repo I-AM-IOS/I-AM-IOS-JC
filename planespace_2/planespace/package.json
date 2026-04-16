@@ -1,0 +1,40 @@
+{
+  "name": "planespace",
+  "version": "1.0.0",
+  "description": "Perceptual 3D for the sovereign web. Depth parallax for standard HTML without rebuilding in a 3D engine.",
+  "type": "module",
+  "main": "./dist/planespace.cjs.js",
+  "module": "./dist/planespace.min.js",
+  "exports": {
+    ".": {
+      "import": "./dist/planespace.min.js",
+      "require": "./dist/planespace.cjs.js"
+    },
+    "./core": {
+      "import": "./src/core/PlanespaceCore.js"
+    }
+  },
+  "types": "./types/index.d.ts",
+  "files": [
+    "dist/",
+    "src/",
+    "types/"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch"
+  },
+  "keywords": [
+    "3d",
+    "parallax",
+    "depth",
+    "webgl",
+    "spatial-ui",
+    "html",
+    "css",
+    "perception"
+  ],
+  "author": "planespace contributors",
+  "license": "MIT",
+  "sideEffects": false
+}

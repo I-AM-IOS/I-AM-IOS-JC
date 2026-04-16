@@ -1,0 +1,122 @@
+PLANESPACE SOURCE-AVAILABLE LICENSE
+Version 1.0
+
+Copyright (c) 2025 planespace contributors
+
+───────────────────────────────────────────────────────────────────────────────
+
+DEFINITIONS
+
+"Software" means the planespace source code, compiled artifacts, documentation,
+and any associated files distributed under this License.
+
+"Personal Use" means use by a natural person for private, non-commercial
+purposes where no monetary compensation, revenue, or organizational benefit
+is derived from that use.
+
+"Academic Research Use" means use by an individual researcher, student, or
+faculty member at an accredited educational institution, solely for scholarly
+research, thesis work, or coursework, provided the use is not funded by or
+conducted on behalf of a commercial, governmental, or organizational entity.
+
+"Commercial Entity" means any corporation, limited liability company,
+partnership, sole proprietorship, or other for-profit legal entity.
+
+"Non-Profit Organization" means any entity organized under a non-profit,
+charitable, tax-exempt, or similar legal structure, regardless of jurisdiction,
+including but not limited to 501(c) organizations, foundations, associations,
+NGOs, and charities.
+
+"Government Entity" means any agency, department, ministry, instrumentality,
+or subdivision of any federal, state, provincial, municipal, or other
+governmental body, whether domestic or foreign, including state-funded research
+institutions and public universities acting in an institutional capacity.
+
+"Organizational Use" means any use conducted by, for, or on behalf of a
+Commercial Entity, Non-Profit Organization, or Government Entity, including
+use by employees, contractors, or agents acting in that capacity.
+
+───────────────────────────────────────────────────────────────────────────────
+
+GRANT OF RIGHTS — FREE USE
+
+Subject to the conditions below, permission is granted, free of charge, to any
+individual to use, copy, modify, and distribute the Software solely for:
+
+  (a) Personal Use; or
+  (b) Academic Research Use.
+
+This free grant does not extend to Organizational Use of any kind.
+
+───────────────────────────────────────────────────────────────────────────────
+
+COMMERCIAL LICENSE REQUIREMENT
+
+A separate paid commercial license is required before using the Software for
+any Organizational Use. This requirement applies without exception to:
+
+  — Commercial Entities of any size, including startups and solo operators
+    operating under a registered business structure;
+
+  — Non-Profit Organizations, including charities, foundations, open-source
+    foundations, and NGOs, regardless of tax-exempt status;
+
+  — Government Entities at any level, including publicly funded research
+    laboratories and state universities acting in an institutional capacity.
+
+The fact that an organization is non-profit, charitable, governmental, or
+otherwise mission-driven does not exempt it from this requirement. The
+distinction is organizational structure, not purpose or profit motive.
+
+To obtain a commercial license, contact: licensing@planespace.dev
+
+───────────────────────────────────────────────────────────────────────────────
+
+CONDITIONS (ALL USES)
+
+1. ATTRIBUTION. Any distribution of the Software or a modified version must
+   retain this License file, the copyright notice above, and a clear
+   attribution to planespace in any user-facing documentation or about screen.
+
+2. NO MISREPRESENTATION. You may not represent the Software as your own
+   original work, remove authorship notices, or claim a free license where a
+   commercial license is required.
+
+3. MODIFICATIONS. You may modify the Software for permitted uses. Modified
+   versions must be clearly marked as modified and may not be distributed
+   under the planespace name or brand without written permission.
+
+4. NO SUBLICENSING. You may not sublicense the Software. Each organization
+   requiring a commercial license must obtain one directly.
+
+───────────────────────────────────────────────────────────────────────────────
+
+DISCLAIMER OF WARRANTIES
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+───────────────────────────────────────────────────────────────────────────────
+
+LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+───────────────────────────────────────────────────────────────────────────────
+
+ENFORCEMENT
+
+Use of the Software in violation of this License automatically terminates your
+rights under it. The authors reserve the right to pursue remedies available
+under applicable copyright and contract law.
+
+───────────────────────────────────────────────────────────────────────────────
+
+CONTACT
+
+Commercial licensing:   licensing@planespace.dev
+General inquiries:      hello@planespace.dev

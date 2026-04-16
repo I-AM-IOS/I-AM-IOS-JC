@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>planespace studio</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=Syne:wght@400;600;700;800&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080d;--surface:rgba(255,255,255,0.035);--surface2:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.07);--border-hi:rgba(255,255,255,0.16);
+  --text:#dde0ea;--muted:rgba(255,255,255,0.35);--faint:rgba(255,255,255,0.12);
+  --accent:#5b6ef5;--accent2:#8b5cf6;--green:#34d399;--amber:#fbbf24;--red:#f87171;
+  --panel-r:12px;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+  font-family:'DM Mono',monospace;color:var(--text);user-select:none;cursor:default}
+
+/* ═══ LAYOUT ═══════════════════════════════════════════════════════════════ */
+#app{position:fixed;inset:0;display:grid;
+  grid-template-rows:48px 1fr 160px;
+  grid-template-columns:56px 1fr 240px;
+  grid-template-areas:
+    "toolbar toolbar toolbar"
+    "tools   stage   inspector"
+    "tools   timeline timeline";
+}
+
+/* ═══ TOOLBAR ═══════════════════════════════════════════════════════════════ */
+#toolbar{
+  grid-area:toolbar;
+  background:rgba(10,11,18,0.95);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:6px;
+  backdrop-filter:blur(8px);z-index:100;
+}
+.tb-sep{width:1px;height:24px;background:var(--border);margin:0 4px}
+.tb-btn{
+  height:30px;padding:0 12px;
+  border:1px solid var(--border);border-radius:7px;
+  background:transparent;color:var(--muted);
+  font-family:'DM Mono',monospace;font-size:11px;
+  cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:all 0.15s;white-space:nowrap;
+}
+.tb-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border-hi)}
+.tb-btn.active{background:rgba(91,110,245,0.18);color:var(--accent);border-color:var(--accent)}
+.tb-btn.danger{border-color:rgba(248,113,113,0.3);color:var(--red)}
+.tb-btn.danger:hover{background:rgba(248,113,113,0.1)}
+.tb-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--text);
+  letter-spacing:0.02em;margin-right:8px}
+.tb-mode-group{display:flex;gap:2px;background:rgba(0,0,0,0.3);border-radius:8px;padding:2px}
+.tb-mode-btn{height:26px;padding:0 10px;border-radius:6px;border:none;
+  background:transparent;color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;
+  cursor:pointer;transition:all 0.15s}
+.tb-mode-btn.active{background:rgba(91,110,245,0.25);color:var(--accent)}
+.tb-fps{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-left:auto}
+.tb-fps input{width:40px;background:rgba(0,0,0,0.4);border:1px solid var(--border);
+  border-radius:4px;color:var(--text);text-align:center;font-family:'DM Mono',monospace;
+  font-size:11px;padding:2px 4px}
+
+/* ═══ TOOLS ═════════════════════════════════════════════════════════════════ */
+#tools{
+  grid-area:tools;
+  background:rgba(10,11,18,0.9);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:10px 0;gap:4px;z-index:50;
+}
+.tool-btn{
+  width:36px;height:36px;border-radius:8px;border:1px solid transparent;
+  background:transparent;color:var(--muted);font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;position:relative;
+}
+.tool-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.tool-btn.active{background:rgba(91,110,245,0.2);color:var(--accent);border-color:var(--accent)}
+.tool-sep{width:28px;height:1px;background:var(--border);margin:4px 0}
+
+/* ═══ STAGE ════════════════════════════════════════════════════════════════ */
+#stage-wrap{
+  grid-area:stage;
+  position:relative;overflow:hidden;
+  background:var(--bg);
+}
+#stage-bg{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:
+    radial-gradient(ellipse 70% 60% at 40% 35%,rgba(91,110,245,0.08) 0%,transparent 65%),
+    radial-gradient(ellipse 50% 70% at 70% 65%,rgba(139,92,246,0.06) 0%,transparent 65%);
+}
+#stage-grid{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(91,110,245,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(91,110,245,0.04) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+#stage{
+  position:absolute;inset:0;
+  perspective:900px;perspective-origin:50% 50%;
+}
+#scene-inner{
+  position:absolute;inset:0;
+  transform-style:preserve-3d;
+  will-change:transform;
+}
+/* onion skin overlay */
+#onion-prev,#onion-next{
+  position:absolute;inset:0;pointer-events:none;
+  transform-style:preserve-3d;
+  opacity:0.25;transition:opacity 0.2s;
+}
+
+/* ═══ PANELS / LAYERS ═══════════════════════════════════════════════════════ */
+.slayer{
+  position:absolute;
+  transform-style:preserve-3d;
+  transition:box-shadow 0.2s;
+  border-radius:var(--panel-r);
+  will-change:transform;
+  cursor:move;
+}
+.slayer .layer-body{
+  position:relative;
+  border-radius:var(--panel-r);
+  border:1px solid var(--border);
+  overflow:hidden;
+  background:var(--surface);
+  transition:border-color 0.2s;
+}
+.slayer.selected .layer-body{border-color:var(--accent)}
+.slayer.selected .layer-body{box-shadow:0 0 0 2px rgba(91,110,245,0.25)}
+/* depth glow */
+.slayer[data-z="80"]  .layer-body{box-shadow:0 8px 30px rgba(91,110,245,0.2)}
+.slayer[data-z="-150"] .layer-body{opacity:0.92}
+.slayer[data-z="-300"] .layer-body{opacity:0.82}
+.slayer[data-z="-500"] .layer-body{opacity:0.65}
+
+.layer-grab{
+  position:absolute;top:0;left:0;right:0;
+  height:26px;background:rgba(0,0,0,0.3);
+  border-radius:var(--panel-r) var(--panel-r) 0 0;
+  display:flex;align-items:center;padding:0 10px;
+  gap:6px;cursor:grab;z-index:2;
+}
+.layer-grab:active{cursor:grabbing}
+.layer-grab-dot{width:5px;height:5px;border-radius:50%}
+.layer-grab-title{font-size:10px;color:var(--muted);font-family:'Syne',sans-serif;
+  font-weight:600;letter-spacing:0.05em;flex:1;text-transform:uppercase}
+.layer-grab-z{font-size:10px;font-family:'DM Mono',monospace;
+  background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;color:var(--accent)}
+
+/* depth pull handle */
+.depth-pull{
+  position:absolute;right:-12px;top:50%;transform:translateY(-50%);
+  width:14px;height:44px;
+  background:rgba(91,110,245,0.12);
+  border:1px solid rgba(91,110,245,0.25);
+  border-radius:0 7px 7px 0;
+  cursor:ns-resize;z-index:10;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  transition:background 0.15s,width 0.15s;
+}
+.depth-pull:hover{background:rgba(91,110,245,0.3);width:18px}
+.depth-pull-pip{width:4px;height:4px;border-radius:50%;background:rgba(91,110,245,0.6)}
+
+/* layer canvas for drawing */
+.layer-canvas{display:block;cursor:crosshair}
+
+/* ═══ INSPECTOR ═════════════════════════════════════════════════════════════ */
+#inspector{
+  grid-area:inspector;
+  background:rgba(10,11,18,0.9);
+  border-left:1px solid var(--border);
+  overflow-y:auto;padding:14px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.insp-section{display:flex;flex-direction:column;gap:6px}
+.insp-label{font-size:10px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:0.08em;margin-bottom:2px}
+.insp-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.insp-val{font-size:12px;color:var(--text);text-align:right}
+input[type=range]{
+  flex:1;accent-color:var(--accent);
+  height:3px;cursor:pointer;
+}
+.insp-num{
+  width:48px;background:rgba(0,0,0,0.4);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-size:11px;font-family:'DM Mono',monospace;
+  text-align:center;padding:3px 4px;
+}
+.insp-num:focus{outline:none;border-color:var(--accent)}
+.color-swatch{
+  width:24px;height:24px;border-radius:5px;border:1px solid var(--border);
+  cursor:pointer;transition:transform 0.1s;
+}
+.color-swatch:hover{transform:scale(1.1)}
+.insp-sep{height:1px;background:var(--border);margin:2px 0}
+
+/* Layer list in inspector */
+.layer-list{display:flex;flex-direction:column;gap:3px}
+.layer-list-item{
+  display:flex;align-items:center;gap:6px;padding:5px 8px;
+  border-radius:7px;border:1px solid transparent;
+  cursor:pointer;font-size:11px;
+  transition:all 0.12s;
+}
+.layer-list-item:hover{background:var(--surface2)}
+.layer-list-item.selected{background:rgba(91,110,245,0.12);border-color:rgba(91,110,245,0.25)}
+.layer-list-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.layer-list-z{font-size:10px;color:var(--muted);margin-left:auto}
+.layer-vis-btn{background:none;border:none;cursor:pointer;color:var(--muted);
+  font-size:12px;padding:0;line-height:1}
+
+/* ═══ TIMELINE ═══════════════════════════════════════════════════════════════ */
+#timeline{
+  grid-area:timeline;
+  background:rgba(8,9,14,0.98);
+  border-top:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;position:relative;z-index:50;
+}
+#timeline-header{
+  height:32px;display:flex;align-items:center;
+  border-bottom:1px solid var(--border);
+  padding:0 10px;gap:8px;flex-shrink:0;
+}
+.tl-ctrl-btn{
+  width:26px;height:26px;border-radius:6px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--muted);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;
+}
+.tl-ctrl-btn:hover{background:var(--surface2);color:var(--text)}
+.tl-ctrl-btn.playing{background:rgba(52,211,153,0.15);color:var(--green);border-color:var(--green)}
+.tl-frame-counter{font-size:11px;color:var(--accent);min-width:60px}
+.tl-total{font-size:10px;color:var(--muted)}
+.tl-fps-display{font-size:10px;color:var(--muted);margin-left:auto}
+
+#timeline-body{flex:1;display:flex;overflow:hidden}
+#tl-layer-names{
+  width:100px;flex-shrink:0;overflow:hidden;
+  border-right:1px solid var(--border);
+}
+.tl-name-row{
+  height:32px;display:flex;align-items:center;padding:0 10px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  font-size:10px;color:var(--muted);gap:5px;
+  cursor:pointer;transition:background 0.1s;
+}
+.tl-name-row:hover{background:var(--surface)}
+.tl-name-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+#tl-scroll{
+  flex:1;overflow-x:auto;overflow-y:hidden;position:relative;
+  cursor:default;
+}
+#tl-inner{position:relative;height:100%}
+.tl-track{
+  height:32px;display:flex;align-items:center;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  position:relative;
+}
+.tl-frame-cell{
+  width:28px;height:28px;flex-shrink:0;
+  border-right:1px solid rgba(255,255,255,0.04);
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:var(--muted);cursor:pointer;
+  position:relative;transition:background 0.1s;
+  border-radius:3px;margin:2px 1px;
+}
+.tl-frame-cell:hover{background:rgba(91,110,245,0.12)}
+.tl-frame-cell.has-keyframe{background:rgba(91,110,245,0.15)}
+.tl-frame-cell.has-keyframe::after{
+  content:'';position:absolute;width:8px;height:8px;
+  background:var(--accent);border-radius:2px;transform:rotate(45deg);
+}
+.tl-frame-cell.current-frame{background:rgba(91,110,245,0.25)!important}
+.tl-frame-cell.current-frame::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:2px;height:100%;background:var(--accent);opacity:0.8;border-radius:1px;
+}
+
+/* playhead */
+#tl-playhead{
+  position:absolute;top:0;bottom:0;width:2px;
+  background:var(--accent);pointer-events:none;z-index:10;
+  transition:left 0.05s linear;
+}
+#tl-playhead::before{
+  content:'';position:absolute;top:-2px;left:50%;transform:translateX(-50%);
+  width:10px;height:10px;background:var(--accent);clip-path:polygon(50% 100%,0 0,100% 0);
+}
+
+/* frame ruler */
+#tl-ruler{
+  height:18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;position:sticky;top:0;
+  background:rgba(8,9,14,0.98);z-index:5;flex-shrink:0;
+}
+.tl-ruler-mark{
+  width:28px;flex-shrink:0;font-size:9px;color:var(--muted);
+  text-align:center;border-right:1px solid rgba(255,255,255,0.04);
+  padding-right:1px;
+}
+.tl-ruler-mark.major{color:var(--faint)}
+
+/* ═══ DEPTH Z-STACK VISUALIZER ══════════════════════════════════════════════ */
+#depth-viz{
+  position:fixed;left:68px;top:50%;transform:translateY(-50%);
+  z-index:200;display:flex;flex-direction:column;align-items:center;
+  gap:0;pointer-events:all;
+}
+.dv-level{
+  width:44px;height:34px;display:flex;align-items:center;justify-content:center;
+  border-left:2px solid var(--border);cursor:pointer;
+  font-size:10px;color:var(--muted);
+  transition:all 0.12s;position:relative;
+}
+.dv-level:hover{color:var(--text)}
+.dv-level.occupied{border-left-color:var(--accent)}
+.dv-level.occupied .dv-dot{display:block}
+.dv-dot{display:none;width:8px;height:8px;border-radius:50%;
+  position:absolute;left:-6px;background:var(--accent)}
+.dv-label{font-size:9px;letter-spacing:0.04em}
+
+/* ═══ DRAW TOOLBAR ═══════════════════════════════════════════════════════════ */
+#draw-colors{
+  display:flex;flex-direction:column;gap:3px;padding:6px 0;
+}
+.draw-color{
+  width:22px;height:22px;border-radius:5px;
+  border:2px solid transparent;cursor:pointer;
+  transition:transform 0.1s,border-color 0.1s;
+}
+.draw-color.active{border-color:white;transform:scale(1.15)}
+
+/* ═══ MODALS & OVERLAYS ═══════════════════════════════════════════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.modal{
+  background:#0f1118;border:1px solid var(--border-hi);border-radius:16px;
+  padding:24px;min-width:320px;max-width:480px;width:90%;
+}
+.modal h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:16px}
+.modal-row{display:flex;gap:8px;margin-top:8px}
+
+/* ═══ GAME MODE ═══════════════════════════════════════════════════════════════ */
+#game-overlay{
+  position:absolute;inset:0;z-index:300;pointer-events:none;display:none;
+}
+.game-score{
+  position:absolute;top:12px;right:12px;
+  font-family:'Syne',sans-serif;font-size:20px;font-weight:800;
+  color:var(--accent);text-shadow:0 0 20px rgba(91,110,245,0.5);
+}
+.game-msg{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-family:'Syne',sans-serif;font-size:32px;font-weight:800;
+  text-align:center;pointer-events:none;
+}
+
+/* ═══ NOTIFICATIONS ══════════════════════════════════════════════════════════ */
+#notifs{
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+  z-index:600;display:flex;flex-direction:column;gap:6px;pointer-events:none;
+}
+.notif{
+  background:rgba(15,17,24,0.95);border:1px solid var(--border-hi);
+  border-radius:24px;padding:8px 18px;font-size:12px;text-align:center;
+  animation:notifIn 0.25s ease-out,notifOut 0.3s ease-in 1.7s forwards;
+  backdrop-filter:blur(8px);
+}
+@keyframes notifIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes notifOut{to{opacity:0;transform:translateY(-8px)}}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.15)}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── TOOLBAR ── -->
+<div id="toolbar">
+  <div class="tb-title">planespace</div>
+  <div class="tb-sep"></div>
+
+  <div class="tb-mode-group" id="mode-group">
+    <button class="tb-mode-btn active" data-mode="animate" title="Animation/Flipbook mode">✦ Animate</button>
+    <button class="tb-mode-btn" data-mode="draw" title="Draw on layers">✏ Draw</button>
+    <button class="tb-mode-btn" data-mode="game" title="Game mode">◈ Game</button>
+  </div>
+
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-add-layer" title="Add a new layer (A)">+ Layer</button>
+  <button class="tb-btn" id="btn-add-keyframe" title="Set keyframe at current frame (K)">◆ Keyframe</button>
+  <button class="tb-btn" id="btn-clone-frame" title="Duplicate current frame (D)">⧉ Clone</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-onion" title="Toggle onion skin">🧅 Onion</button>
+  <button class="tb-btn" id="btn-export" title="Export as GIF/frames">⬇ Export</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn danger" id="btn-clear" title="Clear canvas">✕ Clear</button>
+
+  <div class="tb-fps">
+    FPS <input type="number" id="fps-input" value="12" min="1" max="60">
+    <span id="playback-fps" style="color:var(--green);font-size:10px"></span>
+  </div>
+</div>
+
+<!-- ── TOOL SIDEBAR ── -->
+<div id="tools">
+  <button class="tool-btn active" data-tool="select" title="Select (V)">↖</button>
+  <button class="tool-btn" data-tool="move" title="Move layer (M)">✥</button>
+  <button class="tool-btn" data-tool="draw" title="Draw (B)">✏</button>
+  <button class="tool-btn" data-tool="eraser" title="Eraser (E)">◻</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn" data-tool="text" title="Text (T)">T</button>
+  <button class="tool-btn" data-tool="rect" title="Rectangle (R)">▭</button>
+  <button class="tool-btn" data-tool="circle" title="Circle (C)">○</button>
+  <div class="tool-sep"></div>
+  <div id="draw-colors">
+    <div class="draw-color active" style="background:#e2e4eb" data-color="#e2e4eb"></div>
+    <div class="draw-color" style="background:#5b6ef5" data-color="#5b6ef5"></div>
+    <div class="draw-color" style="background:#34d399" data-color="#34d399"></div>
+    <div class="draw-color" style="background:#fbbf24" data-color="#fbbf24"></div>
+    <div class="draw-color" style="background:#f87171" data-color="#f87171"></div>
+    <div class="draw-color" style="background:#000000" data-color="#000000"></div>
+  </div>
+  <div class="tool-sep"></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0">
+    <div style="font-size:9px;color:var(--muted)">SIZE</div>
+    <input type="range" id="brush-size" min="1" max="40" value="6"
+      style="writing-mode:vertical-lr;width:4px;height:60px;transform:rotate(180deg)">
+    <div id="brush-size-val" style="font-size:9px;color:var(--accent)">6</div>
+  </div>
+</div>
+
+<!-- ── STAGE ── -->
+<div id="stage-wrap">
+  <div id="stage-bg"></div>
+  <div id="stage-grid"></div>
+  <div id="stage">
+    <div id="scene-inner"></div>
+    <div id="onion-prev"></div>
+    <div id="onion-next"></div>
+  </div>
+  <div id="game-overlay">
+    <div class="game-score" id="game-score">0</div>
+    <div class="game-msg" id="game-msg"></div>
+  </div>
+
+  <!-- Depth visualizer -->
+  <div id="depth-viz">
+    <div style="font-size:9px;color:var(--muted);text-align:center;margin-bottom:4px;letter-spacing:0.06em">NEAR</div>
+    <div class="dv-level" data-z="80"><div class="dv-dot"></div><span class="dv-label">+80</span></div>
+    <div class="dv-level" data-z="0"><div class="dv-dot"></div><span class="dv-label">0</span></div>
+    <div class="dv-level" data-z="-150"><div class="dv-dot"></div><span class="dv-label">-150</span></div>
+    <div class="dv-level" data-z="-300"><div class="dv-dot"></div><span class="dv-label">-300</span></div>
+    <div class="dv-level" data-z="-500"><div class="dv-dot"></div><span class="dv-label">-500</span></div>
+    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:4px;letter-spacing:0.06em">FAR</div>
+  </div>
+</div>
+
+<!-- ── INSPECTOR ── -->
+<div id="inspector">
+  <div class="insp-section">
+    <div class="insp-label">Selected Layer</div>
+    <div id="insp-name" style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text)">—</div>
+  </div>
+
+  <div class="insp-section" id="insp-transform">
+    <div class="insp-label">Transform</div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">X</span>
+      <input class="insp-num" id="insp-x" type="number" value="0">
+    </div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">Y</span>
+      <input class="insp-num" id="insp-y" type="number" value="0">
+    </div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">Z</span>
+      <input class="insp-num" id="insp-z" type="number" value="0">
+    </div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">W</span>
+      <input class="insp-num" id="insp-w" type="number" value="200">
+    </div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">H</span>
+      <input class="insp-num" id="insp-h" type="number" value="150">
+    </div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">Rot</span>
+      <input class="insp-num" id="insp-rot" type="number" value="0">°
+    </div>
+  </div>
+
+  <div class="insp-sep"></div>
+
+  <div class="insp-section">
+    <div class="insp-label">Depth Snap</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px" id="depth-snap-btns">
+      <button class="tb-btn" data-snap="80"  style="padding:0 8px;height:24px;font-size:10px">+80</button>
+      <button class="tb-btn" data-snap="0"   style="padding:0 8px;height:24px;font-size:10px">0</button>
+      <button class="tb-btn" data-snap="-150" style="padding:0 8px;height:24px;font-size:10px">-150</button>
+      <button class="tb-btn" data-snap="-300" style="padding:0 8px;height:24px;font-size:10px">-300</button>
+      <button class="tb-btn" data-snap="-500" style="padding:0 8px;height:24px;font-size:10px">-500</button>
+    </div>
+  </div>
+
+  <div class="insp-sep"></div>
+
+  <div class="insp-section">
+    <div class="insp-label">Viewer</div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">maxAngle</span>
+      <input type="range" min="1" max="20" value="7" id="sl-maxangle">
+      <div class="insp-val" id="val-maxangle">7°</div>
+    </div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">lerp</span>
+      <input type="range" min="1" max="30" value="8" id="sl-lerp">
+      <div class="insp-val" id="val-lerp">0.08</div>
+    </div>
+    <div class="insp-row">
+      <span style="font-size:11px;color:var(--muted)">persp</span>
+      <input type="range" min="200" max="2000" value="900" id="sl-persp">
+      <div class="insp-val" id="val-persp">900</div>
+    </div>
+  </div>
+
+  <div class="insp-sep"></div>
+
+  <div class="insp-section">
+    <div class="insp-label">Layers</div>
+    <div class="layer-list" id="layer-list"></div>
+  </div>
+</div>
+
+<!-- ── TIMELINE ── -->
+<div id="timeline">
+  <div id="timeline-header">
+    <button class="tl-ctrl-btn" id="btn-prev-frame" title="Previous frame (←)">◀</button>
+    <button class="tl-ctrl-btn" id="btn-play" title="Play/Pause (Space)">▶</button>
+    <button class="tl-ctrl-btn" id="btn-next-frame" title="Next frame (→)">▶</button>
+    <button class="tl-ctrl-btn" id="btn-loop" title="Loop" style="font-size:10px">↺</button>
+    <div class="tl-frame-counter">
+      Frame <span id="frame-num">1</span>
+    </div>
+    <div class="tl-total" id="frame-total">/ 24</div>
+    <button class="tb-btn" id="btn-add-frame" style="height:24px;padding:0 10px;font-size:10px">+ Frame</button>
+    <button class="tb-btn" id="btn-del-frame" style="height:24px;padding:0 10px;font-size:10px">- Frame</button>
+    <div class="tl-fps-display" id="tl-fps-display">12 fps</div>
+  </div>
+  <div id="timeline-body">
+    <div id="tl-layer-names"></div>
+    <div id="tl-scroll">
+      <div id="tl-inner">
+        <div id="tl-ruler"></div>
+        <div id="tl-tracks"></div>
+        <div id="tl-playhead"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<div id="notifs"></div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════════════════
+// planespace studio — core engine
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DEPTH_LEVELS = [
+  { z: 80,   name:'Near+',  color:'#5b6ef5' },
+  { z: 0,    name:'Surface',color:'#7c9ef5' },
+  { z: -150, name:'Mid',    color:'#8ba8c8' },
+  { z: -300, name:'Back',   color:'#6b7d9c' },
+  { z: -500, name:'Deep',   color:'#3d4d6e' },
+];
+const FRAME_W = 29;
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const S = {
+  // playback
+  fps: 12,
+  totalFrames: 24,
+  currentFrame: 0,
+  playing: false,
+  loop: true,
+  playLastTime: 0,
+  rafId: null,
+
+  // viewer
+  mx: 0, my: 0,   // raw mouse -1..1
+  vx: 0, vy: 0,   // lerped viewer
+  maxAngle: 7,
+  lerpFactor: 0.08,
+  perspective: 900,
+
+  // mode
+  mode: 'animate',    // animate | draw | game
+  tool: 'select',
+  brushColor: '#e2e4eb',
+  brushSize: 6,
+  onionSkin: false,
+
+  // layers: array of {id, name, color, visible, locked}
+  layers: [],
+
+  // keyframes: Map<layerId, Map<frameIdx, {x,y,z,w,h,rot,canvasData}>>
+  keyframes: new Map(),
+
+  // interpolated state per layer for current frame
+  frameState: new Map(),  // layerId -> {x,y,z,w,h,rot}
+
+  selectedLayerId: null,
+  nextId: 1,
+
+  // drag
+  dragging: null,   // { layerId, startMX, startMY, origX, origY }
+  depthDragging: null,
+
+  // drawing
+  painting: false,
+  paintCtx: null,
+  lastPX: 0, lastPY: 0,
+
+  // game
+  gameActive: false,
+  gameScore: 0,
+  gameObjects: [],
+  gameRaf: null,
+
+  // keyboard
+  keys: new Set(),
+};
+
+// ─── DOM REFS ────────────────────────────────────────────────────────────────
+const sceneInner    = document.getElementById('scene-inner');
+const onionPrev     = document.getElementById('onion-prev');
+const onionNext     = document.getElementById('onion-next');
+const frameNum      = document.getElementById('frame-num');
+const frameTotal    = document.getElementById('frame-total');
+const tlTracks      = document.getElementById('tl-tracks');
+const tlRuler       = document.getElementById('tl-ruler');
+const tlNames       = document.getElementById('tl-layer-names');
+const tlPlayhead    = document.getElementById('tl-playhead');
+const layerListEl   = document.getElementById('layer-list');
+const btnPlay       = document.getElementById('btn-play');
+const gameOverlay   = document.getElementById('game-overlay');
+const gameScore     = document.getElementById('game-score');
+const gameMsg       = document.getElementById('game-msg');
+
+// ─── NOTIFY ──────────────────────────────────────────────────────────────────
+function notify(msg, color = '#5b6ef5') {
+  const el = document.createElement('div');
+  el.className = 'notif';
+  el.style.borderColor = color + '44';
+  el.style.color = color;
+  el.textContent = msg;
+  document.getElementById('notifs').appendChild(el);
+  setTimeout(() => el.remove(), 2100);
+}
+
+// ─── LAYERS ──────────────────────────────────────────────────────────────────
+function addLayer(opts = {}) {
+  const id = S.nextId++;
+  const colors = ['#5b6ef5','#34d399','#fbbf24','#f87171','#8b5cf6','#fb7185'];
+  const color = opts.color || colors[(S.layers.length) % colors.length];
+  const zLevels = [80, 0, -150, -300, -500];
+  const z = opts.z !== undefined ? opts.z : zLevels[S.layers.length % zLevels.length];
+
+  const layer = {
+    id,
+    name: opts.name || `Layer ${id}`,
+    color,
+    visible: true,
+    locked: false,
+  };
+  S.layers.push(layer);
+  S.keyframes.set(id, new Map());
+
+  // Create initial keyframe at frame 0
+  const stageW = document.getElementById('stage-wrap').clientWidth;
+  const stageH = document.getElementById('stage-wrap').clientHeight;
+  const w = opts.w || 180 + Math.random() * 80 | 0;
+  const h = opts.h || 120 + Math.random() * 60 | 0;
+  const x = opts.x !== undefined ? opts.x : (stageW/2 - w/2 + (Math.random()-0.5)*100) | 0;
+  const y = opts.y !== undefined ? opts.y : (stageH/2 - h/2 + (Math.random()-0.5)*80) | 0;
+
+  setKeyframe(id, 0, { x, y, z, w, h, rot: 0, canvasData: null });
+
+  // Build DOM element
+  buildLayerDOM(layer, { x, y, z, w, h, rot: 0 });
+
+  selectLayer(id);
+  rebuildTimeline();
+  rebuildLayerList();
+  updateDepthViz();
+  notify(`Layer "${layer.name}" added at z=${z}`, color);
+  return layer;
+}
+
+function removeLayer(id) {
+  const idx = S.layers.findIndex(l => l.id === id);
+  if (idx < 0) return;
+  S.layers.splice(idx, 1);
+  S.keyframes.delete(id);
+  S.frameState.delete(id);
+  const el = document.getElementById(`layer-${id}`);
+  if (el) el.remove();
+  if (S.selectedLayerId === id) {
+    S.selectedLayerId = S.layers.length > 0 ? S.layers[S.layers.length-1].id : null;
+  }
+  rebuildTimeline();
+  rebuildLayerList();
+  updateDepthViz();
+}
+
+function selectLayer(id) {
+  S.selectedLayerId = id;
+  document.querySelectorAll('.slayer.selected').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById(`layer-${id}`);
+  if (el) el.classList.add('selected');
+  updateInspector();
+  rebuildLayerList();
+}
+
+// ─── KEYFRAMES ───────────────────────────────────────────────────────────────
+function setKeyframe(layerId, frameIdx, props) {
+  const kfs = S.keyframes.get(layerId);
+  if (!kfs) return;
+  const existing = kfs.get(frameIdx) || {};
+  kfs.set(frameIdx, { ...existing, ...props });
+}
+
+function getKeyframe(layerId, frameIdx) {
+  const kfs = S.keyframes.get(layerId);
+  if (!kfs) return null;
+  return kfs.get(frameIdx) || null;
+}
+
+function getInterpolatedState(layerId, frameIdx) {
+  const kfs = S.keyframes.get(layerId);
+  if (!kfs || kfs.size === 0) return null;
+
+  // Find surrounding keyframes
+  const frames = [...kfs.keys()].sort((a,b)=>a-b);
+
+  // Exact match
+  if (kfs.has(frameIdx)) return { ...kfs.get(frameIdx) };
+
+  // Before first or after last
+  const first = frames[0], last = frames[frames.length-1];
+  if (frameIdx < first) return { ...kfs.get(first) };
+  if (frameIdx > last)  return { ...kfs.get(last) };
+
+  // Interpolate between surrounding frames
+  let prevF = first, nextF = last;
+  for (const f of frames) {
+    if (f <= frameIdx) prevF = f;
+    if (f >= frameIdx && nextF === last) nextF = f;
+  }
+  if (prevF === nextF) return { ...kfs.get(prevF) };
+
+  const t = (frameIdx - prevF) / (nextF - prevF);
+  const e = easeInOut(t);
+  const a = kfs.get(prevF), b = kfs.get(nextF);
+  return {
+    x: lerp(a.x, b.x, e),
+    y: lerp(a.y, b.y, e),
+    z: lerpZ(a.z, b.z, e),
+    w: lerp(a.w, b.w, e),
+    h: lerp(a.h, b.h, e),
+    rot: lerp(a.rot, b.rot, e),
+    canvasData: a.canvasData, // no interpolation for canvas
+  };
+}
+
+function lerpZ(a, b, t) {
+  // Snap z to nearest depth level based on interpolation
+  const mid = a + (b - a) * t;
+  return DEPTH_LEVELS.reduce((best, lv) =>
+    Math.abs(lv.z - mid) < Math.abs(best.z - mid) ? lv : best
+  ).z;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+// ─── DOM LAYER BUILDING ───────────────────────────────────────────────────────
+function buildLayerDOM(layer, state) {
+  const existing = document.getElementById(`layer-${layer.id}`);
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.className = 'slayer';
+  el.id = `layer-${layer.id}`;
+  el.dataset.id = layer.id;
+  el.dataset.z = state.z;
+  el.style.left = state.x + 'px';
+  el.style.top = state.y + 'px';
+  el.style.width = state.w + 'px';
+  el.style.transform = `translateZ(${state.z}px) rotate(${state.rot||0}deg)`;
+
+  el.innerHTML = `
+    <div class="layer-body">
+      <div class="layer-grab" data-id="${layer.id}">
+        <div class="layer-grab-dot" style="background:${layer.color}"></div>
+        <div class="layer-grab-title">${layer.name}</div>
+        <div class="layer-grab-z">${state.z > 0 ? '+':''}${state.z}</div>
+      </div>
+      <canvas class="layer-canvas" id="canvas-${layer.id}"
+        width="${state.w}" height="${state.h - 26}" style="display:block"></canvas>
+    </div>
+    <div class="depth-pull" data-id="${layer.id}">
+      <div class="depth-pull-pip"></div>
+      <div class="depth-pull-pip"></div>
+      <div class="depth-pull-pip"></div>
+    </div>
+  `;
+
+  sceneInner.appendChild(el);
+
+  // Restore canvas data if present
+  if (state.canvasData) {
+    const canvas = el.querySelector('canvas');
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = state.canvasData;
+  }
+
+  attachLayerEvents(el, layer);
+  return el;
+}
+
+function applyLayerState(layerId, st) {
+  if (!st) return;
+  const el = document.getElementById(`layer-${layerId}`);
+  if (!el) return;
+  el.style.left = Math.round(st.x) + 'px';
+  el.style.top  = Math.round(st.y) + 'px';
+  el.style.width = Math.round(st.w) + 'px';
+  el.style.transform = `translateZ(${st.z}px) rotate(${st.rot||0}deg)`;
+  el.dataset.z = st.z;
+  const canvas = el.querySelector('canvas');
+  if (canvas) {
+    canvas.width  = Math.round(st.w);
+    canvas.height = Math.max(20, Math.round(st.h) - 26);
+  }
+  const zLabel = el.querySelector('.layer-grab-z');
+  if (zLabel) zLabel.textContent = (st.z > 0 ? '+' : '') + st.z;
+
+  // Restore canvas for this frame
+  if (st.canvasData && canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0);
+    img.src = st.canvasData;
+  } else if (!st.canvasData && canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+// ─── FRAME EVALUATION ────────────────────────────────────────────────────────
+function evalFrame(frameIdx) {
+  for (const layer of S.layers) {
+    if (!layer.visible) {
+      const el = document.getElementById(`layer-${layer.id}`);
+      if (el) el.style.display = 'none';
+      continue;
+    }
+    const el = document.getElementById(`layer-${layer.id}`);
+    if (el) el.style.display = '';
+
+    const st = getInterpolatedState(layer.id, frameIdx);
+    if (st) {
+      S.frameState.set(layer.id, st);
+      applyLayerState(layer.id, st);
+    }
+  }
+  updateOnionSkin(frameIdx);
+  updateInspector();
+  updateDepthViz();
+  // Update timeline playhead
+  tlPlayhead.style.left = (frameIdx * FRAME_W + FRAME_W/2) + 'px';
+  frameNum.textContent = frameIdx + 1;
+  // Highlight current cells
+  document.querySelectorAll('.tl-frame-cell').forEach(cell => {
+    cell.classList.toggle('current-frame', parseInt(cell.dataset.frame) === frameIdx);
+  });
+}
+
+// ─── ONION SKIN ───────────────────────────────────────────────────────────────
+function updateOnionSkin(frameIdx) {
+  onionPrev.innerHTML = '';
+  onionNext.innerHTML = '';
+  if (!S.onionSkin) return;
+
+  [-1, 1].forEach((delta, i) => {
+    const target = i === 0 ? onionPrev : onionNext;
+    const fi = frameIdx + delta;
+    if (fi < 0 || fi >= S.totalFrames) return;
+
+    for (const layer of S.layers) {
+      if (!layer.visible) continue;
+      const st = getInterpolatedState(layer.id, fi);
+      if (!st) continue;
+      const ghost = document.createElement('div');
+      ghost.style.cssText = `
+        position:absolute;
+        left:${Math.round(st.x)}px;top:${Math.round(st.y)}px;
+        width:${Math.round(st.w)}px;height:${Math.round(st.h)}px;
+        transform:translateZ(${st.z}px) rotate(${st.rot||0}deg);
+        transform-style:preserve-3d;
+        border:1px solid ${layer.color};
+        border-radius:12px;
+        pointer-events:none;
+      `;
+      if (st.canvasData) {
+        const img = document.createElement('img');
+        img.src = st.canvasData;
+        img.style.cssText = 'position:absolute;top:26px;left:0;width:100%;height:calc(100% - 26px);object-fit:contain';
+        ghost.appendChild(img);
+      }
+      target.appendChild(ghost);
+    }
+  });
+}
+
+// ─── PLAYBACK ────────────────────────────────────────────────────────────────
+function play() {
+  S.playing = true;
+  S.playLastTime = performance.now();
+  btnPlay.innerHTML = '⏸';
+  btnPlay.classList.add('playing');
+  document.getElementById('tl-fps-display').textContent = `${S.fps} fps`;
+  scheduleTick();
+}
+
+function pause() {
+  S.playing = false;
+  cancelAnimationFrame(S.rafId);
+  btnPlay.innerHTML = '▶';
+  btnPlay.classList.remove('playing');
+}
+
+function togglePlay() { S.playing ? pause() : play(); }
+
+function scheduleTick() {
+  S.rafId = requestAnimationFrame(masterTick);
+}
+
+let _lastFPSTime = 0, _frameCount = 0, _displayFPS = 0;
+
+function masterTick(ts) {
+  // Viewer lerp
+  S.vx += (S.mx - S.vx) * Math.min(1, S.lerpFactor * 10);
+  S.vy += (S.my - S.vy) * Math.min(1, S.lerpFactor * 10);
+  sceneInner.style.transform =
+    `perspective(${S.perspective}px) rotateY(${S.vx * S.maxAngle}deg) rotateX(${S.vy * -S.maxAngle}deg)`;
+  onionPrev.style.transform = sceneInner.style.transform;
+  onionNext.style.transform = sceneInner.style.transform;
+
+  // Playback advance
+  if (S.playing) {
+    const interval = 1000 / S.fps;
+    if (ts - S.playLastTime >= interval) {
+      S.playLastTime = ts;
+      let next = S.currentFrame + 1;
+      if (next >= S.totalFrames) {
+        if (S.loop) next = 0;
+        else { next = S.totalFrames - 1; pause(); }
+      }
+      S.currentFrame = next;
+      evalFrame(next);
+    }
+  }
+
+  // FPS counter
+  _frameCount++;
+  if (ts - _lastFPSTime > 1000) {
+    _displayFPS = _frameCount;
+    _frameCount = 0;
+    _lastFPSTime = ts;
+    document.getElementById('playback-fps').textContent = `${_displayFPS}fps rend`;
+  }
+
+  // Game tick
+  if (S.gameActive) gameTick(ts);
+
+  S.rafId = requestAnimationFrame(masterTick);
+}
+
+// ─── VIEWER INPUT ─────────────────────────────────────────────────────────────
+document.getElementById('stage-wrap').addEventListener('mousemove', e => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  S.mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  S.my = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+});
+
+// ─── DRAG: LAYER MOVE ─────────────────────────────────────────────────────────
+function attachLayerEvents(el, layer) {
+  const grab = el.querySelector('.layer-grab');
+  const pull = el.querySelector('.depth-pull');
+
+  grab.addEventListener('mousedown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault(); e.stopPropagation();
+    selectLayer(layer.id);
+    const st = S.frameState.get(layer.id) || getInterpolatedState(layer.id, S.currentFrame) || { x:0, y:0 };
+    S.dragging = { layerId: layer.id, startMX: e.clientX, startMY: e.clientY, origX: st.x, origY: st.y };
+    el.style.cursor = 'grabbing';
+  });
+
+  pull.addEventListener('mousedown', e => {
+    e.preventDefault(); e.stopPropagation();
+    selectLayer(layer.id);
+    const st = S.frameState.get(layer.id) || getInterpolatedState(layer.id, S.currentFrame) || { z:0 };
+    S.depthDragging = { layerId: layer.id, startY: e.clientY, origZ: st.z, lastZ: st.z };
+  });
+
+  el.addEventListener('mousedown', e => {
+    if (!e.target.closest('.layer-grab') && !e.target.closest('.depth-pull') && !e.target.closest('canvas')) {
+      selectLayer(layer.id);
+    }
+  });
+
+  el.addEventListener('dblclick', e => {
+    if (!e.target.closest('.layer-grab') && !e.target.closest('.depth-pull')) return;
+    snapLayerZ(layer.id, 80);
+  });
+}
+
+window.addEventListener('mousemove', e => {
+  if (S.dragging) {
+    const dx = e.clientX - S.dragging.startMX;
+    const dy = e.clientY - S.dragging.startMY;
+    const newX = S.dragging.origX + dx;
+    const newY = S.dragging.origY + dy;
+    const st = getOrCreateFrameState(S.dragging.layerId);
+    st.x = newX; st.y = newY;
+    applyLayerState(S.dragging.layerId, st);
+    updateInspector();
+  }
+  if (S.depthDragging) {
+    const dy = e.clientY - S.depthDragging.startY;
+    const rawZ = S.depthDragging.origZ - dy * 3;
+    const snap = DEPTH_LEVELS.reduce((a,b) => Math.abs(a.z-rawZ) < Math.abs(b.z-rawZ) ? a : b);
+    if (snap.z !== S.depthDragging.lastZ) {
+      S.depthDragging.lastZ = snap.z;
+      const st = getOrCreateFrameState(S.depthDragging.layerId);
+      st.z = snap.z;
+      applyLayerState(S.depthDragging.layerId, st);
+      updateInspector();
+      updateDepthViz();
+    }
+  }
+  // Drawing
+  if (S.painting && S.paintCtx) {
+    const el = document.getElementById(`layer-${S.selectedLayerId}`);
+    if (!el) return;
+    const canvas = el.querySelector('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    S.paintCtx.beginPath();
+    S.paintCtx.moveTo(S.lastPX, S.lastPY);
+    S.paintCtx.lineTo(x, y);
+    S.paintCtx.stroke();
+    S.lastPX = x; S.lastPY = y;
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (S.dragging) {
+    commitCurrentState(S.dragging.layerId);
+    S.dragging = null;
+    const el = document.querySelectorAll('.slayer');
+    el.forEach(e => e.style.cursor = '');
+  }
+  if (S.depthDragging) {
+    commitCurrentState(S.depthDragging.layerId);
+    S.depthDragging = null;
+    rebuildTimeline();
+  }
+  if (S.painting) {
+    S.painting = false;
+    // Save canvas data
+    saveCanvasData(S.selectedLayerId);
+    S.paintCtx = null;
+  }
+});
+
+function getOrCreateFrameState(layerId) {
+  let st = S.frameState.get(layerId);
+  if (!st) {
+    st = getInterpolatedState(layerId, S.currentFrame) || { x:0,y:0,z:0,w:200,h:150,rot:0,canvasData:null };
+    S.frameState.set(layerId, st);
+  }
+  return st;
+}
+
+function commitCurrentState(layerId) {
+  const st = S.frameState.get(layerId);
+  if (!st) return;
+  setKeyframe(layerId, S.currentFrame, { ...st });
+  rebuildTimeline();
+}
+
+function saveCanvasData(layerId) {
+  const canvas = document.querySelector(`#layer-${layerId} canvas`);
+  if (!canvas) return;
+  const data = canvas.toDataURL();
+  const st = getOrCreateFrameState(layerId);
+  st.canvasData = data;
+  commitCurrentState(layerId);
+}
+
+// ─── DRAW MODE ────────────────────────────────────────────────────────────────
+document.getElementById('stage').addEventListener('mousedown', e => {
+  if (S.mode !== 'draw' && S.tool !== 'draw' && S.tool !== 'eraser') return;
+  if (!S.selectedLayerId) return;
+  const el = document.getElementById(`layer-${S.selectedLayerId}`);
+  if (!el) return;
+  const canvas = el.querySelector('canvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
+  if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+
+  const ctx = canvas.getContext('2d');
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (S.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+    ctx.lineWidth = S.brushSize * 2;
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = S.brushColor;
+    ctx.lineWidth = S.brushSize;
+  }
+
+  S.painting = true;
+  S.paintCtx = ctx;
+  S.lastPX = x; S.lastPY = y;
+  ctx.beginPath();
+  ctx.arc(x, y, S.brushSize/2, 0, Math.PI*2);
+  ctx.fillStyle = S.tool === 'eraser' ? 'rgba(0,0,0,1)' : S.brushColor;
+  ctx.fill();
+  e.preventDefault();
+});
+
+// ─── SNAP LAYER Z ─────────────────────────────────────────────────────────────
+function snapLayerZ(layerId, z) {
+  const st = getOrCreateFrameState(layerId);
+  st.z = z;
+  applyLayerState(layerId, st);
+  commitCurrentState(layerId);
+  updateInspector();
+  updateDepthViz();
+  rebuildTimeline();
+  notify(`Depth → ${z > 0 ? '+' : ''}${z}`, DEPTH_LEVELS.find(l=>l.z===z)?.color || '#5b6ef5');
+}
+
+// ─── TIMELINE ─────────────────────────────────────────────────────────────────
+function rebuildTimeline() {
+  tlRuler.innerHTML = '';
+  tlTracks.innerHTML = '';
+  tlNames.innerHTML = '';
+
+  // Ruler
+  for (let i = 0; i < S.totalFrames; i++) {
+    const m = document.createElement('div');
+    m.className = 'tl-ruler-mark' + (i % 5 === 0 ? ' major' : '');
+    m.textContent = i % 5 === 0 ? i+1 : '';
+    tlRuler.appendChild(m);
+  }
+
+  // Tracks per layer
+  S.layers.forEach(layer => {
+    // Name label
+    const nameRow = document.createElement('div');
+    nameRow.className = 'tl-name-row';
+    nameRow.innerHTML = `
+      <div class="tl-name-dot" style="background:${layer.color}"></div>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${layer.name}</span>
+      <button class="layer-vis-btn" data-id="${layer.id}" title="Toggle visibility">${layer.visible ? '●' : '○'}</button>
+    `;
+    nameRow.addEventListener('click', () => selectLayer(layer.id));
+    nameRow.querySelector('.layer-vis-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      layer.visible = !layer.visible;
+      e.target.textContent = layer.visible ? '●' : '○';
+      evalFrame(S.currentFrame);
+    });
+    tlNames.appendChild(nameRow);
+
+    // Track
+    const track = document.createElement('div');
+    track.className = 'tl-track';
+    const kfs = S.keyframes.get(layer.id) || new Map();
+
+    for (let i = 0; i < S.totalFrames; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'tl-frame-cell';
+      cell.dataset.frame = i;
+      cell.dataset.layerId = layer.id;
+      if (kfs.has(i)) cell.classList.add('has-keyframe');
+      if (i === S.currentFrame) cell.classList.add('current-frame');
+
+      cell.addEventListener('click', () => {
+        S.currentFrame = i;
+        evalFrame(i);
+        if (!S.playing) rebuildTimeline();
+      });
+
+      cell.addEventListener('dblclick', () => {
+        // Toggle keyframe
+        if (kfs.has(i)) {
+          kfs.delete(i);
+          cell.classList.remove('has-keyframe');
+        } else {
+          const st = getInterpolatedState(layer.id, i) || { x:0,y:0,z:0,w:200,h:150,rot:0 };
+          setKeyframe(layer.id, i, st);
+          cell.classList.add('has-keyframe');
+        }
+        notify(`Keyframe ${kfs.has(i) ? 'added' : 'removed'} at frame ${i+1}`, layer.color);
+      });
+
+      track.appendChild(cell);
+    }
+    tlTracks.appendChild(track);
+  });
+
+  // Playhead
+  tlPlayhead.style.left = (S.currentFrame * FRAME_W + FRAME_W/2) + 'px';
+  document.getElementById('tl-inner').style.width = (S.totalFrames * FRAME_W + 20) + 'px';
+  frameTotal.textContent = `/ ${S.totalFrames}`;
+  document.getElementById('tl-fps-display').textContent = `${S.fps} fps`;
+}
+
+// ─── LAYER LIST IN INSPECTOR ──────────────────────────────────────────────────
+function rebuildLayerList() {
+  layerListEl.innerHTML = '';
+  [...S.layers].reverse().forEach(layer => {
+    const st = S.frameState.get(layer.id) || getInterpolatedState(layer.id, S.currentFrame);
+    const item = document.createElement('div');
+    item.className = 'layer-list-item' + (S.selectedLayerId === layer.id ? ' selected' : '');
+    item.innerHTML = `
+      <div class="layer-list-dot" style="background:${layer.color}"></div>
+      <span style="flex:1">${layer.name}</span>
+      <span class="layer-list-z" style="color:${DEPTH_LEVELS.find(l=>l.z===(st?.z||0))?.color||'#888'}">
+        ${st ? (st.z > 0 ? '+':'') + st.z : '?'}
+      </span>
+      <button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;padding:0 0 0 4px"
+        data-del="${layer.id}">×</button>
+    `;
+    item.addEventListener('click', e => {
+      if (!e.target.dataset.del) selectLayer(layer.id);
+    });
+    item.querySelector('[data-del]').addEventListener('click', e => {
+      e.stopPropagation();
+      removeLayer(layer.id);
+    });
+    layerListEl.appendChild(item);
+  });
+}
+
+// ─── INSPECTOR UPDATE ─────────────────────────────────────────────────────────
+function updateInspector() {
+  if (!S.selectedLayerId) {
+    document.getElementById('insp-name').textContent = '—';
+    return;
+  }
+  const layer = S.layers.find(l => l.id === S.selectedLayerId);
+  if (!layer) return;
+  const st = S.frameState.get(S.selectedLayerId) || getInterpolatedState(S.selectedLayerId, S.currentFrame);
+  if (!st) return;
+  document.getElementById('insp-name').textContent = layer.name;
+  document.getElementById('insp-x').value = Math.round(st.x);
+  document.getElementById('insp-y').value = Math.round(st.y);
+  document.getElementById('insp-z').value = st.z;
+  document.getElementById('insp-w').value = Math.round(st.w);
+  document.getElementById('insp-h').value = Math.round(st.h);
+  document.getElementById('insp-rot').value = Math.round(st.rot || 0);
+  rebuildLayerList();
+}
+
+// Inspector input handlers
+['x','y','z','w','h','rot'].forEach(field => {
+  document.getElementById(`insp-${field}`).addEventListener('change', e => {
+    if (!S.selectedLayerId) return;
+    const st = getOrCreateFrameState(S.selectedLayerId);
+    st[field] = parseFloat(e.target.value) || 0;
+    // Snap z to valid levels
+    if (field === 'z') {
+      const snap = DEPTH_LEVELS.reduce((a,b)=>Math.abs(a.z-st.z)<Math.abs(b.z-st.z)?a:b);
+      st.z = snap.z;
+      e.target.value = snap.z;
+    }
+    applyLayerState(S.selectedLayerId, st);
+    commitCurrentState(S.selectedLayerId);
+    updateDepthViz();
+  });
+});
+
+// ─── DEPTH VIZ ────────────────────────────────────────────────────────────────
+function updateDepthViz() {
+  const occupied = new Set();
+  for (const layer of S.layers) {
+    const st = S.frameState.get(layer.id) || getInterpolatedState(layer.id, S.currentFrame);
+    if (st) occupied.add(st.z);
+  }
+  document.querySelectorAll('.dv-level').forEach(el => {
+    const z = parseInt(el.dataset.z);
+    el.classList.toggle('occupied', occupied.has(z));
+  });
+}
+
+// Click depth viz to snap selected layer
+document.querySelectorAll('.dv-level').forEach(el => {
+  el.addEventListener('click', () => {
+    if (!S.selectedLayerId) return;
+    snapLayerZ(S.selectedLayerId, parseInt(el.dataset.z));
+  });
+});
+
+// ─── TOOLBAR HANDLERS ─────────────────────────────────────────────────────────
+document.getElementById('btn-add-layer').addEventListener('click', () => addLayer());
+
+document.getElementById('btn-add-keyframe').addEventListener('click', () => {
+  if (!S.selectedLayerId) { notify('Select a layer first', '#f87171'); return; }
+  const st = S.frameState.get(S.selectedLayerId) || getInterpolatedState(S.selectedLayerId, S.currentFrame);
+  if (st) {
+    setKeyframe(S.selectedLayerId, S.currentFrame, { ...st });
+    rebuildTimeline();
+    notify(`Keyframe at frame ${S.currentFrame+1}`, '#34d399');
+  }
+});
+
+document.getElementById('btn-clone-frame').addEventListener('click', () => {
+  // Duplicate current frame's keyframes to next frame
+  const nextF = S.currentFrame + 1;
+  if (nextF >= S.totalFrames) { notify('At last frame — add more frames first', '#fbbf24'); return; }
+  for (const layer of S.layers) {
+    const st = getInterpolatedState(layer.id, S.currentFrame);
+    if (st) setKeyframe(layer.id, nextF, { ...st });
+  }
+  S.currentFrame = nextF;
+  evalFrame(nextF);
+  rebuildTimeline();
+  notify(`Cloned frame ${nextF} → ${nextF+1}`, '#34d399');
+});
+
+document.getElementById('btn-onion').addEventListener('click', function() {
+  S.onionSkin = !S.onionSkin;
+  this.classList.toggle('active', S.onionSkin);
+  updateOnionSkin(S.currentFrame);
+  notify(`Onion skin ${S.onionSkin ? 'ON' : 'OFF'}`, S.onionSkin ? '#34d399' : '#888');
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (!S.selectedLayerId) { notify('Select a layer first', '#f87171'); return; }
+  const canvas = document.querySelector(`#layer-${S.selectedLayerId} canvas`);
+  if (!canvas) return;
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  saveCanvasData(S.selectedLayerId);
+  notify('Canvas cleared');
+});
+
+document.getElementById('btn-add-frame').addEventListener('click', () => {
+  S.totalFrames = Math.min(120, S.totalFrames + 1);
+  rebuildTimeline();
+});
+
+document.getElementById('btn-del-frame').addEventListener('click', () => {
+  S.totalFrames = Math.max(1, S.totalFrames - 1);
+  if (S.currentFrame >= S.totalFrames) { S.currentFrame = S.totalFrames - 1; evalFrame(S.currentFrame); }
+  rebuildTimeline();
+});
+
+document.getElementById('btn-prev-frame').addEventListener('click', () => {
+  S.currentFrame = Math.max(0, S.currentFrame - 1);
+  evalFrame(S.currentFrame);
+  rebuildTimeline();
+});
+
+document.getElementById('btn-next-frame').addEventListener('click', () => {
+  S.currentFrame = Math.min(S.totalFrames-1, S.currentFrame + 1);
+  evalFrame(S.currentFrame);
+  rebuildTimeline();
+});
+
+document.getElementById('btn-play').addEventListener('click', togglePlay);
+
+document.getElementById('btn-loop').addEventListener('click', function() {
+  S.loop = !S.loop;
+  this.classList.toggle('active', S.loop);
+});
+
+document.getElementById('fps-input').addEventListener('change', e => {
+  S.fps = Math.max(1, Math.min(60, parseInt(e.target.value) || 12));
+  e.target.value = S.fps;
+  document.getElementById('tl-fps-display').textContent = `${S.fps} fps`;
+});
+
+// Viewer sliders
+document.getElementById('sl-maxangle').addEventListener('input', e => {
+  S.maxAngle = parseInt(e.target.value);
+  document.getElementById('val-maxangle').textContent = S.maxAngle + '°';
+});
+document.getElementById('sl-lerp').addEventListener('input', e => {
+  S.lerpFactor = parseInt(e.target.value) / 100;
+  document.getElementById('val-lerp').textContent = S.lerpFactor.toFixed(2);
+});
+document.getElementById('sl-persp').addEventListener('input', e => {
+  S.perspective = parseInt(e.target.value);
+  document.getElementById('val-persp').textContent = S.perspective;
+});
+
+// Depth snap buttons
+document.getElementById('depth-snap-btns').addEventListener('click', e => {
+  const btn = e.target.closest('[data-snap]');
+  if (!btn || !S.selectedLayerId) return;
+  snapLayerZ(S.selectedLayerId, parseInt(btn.dataset.snap));
+});
+
+// Mode switcher
+document.getElementById('mode-group').addEventListener('click', e => {
+  const btn = e.target.closest('[data-mode]');
+  if (!btn) return;
+  document.querySelectorAll('.tb-mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  S.mode = btn.dataset.mode;
+  if (S.mode === 'game') startGame();
+  else if (S.mode !== 'game' && S.gameActive) stopGame();
+  notify(`Mode: ${S.mode}`, '#5b6ef5');
+});
+
+// Tool sidebar
+document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    S.tool = btn.dataset.tool;
+    // Auto-switch to draw mode if draw tool selected
+    if (S.tool === 'draw' || S.tool === 'eraser') S.mode = 'draw';
+    else S.mode = 'animate';
+  });
+});
+
+// Draw colors
+document.querySelectorAll('.draw-color').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.draw-color').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    S.brushColor = el.dataset.color;
+    S.tool = 'draw';
+    document.querySelector('[data-tool="draw"]').click();
+  });
+});
+
+// Brush size
+document.getElementById('brush-size').addEventListener('input', e => {
+  S.brushSize = parseInt(e.target.value);
+  document.getElementById('brush-size-val').textContent = S.brushSize;
+});
+
+// Export (capture frames as images)
+document.getElementById('btn-export').addEventListener('click', exportAnimation);
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+async function exportAnimation() {
+  notify('Exporting frames... (check downloads)', '#34d399');
+  const stageWrap = document.getElementById('stage-wrap');
+  const origFrame = S.currentFrame;
+
+  for (let i = 0; i < S.totalFrames; i++) {
+    S.currentFrame = i;
+    evalFrame(i);
+    await new Promise(r => setTimeout(r, 50)); // let DOM settle
+
+    // Composite all visible canvases onto one
+    const composite = document.createElement('canvas');
+    composite.width = stageWrap.clientWidth;
+    composite.height = stageWrap.clientHeight;
+    const ctx = composite.getContext('2d');
+    ctx.fillStyle = '#07080d';
+    ctx.fillRect(0,0,composite.width,composite.height);
+
+    for (const layer of [...S.layers].reverse()) {
+      if (!layer.visible) continue;
+      const st = S.frameState.get(layer.id);
+      if (!st) continue;
+      const canvas = document.querySelector(`#layer-${layer.id} canvas`);
+      if (!canvas) continue;
+
+      ctx.save();
+      ctx.translate(st.x, st.y + 26);
+      ctx.rotate((st.rot||0) * Math.PI / 180);
+      ctx.drawImage(canvas, 0, 0, st.w, st.h - 26);
+      ctx.restore();
+    }
+
+    // Download frame
+    const link = document.createElement('a');
+    link.download = `frame-${String(i+1).padStart(3,'0')}.png`;
+    link.href = composite.toDataURL('image/png');
+    link.click();
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  S.currentFrame = origFrame;
+  evalFrame(origFrame);
+  notify(`Exported ${S.totalFrames} frames!`, '#34d399');
+}
+
+// ─── KEYBOARD ────────────────────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  S.keys.add(e.code);
+
+  switch(e.code) {
+    case 'Space': e.preventDefault(); togglePlay(); break;
+    case 'ArrowRight': e.preventDefault();
+      S.currentFrame = Math.min(S.totalFrames-1, S.currentFrame+1);
+      evalFrame(S.currentFrame); if (!S.playing) rebuildTimeline(); break;
+    case 'ArrowLeft': e.preventDefault();
+      S.currentFrame = Math.max(0, S.currentFrame-1);
+      evalFrame(S.currentFrame); if (!S.playing) rebuildTimeline(); break;
+    case 'ArrowUp':
+      if (S.selectedLayerId) { e.preventDefault(); snapLayerToNext(S.selectedLayerId, 1); } break;
+    case 'ArrowDown':
+      if (S.selectedLayerId) { e.preventDefault(); snapLayerToNext(S.selectedLayerId, -1); } break;
+    case 'KeyA': addLayer(); break;
+    case 'KeyK':
+      document.getElementById('btn-add-keyframe').click(); break;
+    case 'KeyD':
+      document.getElementById('btn-clone-frame').click(); break;
+    case 'KeyV': document.querySelector('[data-tool="select"]').click(); break;
+    case 'KeyB': document.querySelector('[data-tool="draw"]').click(); break;
+    case 'KeyE': document.querySelector('[data-tool="eraser"]').click(); break;
+    case 'Delete': case 'Backspace':
+      if (S.selectedLayerId) { e.preventDefault(); removeLayer(S.selectedLayerId); } break;
+  }
+});
+window.addEventListener('keyup', e => S.keys.delete(e.code));
+
+function snapLayerToNext(layerId, dir) {
+  const st = S.frameState.get(layerId) || getInterpolatedState(layerId, S.currentFrame);
+  if (!st) return;
+  const sorted = [...DEPTH_LEVELS].sort((a,b) => b.z - a.z);
+  const idx = sorted.findIndex(l => l.z === st.z);
+  const next = sorted[Math.max(0, Math.min(sorted.length-1, idx - dir))];
+  snapLayerZ(layerId, next.z);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GAME MODE — depth-based parallax shooter
+// ═══════════════════════════════════════════════════════════════════════════
+const GAME = {
+  projectiles: [],
+  enemies: [],
+  particles: [],
+  player: { x: 0.5, z: 80 },
+  spawnTimer: 0,
+  active: false,
+  score: 0,
+  lives: 3,
+  level: 1,
+};
+
+function startGame() {
+  if (S.gameActive) return;
+  S.gameActive = true;
+  GAME.active = true;
+  GAME.score = 0; GAME.lives = 3; GAME.level = 1;
+  GAME.enemies = []; GAME.projectiles = []; GAME.particles = [];
+  GAME.player.x = 0.5; GAME.player.z = 80;
+  gameOverlay.style.display = 'block';
+  gameOverlay.style.pointerEvents = 'all';
+  gameScore.textContent = '0';
+  gameMsg.textContent = '';
+  notify('Game mode! Move mouse • Click to shoot • ↑↓ to change depth layer', '#34d399');
+  // Player is the first layer or a special layer
+  spawnPlayerLayer();
+}
+
+function stopGame() {
+  S.gameActive = false;
+  GAME.active = false;
+  gameOverlay.style.display = 'none';
+  gameOverlay.style.pointerEvents = 'none';
+  // Clean up game layers
+  const gameLayers = S.layers.filter(l => l.name.startsWith('🎮'));
+  gameLayers.forEach(l => removeLayer(l.id));
+  notify('Game ended. Score: ' + GAME.score, '#fbbf24');
+}
+
+function spawnPlayerLayer() {
+  // Remove old player
+  const old = S.layers.find(l => l.name === '🎮 Player');
+  if (old) removeLayer(old.id);
+
+  const stageW = document.getElementById('stage-wrap').clientWidth;
+  const stageH = document.getElementById('stage-wrap').clientHeight;
+  addLayer({
+    name: '🎮 Player',
+    color: '#5b6ef5',
+    z: 80,
+    x: stageW/2 - 40,
+    y: stageH - 80,
+    w: 80, h: 60,
+  });
+}
+
+let _lastGameTs = 0;
+function gameTick(ts) {
+  if (!GAME.active) return;
+  const dt = Math.min(50, ts - _lastGameTs) / 1000;
+  _lastGameTs = ts;
+
+  const stageWrap = document.getElementById('stage-wrap');
+  const W = stageWrap.clientWidth, H = stageWrap.clientHeight;
+
+  // Move player with mouse X
+  const playerLayer = S.layers.find(l => l.name === '🎮 Player');
+  if (playerLayer) {
+    const st = getOrCreateFrameState(playerLayer.id);
+    st.x = S.mx * 0.5 * W + W/2 - 40;
+    st.y = H - 80;
+    GAME.player.x = st.x / W;
+    applyLayerState(playerLayer.id, st);
+  }
+
+  // Spawn enemies
+  GAME.spawnTimer -= dt;
+  if (GAME.spawnTimer <= 0) {
+    GAME.spawnTimer = Math.max(0.3, 1.2 - GAME.level * 0.1);
+    spawnEnemy(W, H);
+  }
+
+  // Update enemies
+  GAME.enemies = GAME.enemies.filter(e => {
+    e.y += (60 + GAME.level * 15) * dt;
+    const layer = S.layers.find(l => l.name === e.layerName);
+    if (layer) {
+      const st = getOrCreateFrameState(layer.id);
+      st.y = e.y; st.x = e.x;
+      applyLayerState(layer.id, st);
+    }
+    if (e.y > H + 50) {
+      if (layer) removeLayer(layer.id);
+      GAME.lives = Math.max(0, GAME.lives - 1);
+      if (GAME.lives <= 0) gameOver();
+      return false;
+    }
+    return true;
+  });
+
+  // Update projectiles
+  GAME.projectiles = GAME.projectiles.filter(p => {
+    p.y -= 400 * dt;
+    const layer = S.layers.find(l => l.name === p.layerName);
+    if (layer) {
+      const st = getOrCreateFrameState(layer.id);
+      st.y = p.y; st.x = p.x;
+      applyLayerState(layer.id, st);
+    }
+    if (p.y < -50) {
+      if (layer) removeLayer(layer.id);
+      return false;
+    }
+    // Collision: projectile must be at SAME depth as enemy
+    for (let i = GAME.enemies.length-1; i >= 0; i--) {
+      const e = GAME.enemies[i];
+      if (Math.abs(e.z - p.z) > 50) continue; // depth mismatch — miss!
+      const ex = e.x, ey = e.y;
+      if (Math.abs(p.x - ex) < 50 && Math.abs(p.y - ey) < 50) {
+        // HIT
+        GAME.score += 10 * GAME.level;
+        gameScore.textContent = GAME.score;
+        spawnParticles(p.x, p.y, e.color || '#f87171', 12);
+        const eLayer = S.layers.find(l => l.name === e.layerName);
+        if (eLayer) removeLayer(eLayer.id);
+        GAME.enemies.splice(i, 1);
+        if (layer) removeLayer(layer.id);
+        if (GAME.score % 100 === 0) GAME.level++;
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Particle update
+  GAME.particles = GAME.particles.filter(p => {
+    p.life -= dt; p.x += p.vx*dt; p.y += p.vy*dt;
+    return p.life > 0;
+  });
+
+  gameScore.textContent = GAME.score;
+}
+
+function spawnEnemy(W, H) {
+  const zOptions = DEPTH_LEVELS.map(l => l.z);
+  const z = zOptions[Math.floor(Math.random() * zOptions.length)];
+  const depth = DEPTH_LEVELS.find(l => l.z === z);
+  const x = Math.random() * (W - 60);
+  const layerName = `🎮 Enemy-${Date.now()}`;
+
+  const layer = addLayer({
+    name: layerName,
+    color: depth.color,
+    z,
+    x, y: -60,
+    w: 50, h: 40,
+  });
+
+  // Draw enemy shape on canvas
+  const canvas = document.querySelector(`#layer-${layer.id} canvas`);
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = depth.color + 'cc';
+    ctx.beginPath();
+    ctx.moveTo(25, 5); ctx.lineTo(45, 35); ctx.lineTo(5, 35);
+    ctx.closePath(); ctx.fill();
+    // Draw z label
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(z > 0 ? '+'+z : z, 25, 28);
+  }
+
+  GAME.enemies.push({ x, y: -60, z, layerName, color: depth.color });
+}
+
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const angle = (Math.PI * 2 * i) / n;
+    GAME.particles.push({
+      x, y, color,
+      vx: Math.cos(angle) * (50 + Math.random() * 100),
+      vy: Math.sin(angle) * (50 + Math.random() * 100),
+      life: 0.4 + Math.random() * 0.3
+    });
+  }
+}
+
+function gameOver() {
+  GAME.active = false;
+  gameMsg.innerHTML = `<span style="color:#f87171">GAME OVER</span><br>
+    <span style="font-size:18px;color:#fbbf24">Score: ${GAME.score}</span><br>
+    <button onclick="location.reload()" style="margin-top:12px;padding:8px 20px;background:#5b6ef5;border:none;border-radius:8px;color:white;font-size:14px;cursor:pointer">Restart</button>`;
+  gameOverlay.style.pointerEvents = 'all';
+}
+
+// Game: click to shoot
+gameOverlay.addEventListener('click', e => {
+  if (!GAME.active) return;
+  const stageWrap = document.getElementById('stage-wrap');
+  const W = stageWrap.clientWidth, H = stageWrap.clientHeight;
+
+  const playerLayer = S.layers.find(l => l.name === '🎮 Player');
+  const pSt = playerLayer ? S.frameState.get(playerLayer.id) : null;
+  const px = pSt ? pSt.x + 30 : W/2;
+  const py = pSt ? pSt.y : H - 80;
+  const pz = pSt ? pSt.z : 80;
+
+  const layerName = `🎮 Bullet-${Date.now()}`;
+  const bullet = addLayer({
+    name: layerName,
+    color: '#34d399',
+    z: pz,  // bullet fires at same depth as player
+    x: px - 5, y: py,
+    w: 10, h: 20,
+  });
+
+  const canvas = document.querySelector(`#layer-${bullet.id} canvas`);
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#34d399';
+    ctx.fillRect(3, 0, 4, canvas.height);
+  }
+
+  GAME.projectiles.push({ x: px, y: py, z: pz, layerName });
+});
+
+// ─── INITIALIZE ───────────────────────────────────────────────────────────────
+function init() {
+  const stageW = document.getElementById('stage-wrap').clientWidth;
+  const stageH = document.getElementById('stage-wrap').clientHeight;
+
+  // Create initial demo layers across depths
+  const demos = [
+    { name:'Background', color:'#3d4d6e', z:-500, x:0, y:0, w:stageW, h:stageH, content:'bg' },
+    { name:'Mountains',  color:'#4a5568', z:-300, x:0, y:stageH*0.4, w:stageW, h:stageH*0.6, content:'mountains' },
+    { name:'Midground',  color:'#6b7d9c', z:-150, x:stageW*0.15, y:stageH*0.5, w:stageW*0.7, h:stageH*0.5, content:'mid' },
+    { name:'Character',  color:'#5b6ef5', z:0,    x:stageW/2-60, y:stageH*0.4, w:120, h:150, content:'char' },
+    { name:'Foreground', color:'#7c9ef5', z:80,   x:0, y:stageH*0.75, w:stageW, h:stageH*0.3, content:'fg' },
+  ];
+
+  demos.forEach(d => {
+    const layer = addLayer({ name:d.name, color:d.color, z:d.z, x:d.x, y:d.y, w:d.w, h:d.h });
+    const canvas = document.querySelector(`#layer-${layer.id} canvas`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const cw = canvas.width, ch = canvas.height;
+
+    if (d.content === 'bg') {
+      const grad = ctx.createLinearGradient(0, 0, 0, ch);
+      grad.addColorStop(0, '#0a0f2e');
+      grad.addColorStop(1, '#1a1f3c');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,cw,ch);
+      // Stars
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      for (let i=0;i<80;i++) {
+        const sx=Math.random()*cw, sy=Math.random()*ch;
+        const sr=Math.random()*1.5;
+        ctx.beginPath(); ctx.arc(sx,sy,sr,0,Math.PI*2); ctx.fill();
+      }
+    } else if (d.content === 'mountains') {
+      ctx.clearRect(0,0,cw,ch);
+      ctx.fillStyle = '#2a3352';
+      ctx.beginPath(); ctx.moveTo(0,ch);
+      const peaks = 8;
+      for (let i=0;i<=peaks;i++) {
+        const x = (cw/peaks)*i, y = i%2===0 ? ch*0.05 : ch*0.4;
+        ctx.lineTo(x,y);
+      }
+      ctx.lineTo(cw,ch); ctx.closePath(); ctx.fill();
+    } else if (d.content === 'mid') {
+      ctx.fillStyle = '#3a4a62';
+      ctx.beginPath(); ctx.moveTo(0,ch);
+      for (let i=0;i<=10;i++) {
+        const x=(cw/10)*i, y=i%2===0?ch*0.1:ch*0.5+Math.random()*20;
+        ctx.lineTo(x,y);
+      }
+      ctx.lineTo(cw,ch); ctx.closePath(); ctx.fill();
+    } else if (d.content === 'char') {
+      // Simple character
+      ctx.fillStyle = '#5b6ef5';
+      ctx.beginPath(); ctx.arc(cw/2, ch*0.25, 22, 0, Math.PI*2); ctx.fill(); // head
+      ctx.fillRect(cw/2-14, ch*0.45, 28, 50); // body
+      ctx.fillRect(cw/2-22, ch*0.48, 16, 10); // arm L
+      ctx.fillRect(cw/2+6,  ch*0.48, 16, 10); // arm R
+      ctx.fillRect(cw/2-14, ch*0.78, 12, 20); // leg L
+      ctx.fillRect(cw/2+2,  ch*0.78, 12, 20); // leg R
+    } else if (d.content === 'fg') {
+      ctx.fillStyle = '#1a2a18';
+      ctx.fillRect(0,0,cw,ch);
+      // grass
+      ctx.fillStyle = '#2d4a29';
+      for (let i=0;i<cw;i+=8) {
+        const gh = 15+Math.random()*20;
+        ctx.fillRect(i, 0, 6, gh);
+      }
+    }
+    saveCanvasData(layer.id);
+  });
+
+  // Set up keyframes for a simple animation: character bounces
+  const charLayer = S.layers.find(l => l.name === 'Character');
+  if (charLayer) {
+    const baseX = stageW/2 - 60, baseY = stageH*0.4;
+    for (let f = 0; f < 24; f++) {
+      const bounce = Math.sin(f / 24 * Math.PI * 2) * 20;
+      const zOsc = f < 12 ? 0 : 80;
+      setKeyframe(charLayer.id, f, {
+        x: baseX + Math.sin(f/24*Math.PI*2)*40,
+        y: baseY + bounce,
+        z: zOsc, w: 120, h: 150, rot: Math.sin(f/24*Math.PI*2)*5,
+        canvasData: getKeyframe(charLayer.id, 0)?.canvasData || null
+      });
+    }
+  }
+
+  evalFrame(0);
+  rebuildTimeline();
+  rebuildLayerList();
+  updateDepthViz();
+  scheduleTick();
+  notify('Welcome! Press Space to play the animation', '#5b6ef5');
+}
+
+// slight delay so DOM has measured sizes
+setTimeout(init, 100);
+</script>
+</body>
+</html>

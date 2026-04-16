@@ -1,0 +1,64 @@
+{
+  "name": "planespace",
+  "version": "1.0.0",
+  "description": "A DOM-native perceptual compositor. Depth parallax for standard HTML without layout mutation, scene graph takeover, or forced WebGL dependency.",
+  "type": "module",
+  "main": "./dist/planespace.cjs.js",
+  "module": "./dist/planespace.min.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/planespace.min.js",
+      "require": "./dist/planespace.cjs.js",
+      "types": "./types/index.d.ts"
+    },
+    "./react": {
+      "import": "./integrations/react/index.jsx",
+      "types": "./integrations/react/index.d.ts"
+    },
+    "./web-components": {
+      "import": "./integrations/web-components/index.js"
+    },
+    "./core": {
+      "import": "./src/core/PlanespaceCore.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "types/",
+    "integrations/",
+    "SPEC.md",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch",
+    "bench": "open docs/benchmarks.html"
+  },
+  "keywords": [
+    "parallax",
+    "depth",
+    "spatial-ui",
+    "webgl",
+    "3d",
+    "dom",
+    "html",
+    "css",
+    "compositor",
+    "perceptual",
+    "interactive"
+  ],
+  "sideEffects": false,
+  "author": "planespace contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/planespace/planespace"
+  },
+  "homepage": "https://planespace.dev",
+  "bugs": {
+    "url": "https://github.com/planespace/planespace/issues"
+  }
+}

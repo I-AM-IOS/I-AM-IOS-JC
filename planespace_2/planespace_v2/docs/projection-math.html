@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Depth Projection Math Behind Planespace</title>
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #faf9f6;
+      --ink: #1a1916;
+      --dim: #6b6a66;
+      --accent: #c84c1a;
+      --code-bg: #f0ede6;
+      --border: #e4e1d8;
+      --mono: 'JetBrains Mono', monospace;
+      --serif: 'Libre Baskerville', Georgia, serif;
+    }
+
+    body {
+      font-family: var(--serif);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .article {
+      max-width: 660px;
+      margin: 0 auto;
+      padding: 64px 24px 100px;
+    }
+
+    /* ── Header ── */
+    .article-tag {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+    }
+    .byline {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--dim);
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Body text ── */
+    p {
+      font-size: 1.05rem;
+      line-height: 1.85;
+      margin-bottom: 1.5rem;
+      color: var(--ink);
+    }
+    p + p { text-indent: 1.5em; }
+
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      letter-spacing: -0.01em;
+    }
+    h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Math/code blocks ── */
+    .math-block {
+      background: var(--code-bg);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin: 2rem 0;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+
+    pre, code {
+      font-family: var(--mono);
+    }
+    code {
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px 22px;
+      margin: 2rem 0;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.65;
+    }
+
+    /* ── Pull quote ── */
+    blockquote {
+      border-left: 3px solid var(--border);
+      margin: 2.5rem 0;
+      padding: 4px 0 4px 24px;
+      color: var(--dim);
+      font-style: italic;
+      font-size: 1.08rem;
+      line-height: 1.75;
+    }
+
+    /* ── Diagram ── */
+    .diagram {
+      background: #111118;
+      border-radius: 8px;
+      padding: 32px;
+      margin: 2.5rem 0;
+      text-align: center;
+    }
+    .diagram svg { max-width: 100%; height: auto; }
+
+    /* ── Figure ── */
+    figcaption {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--dim);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 3rem 0;
+    }
+  </style>
+</head>
+<body>
+  <article class="article">
+    <div class="article-tag">Planespace / Engineering</div>
+    <h1>The Depth Projection Math Behind Planespace</h1>
+    <div class="byline">Published 2024 · 12 min read · Technical</div>
+
+    <p>Planespace makes HTML elements appear to float at different depths in 3D space without a scene graph, WebGL, or any modification to the DOM's layout. To understand how this works, you need to understand three things: how we map Z-values to a depth texture, how viewer position maps to a parallax offset, and how a single fullscreen shader composites everything into the final frame.</p>
+
+    <p>This post covers the projection math precisely, including the derivations that informed our choices.</p>
+
+    <h2>Step 1: From data-z to Normalized Depth</h2>
+
+    <p>Every element with a <code>data-z</code> attribute declares a position in Z-space. We first convert these raw user values into a normalized <code>[0, 1]</code> range that the shader can consume:</p>
+
+    <div class="math-block">
+      normalizedDepth(z) = clamp( (z − depthRange[0]) / (depthRange[1] − depthRange[0]), 0, 1 )
+    </div>
+
+    <p>With the default <code>depthRange: [-600, 100]</code>, an element at <code>z = -600</code> gets depth <code>0</code> (far background), and an element at <code>z = 100</code> gets depth <code>1</code> (near foreground). This linearity is a deliberate choice: it keeps the math predictable and the scene editable without surprises.</p>
+
+    <blockquote>The depth projection is deterministic and documented in SPEC.md as Invariant I-6. Any given set of elements and depthRange always produces the same depth map.</blockquote>
+
+    <h2>Step 2: Building the Depth Texture</h2>
+
+    <p>Once we have normalized depth values per element, we need a per-pixel representation. The <code>DepthRegistry.generateDepthTexture(width, height)</code> method rasterizes element bounding boxes into a <code>Float32Array</code>:</p>
+
+    <pre>for (const { el, z } of entries) {
+  const rect = el.getBoundingClientRect();
+  const depth = normalize(z);
+
+  // Convert viewport rect to pixel coords
+  const x0 = Math.floor(rect.left   * (width  / window.innerWidth));
+  const y0 = Math.floor(rect.top    * (height / window.innerHeight));
+  const x1 = Math.ceil (rect.right  * (width  / window.innerWidth));
+  const y1 = Math.ceil (rect.bottom * (height / window.innerHeight));
+
+  for (let py = y0; py < y1; py++) {
+    for (let px = x0; px < x1; px++) {
+      const idx = py * width + px;
+      // Nearest-to-viewer wins
+      if (depth > data[idx]) data[idx] = depth;
+    }
+  }
+}</pre>
+
+    <p>The result is a grayscale float texture where each pixel encodes how "near" the frontmost depth element is at that screen location. Pixels with no element default to <code>0</code> (background depth).</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 500 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Depth map visualization -->
+        <rect x="0" y="0" width="500" height="200" fill="#0c0c10"/>
+
+        <!-- Background zone -->
+        <rect x="20" y="20" width="460" height="160" fill="#1a1a2a" rx="4"/>
+        <text x="250" y="100" fill="rgba(255,255,255,0.15)" font-size="11" text-anchor="middle" font-family="JetBrains Mono, monospace">background — depth: 0.0</text>
+
+        <!-- Mid element -->
+        <rect x="80" y="50" width="160" height="100" fill="#1e2e4a" rx="3"/>
+        <text x="160" y="104" fill="rgba(91,141,238,0.8)" font-size="10" text-anchor="middle" font-family="JetBrains Mono, monospace">data-z="-200" → 0.57</text>
+
+        <!-- Foreground element -->
+        <rect x="260" y="60" width="180" height="80" fill="#2a3a1a" rx="3"/>
+        <text x="350" y="104" fill="rgba(74,222,128,0.8)" font-size="10" text-anchor="middle" font-family="JetBrains Mono, monospace">data-z="80" → 0.97</text>
+
+        <!-- Labels -->
+        <text x="250" y="185" fill="rgba(255,255,255,0.3)" font-size="9" text-anchor="middle" font-family="JetBrains Mono, monospace">depth texture — brighter = nearer viewer</text>
+      </svg>
+    </div>
+    <figcaption>Conceptual depth map: pixel brightness encodes normalized Z.</figcaption>
+
+    <h2>Step 3: Viewer Angle to Parallax Offset</h2>
+
+    <p>The mouse position in the viewport maps to a normalized viewer angle. With the cursor at the horizontal center, <code>rx = 0</code>. Far right gives <code>rx = 1</code>, far left gives <code>rx = -1</code>:</p>
+
+    <div class="math-block">
+      rx = (mouseX / viewportWidth) × 2 − 1
+      ry = (mouseY / viewportHeight) × 2 − 1
+    </div>
+
+    <p>This raw value is smoothed via exponential moving average before use:</p>
+
+    <div class="math-block">
+      viewerX += (targetX − viewerX) × lerpFactor
+    </div>
+
+    <p>With <code>lerpFactor = 0.06</code>, the smoothed angle reaches 95% of the target after roughly 50 frames (~0.83 seconds at 60fps). This creates the characteristic "floating" feel.</p>
+
+    <h2>Step 4: The Warp Shader</h2>
+
+    <p>In <code>reproject</code> mode, the scene is captured as an image and passed to a WebGL2 fragment shader alongside the depth texture. The shader runs once per pixel of the output canvas:</p>
+
+    <pre>#version 300 es
+precision highp float;
+
+uniform sampler2D T_scene;   // captured DOM frame
+uniform sampler2D T_depth;   // normalized depth map
+uniform vec2 viewerAngle;    // smoothed viewer rx, ry
+uniform float warpStrength;  // parallax intensity
+
+in vec2 vUV;
+out vec4 fragColor;
+
+void main() {
+  // 1. Sample depth at this pixel
+  float depth = texture(T_depth, vUV).r;
+
+  // 2. Compute UV offset: near pixels shift more
+  vec2 offset = viewerAngle * depth * warpStrength;
+
+  // 3. Sample scene at warped UV
+  vec2 sampleUV = clamp(vUV + offset, 0.001, 0.999);
+  fragColor = texture(T_scene, sampleUV);
+}</pre>
+
+    <p>The key line is <code>offset = viewerAngle * depth * warpStrength</code>. This is a direct implementation of the parallax formula: the shift of a pixel is proportional to its apparent depth. Near objects (depth ≈ 1) shift by <code>viewerAngle × warpStrength</code>, while background pixels (depth ≈ 0) don't shift at all.</p>
+
+    <h3>Why UV space?</h3>
+
+    <p>The offset is computed in UV space (0 to 1) rather than pixel space. This makes it viewport-size-independent — the same <code>warpStrength</code> value produces the same perceptual parallax intensity regardless of whether you're on a 1080p monitor or a 4K display.</p>
+
+    <h3>Edge clamping</h3>
+
+    <p>Without clamping, warped UVs outside <code>[0, 1]</code> would wrap or mirror, creating jarring edge artifacts. We clamp to a tight inset of <code>0.001</code> rather than exactly <code>0</code> to avoid any sub-pixel bleed from the texture border.</p>
+
+    <h2>Step 5: Transform Mode Projection</h2>
+
+    <p>When WebGL2 is unavailable, Planespace falls back to CSS <code>preserve-3d</code>. The math here is classical perspective projection, offloaded entirely to the browser's compositor:</p>
+
+    <div class="math-block">
+      container.style.transform =
+        `perspective(${P}px) rotateY(${rx × maxAngle}deg) rotateX(${−ry × maxAngle}deg)`
+    </div>
+
+    <p>Each depth element receives <code>translateZ(z)px</code>. The browser projects these into screen space using standard perspective division:</p>
+
+    <div class="math-block">
+      screenX = (worldX × P) / (P − z)
+      screenY = (worldY × P) / (P − z)
+    </div>
+
+    <p>Where <code>P</code> is the perspective distance in pixels (default 900). Near elements (<code>z</code> positive) appear larger and shift more during rotation. This is exactly the correct perceptual behavior.</p>
+
+    <h2>Temporal Smoothing</h2>
+
+    <p>The depth texture is expensive to regenerate (it requires a pass over all element bounding boxes). We avoid regenerating it every frame unless the DOM changes. Between regenerations, we apply temporal smoothing to prevent visible flickering on frame boundaries:</p>
+
+    <div class="math-block">
+      finalDepth[i] = prevDepth[i] × temporalSmoothing + currentDepth[i] × (1 − temporalSmoothing)
+    </div>
+
+    <p>With <code>temporalSmoothing = 0.85</code>, this is an 85/15 blend of the previous and current depth map. It acts as a low-pass filter on the depth texture, smoothing out any per-frame jitter from <code>getBoundingClientRect()</code> precision.</p>
+
+    <h2>Chromatic Aberration (Optional)</h2>
+
+    <p>Near-plane elements can optionally render with RGB channel separation — simulating the lens aberration of a real camera pointed at a near object. The effect scales with depth:</p>
+
+    <div class="math-block">
+      chromaticOffset = depth × chromaticStrength
+      R = sample(T_scene, sampleUV + vec2(ca, 0.0)).r
+      G = sample(T_scene, sampleUV).g
+      B = sample(T_scene, sampleUV − vec2(ca, 0.0)).b
+    </div>
+
+    <p>Background pixels (depth ≈ 0) see zero channel split; foreground pixels get the full offset. This creates a subtle visual cue that near objects are physically "in front" of the focal plane.</p>
+
+    <h2>What This Isn't</h2>
+
+    <p>This is not ray casting, not volume rendering, and not a proper 3D projection. We are remapping UV coordinates based on a simplified depth signal derived from DOM bounding boxes. Overlapping elements at different depths will have a rectangular depth boundary at their box edges — not a per-pixel alpha depth edge. This is an intentional tradeoff: it keeps the system DOM-native, deterministic, and O(n) in element count.</p>
+
+    <p>For scenes with complex transparency and non-rectangular depth boundaries, a proper 3D engine is the right tool. Planespace is for the 95% of web UIs that are made of rectangular boxes and benefit from perceptual depth without the overhead of a retained scene graph.</p>
+
+    <hr>
+
+    <p>The implementation lives in <code>src/shader/WarpShader.js</code> and <code>src/core/DepthRegistry.js</code>. The formal invariants are documented in <code>SPEC.md</code>. Performance benchmarks are in <code>docs/benchmarks.html</code>.</p>
+
+  </article>
+</body>
+</html>

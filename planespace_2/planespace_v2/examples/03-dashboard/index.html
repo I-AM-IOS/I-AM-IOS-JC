@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planespace — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #09090f;
+      --surface: #111118;
+      --panel: rgba(255,255,255,0.035);
+      --panel-border: rgba(255,255,255,0.07);
+      --text: #d8d8e8;
+      --dim: rgba(216,216,232,0.4);
+      --green: #39d98a;
+      --amber: #f5a623;
+      --red: #f56262;
+      --blue: #5b8dee;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      overflow: hidden;
+      font-family: var(--sans);
+      color: var(--text);
+    }
+
+    .scene {
+      width: 100vw; height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Deep background ── */
+    .bg-field {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 50% 50% at 50% 50%, rgba(91,141,238,0.04) 0%, transparent 70%),
+        var(--bg);
+    }
+
+    /* ── Dot grid ── */
+    .dot-grid {
+      position: absolute; inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.4;
+    }
+
+    /* ── Layout ── */
+    .dashboard-layout {
+      position: absolute; inset: 0;
+      display: grid;
+      grid-template-columns: 220px 1fr 1fr 220px;
+      grid-template-rows: 64px 1fr 1fr 48px;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    /* ── Panel base ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-title {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 12px;
+    }
+    .panel-val {
+      font-family: var(--mono);
+      font-size: 2rem;
+      font-weight: 400;
+      color: var(--text);
+      line-height: 1;
+    }
+    .panel-delta {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      margin-top: 6px;
+    }
+    .delta-up { color: var(--green); }
+    .delta-down { color: var(--red); }
+
+    /* ── Header ── */
+    .header {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      background: transparent;
+      border: none;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+    .header-logo {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .header-logo span { color: var(--blue); }
+    .header-status {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--dim);
+    }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Sidebar panels ── */
+    .sidebar-l { grid-column: 1; grid-row: 2 / 4; }
+    .sidebar-r { grid-column: 4; grid-row: 2 / 4; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 8px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      color: var(--dim);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+      margin-bottom: 2px;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .nav-item.active { background: rgba(91,141,238,0.12); color: var(--blue); }
+    .nav-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+    /* ── Main chart area ── */
+    .chart-main { grid-column: 2; grid-row: 2; }
+    .chart-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .chart-svg {
+      width: 100%; height: 100%;
+    }
+
+    /* ── Metric cards ── */
+    .metric-1 { grid-column: 3; grid-row: 2; }
+    .metric-2 { grid-column: 2; grid-row: 3; }
+    .metric-3 { grid-column: 3; grid-row: 3; }
+
+    /* ── Mini sparkline ── */
+    .sparkline {
+      flex: 1;
+      margin-top: 8px;
+    }
+
+    /* ── Activity feed ── */
+    .activity-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.78rem;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .activity-text { color: var(--dim); line-height: 1.4; }
+    .activity-text strong { color: var(--text); font-weight: 500; }
+    .activity-time {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: rgba(216,216,232,0.25);
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      grid-column: 1 / -1;
+      grid-row: 4;
+      background: transparent;
+      border: none;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+    .footer-text {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: rgba(216,216,232,0.2);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Depth indicator ── */
+    #depth-meter {
+      position: absolute;
+      bottom: 80px; right: 28px;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: rgba(216,216,232,0.3);
+      pointer-events: none;
+      text-align: right;
+    }
+    #depth-meter span {
+      display: block;
+      margin-bottom: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="scene" id="scene">
+
+    <!-- Layer: -400 deep background -->
+    <div class="bg-field" data-z="-400"></div>
+    <div class="dot-grid" data-z="-380"></div>
+
+    <!-- Layout wrapper: mid layer -->
+    <div class="dashboard-layout">
+
+      <!-- Header: -60 -->
+      <div class="panel header" data-z="-60">
+        <div class="header-logo">Plan<span>espace</span> / dashboard</div>
+        <div class="header-status">
+          <div class="status-dot"></div>
+          Live — last update 2s ago
+        </div>
+        <div style="font-family:var(--mono);font-size:0.68rem;color:var(--dim)" id="viewer-display">
+          viewer x=0.000 y=0.000
+        </div>
+      </div>
+
+      <!-- Left sidebar: -20 -->
+      <div class="panel sidebar-l" data-z="-20">
+        <div class="panel-title">Navigation</div>
+        <div class="nav-item active"><span class="nav-dot"></span> Overview</div>
+        <div class="nav-item"><span class="nav-dot"></span> Systems</div>
+        <div class="nav-item"><span class="nav-dot"></span> Ingestion</div>
+        <div class="nav-item"><span class="nav-dot"></span> Alerts</div>
+        <div class="nav-item"><span class="nav-dot"></span> Reports</div>
+        <div style="flex:1"></div>
+        <div class="panel-title" style="margin-bottom:8px">Depth layers</div>
+        <div id="depth-list" style="font-family:var(--mono);font-size:0.65rem;color:var(--dim);line-height:1.8"></div>
+      </div>
+
+      <!-- Main chart: 0 -->
+      <div class="panel chart-main" data-z="0">
+        <div class="panel-title">Request rate — 7 day</div>
+        <div class="chart-area">
+          <svg class="chart-svg" viewBox="0 0 400 120" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#5b8dee" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#5b8dee" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0 90 C40 80 60 70 80 65 S120 50 150 48 S190 45 220 40 S260 35 290 38 S330 42 360 36 S390 30 400 28 L400 120 L0 120 Z"
+              fill="url(#chartGrad)"/>
+            <path d="M0 90 C40 80 60 70 80 65 S120 50 150 48 S190 45 220 40 S260 35 290 38 S330 42 360 36 S390 30 400 28"
+              fill="none" stroke="#5b8dee" stroke-width="1.5"/>
+            <!-- Data points -->
+            <circle cx="80" cy="65" r="3" fill="#5b8dee" opacity="0.8"/>
+            <circle cx="150" cy="48" r="3" fill="#5b8dee" opacity="0.8"/>
+            <circle cx="220" cy="40" r="3" fill="#5b8dee" opacity="0.8"/>
+            <circle cx="290" cy="38" r="3" fill="#5b8dee" opacity="0.8"/>
+            <circle cx="400" cy="28" r="4" fill="#5b8dee"/>
+            <!-- Grid lines -->
+            <line x1="0" y1="30" x2="400" y2="30" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="0" y1="60" x2="400" y2="60" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <line x1="0" y1="90" x2="400" y2="90" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Top-right metric: 20 (foreground) -->
+      <div class="panel metric-1" data-z="20">
+        <div class="panel-title">Active nodes</div>
+        <div class="panel-val" id="node-count">1,284</div>
+        <div class="panel-delta delta-up">↑ 3.2% from yesterday</div>
+        <svg class="sparkline" viewBox="0 0 120 32" preserveAspectRatio="none">
+          <polyline points="0,28 20,24 40,20 60,22 80,14 100,10 120,8"
+            fill="none" stroke="var(--green)" stroke-width="1.5" opacity="0.7"/>
+        </svg>
+      </div>
+
+      <!-- Lower-left chart: -10 -->
+      <div class="panel metric-2" data-z="-10">
+        <div class="panel-title">Error rate</div>
+        <div class="panel-val" style="color:var(--red)">0.8%</div>
+        <div class="panel-delta delta-down">↓ within threshold</div>
+        <svg class="sparkline" viewBox="0 0 120 32" preserveAspectRatio="none">
+          <polyline points="0,14 20,18 40,20 60,16 80,12 100,14 120,13"
+            fill="none" stroke="var(--amber)" stroke-width="1.5" opacity="0.7"/>
+        </svg>
+      </div>
+
+      <!-- Lower-right: 30 (most foreground) -->
+      <div class="panel metric-3" data-z="30">
+        <div class="panel-title">Activity feed</div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(57,217,138,0.15);color:var(--green)">↑</div>
+          <div class="activity-text"><strong>api-gateway-03</strong> scaled up — 4→8 replicas</div>
+          <div class="activity-time">12s</div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(91,141,238,0.15);color:var(--blue)">⟳</div>
+          <div class="activity-text"><strong>cache-layer</strong> flush completed</div>
+          <div class="activity-time">48s</div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon" style="background:rgba(245,166,35,0.15);color:var(--amber)">!</div>
+          <div class="activity-text"><strong>region-eu-west</strong> latency spike — monitoring</div>
+          <div class="activity-time">2m</div>
+        </div>
+      </div>
+
+      <!-- Right sidebar: -30 -->
+      <div class="panel sidebar-r" data-z="-30">
+        <div class="panel-title">System health</div>
+        <div id="health-list">
+          <div style="margin-bottom:12px">
+            <div style="font-size:0.75rem;color:var(--dim);margin-bottom:4px">CPU</div>
+            <div style="height:4px;background:var(--panel-border);border-radius:2px;overflow:hidden">
+              <div style="width:42%;height:100%;background:var(--green);border-radius:2px"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.65rem;color:var(--dim);margin-top:3px">42%</div>
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:0.75rem;color:var(--dim);margin-bottom:4px">Memory</div>
+            <div style="height:4px;background:var(--panel-border);border-radius:2px;overflow:hidden">
+              <div style="width:67%;height:100%;background:var(--amber);border-radius:2px"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.65rem;color:var(--dim);margin-top:3px">67%</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--dim);margin-bottom:4px">Network I/O</div>
+            <div style="height:4px;background:var(--panel-border);border-radius:2px;overflow:hidden">
+              <div style="width:28%;height:100%;background:var(--blue);border-radius:2px"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:0.65rem;color:var(--dim);margin-top:3px">28%</div>
+          </div>
+          <div style="flex:1"></div>
+          <div class="panel-title" style="margin-top:auto;margin-bottom:8px">Planespace</div>
+          <div id="ps-stats" style="font-family:var(--mono);font-size:0.65rem;color:var(--dim);line-height:1.9"></div>
+        </div>
+      </div>
+
+      <!-- Footer: -80 -->
+      <div class="panel footer" data-z="-80">
+        <div class="footer-text">planespace dashboard example — move cursor to explore depth layers</div>
+        <div class="footer-text" id="fps-display">fps: — · frames: 0</div>
+      </div>
+
+    </div>
+
+    <!-- Depth meter: 60 (most foreground) -->
+    <div id="depth-meter" data-z="60">
+      <span id="dm-x">x: 0.000</span>
+      <span id="dm-y">y: 0.000</span>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { Planespace } from '../../src/index.js';
+
+    const ps = new Planespace({
+      inputMode: 'mouse',
+      maxAngle: 5,
+      lerpFactor: 0.07,
+      warpMode: 'transform',
+      depthRange: [-400, 60],
+      perspective: 1400,
+    });
+
+    await ps.mount(document.getElementById('scene'));
+
+    // Live viewer display
+    ps.on('frame', ({ rx, ry, frameCount }) => {
+      document.getElementById('viewer-display').textContent =
+        `viewer x=${rx.toFixed(3)} y=${ry.toFixed(3)}`;
+      document.getElementById('dm-x').textContent = `x: ${rx.toFixed(3)}`;
+      document.getElementById('dm-y').textContent = `y: ${ry.toFixed(3)}`;
+
+      if (frameCount % 30 === 0) {
+        const m = ps.getPerformanceMetrics();
+        document.getElementById('fps-display').textContent =
+          `fps: ${m.fps} · frames: ${m.frameCount}`;
+        document.getElementById('ps-stats').innerHTML =
+          `mode: ${ps.warpMode}<br>` +
+          `elements: ${ps.depthElementCount}<br>` +
+          `fps: ${m.fps}<br>` +
+          `uptime: ${(m.uptimeMs/1000).toFixed(1)}s`;
+      }
+    });
+
+    // Show depth layers in sidebar
+    ps.on('ready', () => {
+      const entries = [...document.querySelectorAll('[data-z]')]
+        .map(el => parseFloat(el.getAttribute('data-z')))
+        .sort((a, b) => b - a);
+      const unique = [...new Set(entries)];
+      document.getElementById('depth-list').innerHTML =
+        unique.map(z => `z=${z}`).join('<br>');
+    });
+
+    // Simulate live node count updates
+    setInterval(() => {
+      const base = 1284;
+      const v = base + Math.floor(Math.random() * 40 - 20);
+      document.getElementById('node-count').textContent = v.toLocaleString();
+    }, 3000);
+  </script>
+</body>
+</html>

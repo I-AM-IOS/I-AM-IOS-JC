@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planespace — Interactive Story</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inconsolata:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #060810;
+      --paper: #e8e2d4;
+      --gold: #c9a84c;
+      --dim: rgba(232,226,212,0.45);
+      --border: rgba(201,168,76,0.2);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      overflow: hidden;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      color: var(--paper);
+    }
+
+    .scene {
+      width: 100vw; height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Stars / deep field ── */
+    .stars {
+      position: absolute; inset: -5%;
+      background:
+        radial-gradient(1px 1px at 12% 18%, rgba(232,226,212,0.7) 0%, transparent 1px),
+        radial-gradient(1px 1px at 38% 7%, rgba(201,168,76,0.6) 0%, transparent 1px),
+        radial-gradient(1px 1px at 65% 22%, rgba(232,226,212,0.5) 0%, transparent 1px),
+        radial-gradient(1px 1px at 82% 14%, rgba(232,226,212,0.8) 0%, transparent 1px),
+        radial-gradient(1px 1px at 91% 35%, rgba(201,168,76,0.5) 0%, transparent 1px),
+        radial-gradient(1.5px 1.5px at 24% 48%, rgba(232,226,212,0.6) 0%, transparent 1px),
+        radial-gradient(1px 1px at 55% 52%, rgba(201,168,76,0.7) 0%, transparent 1px),
+        radial-gradient(1px 1px at 77% 61%, rgba(232,226,212,0.4) 0%, transparent 1px),
+        radial-gradient(1px 1px at 8%  72%, rgba(232,226,212,0.5) 0%, transparent 1px),
+        radial-gradient(2px 2px at 46% 81%, rgba(201,168,76,0.4) 0%, transparent 1px),
+        radial-gradient(1px 1px at 89% 78%, rgba(232,226,212,0.6) 0%, transparent 1px),
+        var(--bg);
+    }
+
+    /* ── Nebula glow ── */
+    .nebula {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.18;
+    }
+    .nebula-1 {
+      width: 600px; height: 400px;
+      background: #3b1e6e;
+      top: -100px; left: -80px;
+    }
+    .nebula-2 {
+      width: 500px; height: 500px;
+      background: #1e3b6e;
+      bottom: -80px; right: -60px;
+    }
+
+    /* ── Mountain silhouette ── */
+    .mountains {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 42vh;
+      overflow: hidden;
+    }
+    .mountains svg {
+      width: 100%; height: 100%;
+    }
+
+    /* ── Moon ── */
+    .moon {
+      position: absolute;
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 36%, #f5e9c2 0%, #c9a84c 40%, #8a6928 100%);
+      box-shadow: 0 0 60px rgba(201,168,76,0.35), 0 0 120px rgba(201,168,76,0.12);
+      top: 14%; right: 18%;
+    }
+
+    /* ── Decorative rule ── */
+    .ornament {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 480px;
+      text-align: center;
+    }
+    .ornament-line {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--border);
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      font-family: 'Inconsolata', monospace;
+    }
+    .ornament-line::before, .ornament-line::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Story text ── */
+    .chapter-number {
+      position: absolute;
+      top: 9%; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Inconsolata', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.35em;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    .story-block {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 520px;
+      text-align: center;
+    }
+    .story-block h1 {
+      font-size: clamp(2.4rem, 5vw, 4.2rem);
+      font-weight: 300;
+      line-height: 1.12;
+      letter-spacing: 0.02em;
+      color: var(--paper);
+      margin-bottom: 24px;
+    }
+    .story-block h1 em {
+      font-style: italic;
+      color: var(--gold);
+    }
+    .story-block p {
+      font-size: 1.05rem;
+      font-weight: 300;
+      line-height: 1.85;
+      color: var(--dim);
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    /* ── Quote block ── */
+    .pull-quote {
+      position: absolute;
+      left: 5%; top: 28%;
+      max-width: 220px;
+      border-left: 1px solid var(--border);
+      padding-left: 20px;
+    }
+    .pull-quote p {
+      font-size: 0.9rem;
+      font-style: italic;
+      font-weight: 300;
+      line-height: 1.7;
+      color: var(--dim);
+    }
+
+    /* ── Bottom caption ── */
+    .caption {
+      position: absolute;
+      bottom: 8%; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Inconsolata', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      color: rgba(201,168,76,0.4);
+      text-transform: uppercase;
+    }
+
+    /* ── Scroll indicator ── */
+    .scroll-hint {
+      position: absolute;
+      right: 5%; top: 50%;
+      transform: translateY(-50%) rotate(90deg);
+      font-family: 'Inconsolata', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.3em;
+      color: rgba(232,226,212,0.25);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="scene" id="scene">
+
+    <!-- Layer: -600 deep field -->
+    <div class="stars" data-z="-600"></div>
+    <div class="nebula nebula-1" data-z="-500"></div>
+    <div class="nebula nebula-2" data-z="-460"></div>
+
+    <!-- Layer: -280 moon -->
+    <div class="moon" data-z="-280"></div>
+
+    <!-- Layer: -180 distant mountains -->
+    <div class="mountains" data-z="-180">
+      <svg viewBox="0 0 1440 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 300 L0 200 L120 150 L240 180 L340 120 L480 160 L560 100 L680 145 L800 90 L920 135 L1040 80 L1160 125 L1280 95 L1380 140 L1440 120 L1440 300 Z"
+          fill="#0d0f1a" opacity="0.9"/>
+        <path d="M0 300 L0 240 L150 200 L260 220 L380 185 L500 210 L620 180 L740 200 L860 170 L980 190 L1100 165 L1220 185 L1340 175 L1440 190 L1440 300 Z"
+          fill="#0b0d17" opacity="1"/>
+      </svg>
+    </div>
+
+    <!-- Layer: -100 pull quote side -->
+    <div class="pull-quote" data-z="-100">
+      <p>"The eye that sees depth does not see distance — it perceives relation."</p>
+    </div>
+
+    <!-- Layer: -60 ornament / chapter number -->
+    <div class="chapter-number" data-z="-60">Chapter I — Threshold</div>
+
+    <!-- Layer: 0 main story block -->
+    <div class="story-block" data-z="0">
+      <h1>Beyond the <em>threshold</em> of the seen</h1>
+      <p>She had walked through a thousand rooms and none of them had held still. The walls breathed. The doors moved as she moved — responding, calculating, knowing where she was before she did.</p>
+    </div>
+
+    <!-- Layer: 50 ornament rule near -->
+    <div class="ornament" style="top:calc(50% + 140px)" data-z="50">
+      <div class="ornament-line">∗ ∗ ∗</div>
+    </div>
+
+    <!-- Layer: -40 caption -->
+    <div class="caption" data-z="-40">Move your cursor to explore depth</div>
+
+    <div class="scroll-hint" data-z="-30">Scroll to advance</div>
+
+  </div>
+
+  <script type="module">
+    import { Planespace } from '../../src/index.js';
+
+    const ps = new Planespace({
+      inputMode: 'mouse',
+      maxAngle: 9,
+      lerpFactor: 0.04,
+      warpMode: 'transform',
+      depthRange: [-600, 80],
+      perspective: 1200,
+    });
+
+    await ps.mount(document.getElementById('scene'));
+  </script>
+</body>
+</html>

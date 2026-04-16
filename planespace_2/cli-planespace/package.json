@@ -1,0 +1,15 @@
+{
+  "name": "planespace-cli",
+  "version": "1.0.0",
+  "description": "CLI for planespace — scaffold, audit, and serve perceptual 3D interfaces",
+  "type": "module",
+  "bin": {
+    "planespace": "./bin/planespace.js"
+  },
+  "scripts": {
+    "test": "node bin/planespace.js --help"
+  },
+  "engines": { "node": ">=18" },
+  "keywords": ["planespace", "3d", "depth", "parallax", "webgl"],
+  "license": "MIT"
+}
