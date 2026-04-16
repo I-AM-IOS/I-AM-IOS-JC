@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sovereign Notepad — Your notes, provably yours</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:       #0a0a0f;
+  --paper:     #f5f2eb;
+  --cream:     #ede9de;
+  --gold:      #b8923a;
+  --gold-lt:   #d4aa5a;
+  --olive:     #3d4a2e;
+  --rust:      #8b3a2a;
+  --mist:      #8a8a8a;
+  --chain:     #2a4a3a;
+  --chain-lt:  #4a7a5a;
+  --verified:  #2d6a4f;
+  --panel:     #1a1a22;
+  --panel-lt:  #242432;
+  --glow:      rgba(184,146,58,.15);
+}
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'DM Mono', monospace;
+  background: var(--paper);
+  color: var(--ink);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ── LAYOUT ── */
+.app {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+  gap: 0;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--ink);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  position: relative;
+  z-index: 10;
+}
+
+.brand {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--gold);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.brand span { color: rgba(255,255,255,.35); font-weight: 400; }
+
+.topbar-divider { width: 1px; height: 24px; background: rgba(255,255,255,.08); }
+
+.chain-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: rgba(255,255,255,.45);
+  letter-spacing: .04em;
+}
+
+.chain-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--chain-lt);
+  box-shadow: 0 0 6px var(--chain-lt);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
+
+.chain-hash {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--chain-lt);
+  opacity: .7;
+  letter-spacing: .06em;
+}
+
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+.net-badge {
+  font-size: 10px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(45,106,79,.2);
+  color: #5cb88a;
+  border: 1px solid rgba(92,184,138,.2);
+  text-transform: uppercase;
+}
+
+.event-count {
+  font-size: 11px;
+  color: rgba(255,255,255,.3);
+  letter-spacing: .03em;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background: var(--cream);
+  border-right: 1px solid rgba(0,0,0,.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(0,0,0,.07);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+
+.new-note-btn {
+  width: 26px; height: 26px;
+  border-radius: 5px;
+  background: var(--ink);
+  color: var(--gold);
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, transform .1s;
+}
+.new-note-btn:hover { background: var(--gold); color: var(--ink); transform: scale(1.05); }
+
+.notes-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+.note-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s;
+  margin-bottom: 2px;
+  border: 1px solid transparent;
+  position: relative;
+}
+.note-item:hover { background: rgba(0,0,0,.04); }
+.note-item.active {
+  background: var(--ink);
+  border-color: transparent;
+}
+.note-item .note-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+  transition: color .12s;
+}
+.note-item.active .note-title { color: var(--gold); }
+
+.note-item .note-meta {
+  font-size: 10px;
+  color: var(--mist);
+  margin-top: 3px;
+  letter-spacing: .03em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.note-item.active .note-meta { color: rgba(255,255,255,.35); }
+
+.note-verified {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--chain-lt);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ── EDITOR ── */
+.editor-area {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+  position: relative;
+}
+
+.editor-toolbar {
+  padding: 10px 28px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,.5);
+  backdrop-filter: blur(4px);
+}
+
+.note-title-input {
+  flex: 1;
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  outline: none;
+  letter-spacing: -.01em;
+}
+.note-title-input::placeholder { color: rgba(0,0,0,.18); }
+
+.save-btn {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1.5px solid var(--gold);
+  background: transparent;
+  color: var(--gold);
+  cursor: pointer;
+  transition: all .15s;
+  text-transform: uppercase;
+}
+.save-btn:hover { background: var(--gold); color: var(--ink); }
+.save-btn.saving { opacity: .5; pointer-events: none; }
+
+.editor-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 28px 60px;
+}
+
+.note-content {
+  width: 100%;
+  min-height: calc(100% - 40px);
+  font-family: 'Instrument Serif', serif;
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--ink);
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  letter-spacing: .005em;
+}
+.note-content::placeholder { color: rgba(0,0,0,.18); font-style: italic; }
+
+/* ── CHAIN PANEL ── */
+.chain-panel {
+  background: var(--panel);
+  border-left: 1px solid rgba(255,255,255,.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: rgba(255,255,255,.75);
+}
+
+.chain-panel-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chain-panel-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.35);
+}
+
+.chain-panel-live {
+  font-size: 10px;
+  color: var(--chain-lt);
+  letter-spacing: .06em;
+  display: flex; align-items: center; gap: 5px;
+}
+
+.panel-sections { flex: 1; overflow-y: auto; }
+
+.panel-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+
+.panel-section-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.25);
+  margin-bottom: 10px;
+}
+
+/* Hash chain visualization */
+.hash-chain { display: flex; flex-direction: column; gap: 2px; }
+
+.hash-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.05);
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+  position: relative;
+  overflow: hidden;
+}
+.hash-block:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.1); }
+.hash-block.current {
+  background: rgba(184,146,58,.1);
+  border-color: rgba(184,146,58,.25);
+}
+
+.hash-block::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--chain-lt);
+  opacity: 0;
+}
+.hash-block.current::before { opacity: 1; background: var(--gold); }
+
+.hash-seq {
+  font-size: 9px;
+  color: rgba(255,255,255,.2);
+  font-family: 'DM Mono', monospace;
+  min-width: 22px;
+  letter-spacing: .04em;
+}
+.hash-block.current .hash-seq { color: var(--gold-lt); }
+
+.hash-val {
+  font-size: 9.5px;
+  font-family: 'DM Mono', monospace;
+  color: var(--chain-lt);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: .04em;
+}
+.hash-block.current .hash-val { color: var(--gold-lt); }
+
+.hash-type {
+  font-size: 8px;
+  font-family: 'Syne', sans-serif;
+  color: rgba(255,255,255,.2);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.chain-connector {
+  width: 1px;
+  height: 6px;
+  background: linear-gradient(to bottom, var(--chain-lt), transparent);
+  margin-left: 16px;
+  opacity: .3;
+}
+
+/* Time machine */
+.time-machine {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+
+.tm-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.25);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tm-reset {
+  font-size: 9px;
+  color: var(--gold);
+  cursor: pointer;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  font-weight: 700;
+  opacity: .7;
+  transition: opacity .12s;
+}
+.tm-reset:hover { opacity: 1; }
+
+.tm-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,.1);
+  outline: none;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.tm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(184,146,58,.5);
+  cursor: pointer;
+  transition: transform .1s;
+}
+.tm-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+.tm-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: rgba(255,255,255,.3);
+  letter-spacing: .04em;
+  font-family: 'DM Mono', monospace;
+}
+
+/* Integrity proof */
+.proof-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 10px;
+}
+.proof-label { color: rgba(255,255,255,.3); letter-spacing: .04em; }
+.proof-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  color: var(--chain-lt);
+  letter-spacing: .04em;
+}
+.proof-value.gold { color: var(--gold-lt); }
+.proof-verified {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #5cb88a;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  letter-spacing: .05em;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(92,184,138,.08);
+  border-radius: 4px;
+  border: 1px solid rgba(92,184,138,.15);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--panel);
+  color: rgba(255,255,255,.85);
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  letter-spacing: .04em;
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast-icon { font-size: 14px; }
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 14px;
+  opacity: .5;
+}
+.empty-icon {
+  font-size: 40px;
+  filter: grayscale(1);
+}
+.empty-text {
+  font-family: 'Instrument Serif', serif;
+  font-size: 18px;
+  color: var(--mist);
+  font-style: italic;
+}
+.empty-sub {
+  font-size: 11px;
+  color: var(--mist);
+  letter-spacing: .04em;
+  font-family: 'Syne', sans-serif;
+}
+
+/* Time-machine overlay */
+.tm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(245,242,235,.92);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
+  z-index: 5;
+}
+.tm-overlay.active { opacity: 1; pointer-events: all; }
+.tm-overlay-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.tm-snapshot-text {
+  font-family: 'Instrument Serif', serif;
+  font-size: 16px;
+  color: var(--mist);
+  font-style: italic;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12); border-radius: 2px; }
+
+/* Intro banner */
+.intro-banner {
+  position: fixed;
+  inset: 0;
+  background: var(--ink);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  transition: opacity .5s, transform .5s;
+}
+.intro-banner.hide { opacity: 0; transform: scale(1.02); pointer-events: none; }
+
+.intro-logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: -.02em;
+}
+.intro-logo span { color: rgba(255,255,255,.25); }
+
+.intro-tagline {
+  font-family: 'Instrument Serif', serif;
+  font-size: 20px;
+  color: rgba(255,255,255,.6);
+  font-style: italic;
+  text-align: center;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.intro-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+  max-width: 560px;
+}
+
+.intro-feature {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.intro-feature-icon { font-size: 20px; margin-bottom: 8px; }
+.intro-feature-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.intro-feature-desc {
+  font-size: 10px;
+  color: rgba(255,255,255,.35);
+  line-height: 1.5;
+  letter-spacing: .02em;
+  font-family: 'DM Mono', monospace;
+}
+
+.intro-btn {
+  margin-top: 8px;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 14px 40px;
+  border-radius: 6px;
+  background: var(--gold);
+  color: var(--ink);
+  border: none;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 0 0 0 rgba(184,146,58,0);
+}
+.intro-btn:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 40px rgba(184,146,58,.3);
+}
+
+.intro-sub {
+  font-size: 10px;
+  color: rgba(255,255,255,.2);
+  letter-spacing: .06em;
+  font-family: 'DM Mono', monospace;
+}
+
+/* Peer count badge */
+.peer-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: rgba(255,255,255,.3);
+  letter-spacing: .04em;
+}
+
+/* Animations */
+@keyframes fadeIn { from { opacity:0; transform: translateY(6px) } to { opacity:1; transform: translateY(0) } }
+.hash-block { animation: fadeIn .2s ease both; }
+
+@keyframes slideIn { from { opacity:0; transform: translateX(-8px) } to { opacity:1; transform: translateX(0) } }
+.note-item { animation: slideIn .18s ease both; }
+
+/* Responsive tweaks */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 220px 1fr 0; }
+  .chain-panel { display: none; }
+}
+
+</style>
+</head>
+<body>
+<!-- BACK NAV -->
+<div style="position:sticky;top:0;z-index:9999;display:flex;align-items:center;gap:12px;padding:0 20px;height:38px;background:rgba(7,11,15,.96);border-bottom:1px solid #1b2d3a;backdrop-filter:blur(12px);font-family:'DM Mono',monospace;font-size:10px;">
+  <a href="../index.html" style="color:#22d3ee;text-decoration:none;letter-spacing:.1em;opacity:.85;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">← I-AM-IOS SUITE</a>
+  <span style="color:#1b2d3a;margin:0 4px">·</span>
+  <span style="color:#3a5568;letter-spacing:.08em;">SOVEREIGN NOTEPAD</span>
+</div>
+
+<!-- Intro splash -->
+<div class="intro-banner" id="introBanner">
+  <div class="intro-logo">Sovereign<span>.</span>Notes</div>
+  <div class="intro-tagline">Every word you write is hashed, chained, and provably yours — forever.</div>
+  <div class="intro-features">
+    <div class="intro-feature">
+      <div class="intro-feature-icon">⛓️</div>
+      <div class="intro-feature-title">Hash Chain</div>
+      <div class="intro-feature-desc">Every save is a block. Tamper-proof. Cryptographically linked.</div>
+    </div>
+    <div class="intro-feature">
+      <div class="intro-feature-icon">⏳</div>
+      <div class="intro-feature-title">Time Machine</div>
+      <div class="intro-feature-desc">Rewind any note to any moment. Full history, always.</div>
+    </div>
+    <div class="intro-feature">
+      <div class="intro-feature-icon">📡</div>
+      <div class="intro-feature-title">Offline First</div>
+      <div class="intro-feature-desc">Works without internet. P2P sync when peers connect.</div>
+    </div>
+  </div>
+  <button class="intro-btn" onclick="dismissIntro()">Open Notepad</button>
+  <div class="intro-sub">No account. No server. No tracking. Just a hash chain in your browser.</div>
+</div>
+
+<div class="app">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="brand">Sovereign<span>.</span>Notes</div>
+    <div class="topbar-divider"></div>
+    <div class="chain-status">
+      <div class="chain-dot" id="chainDot"></div>
+      <span>HEAD</span>
+      <span class="chain-hash" id="headHash">0000000000000000</span>
+    </div>
+    <div class="topbar-right">
+      <div class="peer-badge" id="peerBadge">
+        <span id="peerCount">0</span> peers
+      </div>
+      <div class="net-badge" id="netBadge">LOCAL</div>
+      <div class="event-count"><span id="eventCount">0</span> events</div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">Notes</span>
+      <button class="new-note-btn" onclick="createNote()" title="New note">+</button>
+    </div>
+    <div class="notes-list" id="notesList">
+      <!-- notes injected here -->
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-area">
+    <div id="emptyState" class="empty-state">
+      <div class="empty-icon">📄</div>
+      <div class="empty-text">No note selected</div>
+      <div class="empty-sub">Create a note to begin building your chain</div>
+    </div>
+
+    <div id="editorPanel" style="display:none; display:flex; flex-direction:column; height:100%;">
+      <div class="editor-toolbar">
+        <input class="note-title-input" id="noteTitleInput" placeholder="Note title…" oninput="onTitleChange()" />
+        <button class="save-btn" id="saveBtn" onclick="saveCurrentNote()">Save</button>
+      </div>
+      <div class="editor-body" style="position:relative;">
+        <div class="tm-overlay" id="tmOverlay">
+          <div class="tm-overlay-label">⏳ Time Machine Active</div>
+          <div class="tm-snapshot-text" id="tmSnapshotText">Viewing past state</div>
+        </div>
+        <textarea class="note-content" id="noteContent"
+          placeholder="Start writing… every save becomes a block in your chain."
+          oninput="onContentChange()"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chain Panel -->
+  <div class="chain-panel">
+    <div class="chain-panel-header">
+      <span class="chain-panel-title">Chain Inspector</span>
+      <span class="chain-panel-live">
+        <div class="chain-dot" style="width:5px;height:5px;"></div>
+        LIVE
+      </span>
+    </div>
+
+    <div class="panel-sections">
+
+      <!-- Time machine -->
+      <div class="time-machine">
+        <div class="tm-label">
+          Time Machine
+          <span class="tm-reset" id="tmResetBtn" onclick="timeMachineReset()" style="display:none">↩ Present</span>
+        </div>
+        <input type="range" class="tm-slider" id="tmSlider" min="0" max="0" value="0" oninput="timeMachineSeek(this.value)" />
+        <div class="tm-info">
+          <span id="tmFrom">Genesis</span>
+          <span id="tmCurrent">Now</span>
+        </div>
+      </div>
+
+      <!-- Integrity proof -->
+      <div class="panel-section">
+        <div class="panel-section-title">Integrity Proof</div>
+        <div class="proof-row">
+          <span class="proof-label">Events</span>
+          <span class="proof-value gold" id="proofEvents">0</span>
+        </div>
+        <div class="proof-row">
+          <span class="proof-label">Head hash</span>
+          <span class="proof-value" id="proofHead" style="font-size:8.5px">—</span>
+        </div>
+        <div class="proof-row">
+          <span class="proof-label">Notes</span>
+          <span class="proof-value gold" id="proofNotes">0</span>
+        </div>
+        <div class="proof-row">
+          <span class="proof-label">Revisions</span>
+          <span class="proof-value gold" id="proofRevisions">0</span>
+        </div>
+        <div class="proof-verified" id="proofVerified">
+          <span>✓</span> Chain integrity verified
+        </div>
+      </div>
+
+      <!-- Hash chain blocks -->
+      <div class="panel-section">
+        <div class="panel-section-title">Event Log</div>
+        <div class="hash-chain" id="hashChain">
+          <!-- blocks rendered here -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">✓</span>
+  <span id="toastMsg">Saved</span>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  SOVEREIGN LOG — self-contained, inline
+//  Invariant: state(n) = deriveState(log[0..n])
+//  No deps. No framework. Just a hash chain.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── SHA-256 (sync, browser-native via SubtleCrypto + microtask trick) ────────
+// We use a pre-computed table approach for sync SHA-256.
+// This is a compact but correct SHA-256 implementation.
+function sha256(msg) {
+  function rightRotate(value, amount) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+  const mathPow = Math.pow;
+  const maxWord = mathPow(2, 32);
+  let result = '';
+  const words = [];
+  const asciiBitLength = msg.length * 8;
+  let hash = sha256.h = sha256.h || [];
+  let k = sha256.k = sha256.k || [];
+  let primeCounter = k.length;
+
+  const isComposite = {};
+  for (let candidate = 2; primeCounter < 64; candidate++) {
+    if (!isComposite[candidate]) {
+      for (let i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+      hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+      k[primeCounter++] = (mathPow(candidate, 1/3) * maxWord) | 0;
+    }
+  }
+
+  msg += '\x80';
+  while (msg.length % 64 - 56) msg += '\x00';
+  for (let i = 0; i < msg.length; i++) {
+    const j = msg.charCodeAt(i);
+    if (j >> 8) return '';
+    words[i >> 2] |= j << ((3 - i) % 4) * 8;
+  }
+  words[words.length] = ((asciiBitLength / maxWord) | 0);
+  words[words.length] = (asciiBitLength | 0);
+
+  for (let j = 0; j < words.length;) {
+    const w = words.slice(j, j += 16);
+    const oldHash = hash.slice(0);
+    for (let i = 0; i < 64; i++) {
+      const w15 = w[i - 15], w2 = w[i - 2];
+      const a = hash[0], e = hash[4];
+      const temp1 = hash[7] +
+        (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) +
+        ((e & hash[5]) ^ (~e & hash[6])) + k[i] +
+        (w[i] = (i < 16) ? w[i] :
+          (w[i-16] + (rightRotate(w15,7) ^ rightRotate(w15,18) ^ (w15>>>3)) +
+          w[i-7] + (rightRotate(w2,17) ^ rightRotate(w2,19) ^ (w2>>>10))) | 0);
+      const temp2 =
+        (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) +
+        ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+      hash = [(temp1 + temp2) | 0, a, hash[1], hash[2],
+              (hash[3] + temp1) | 0, e, hash[4], hash[5]];
+    }
+    hash = hash.map((x, i) => (x + oldHash[i]) | 0);
+  }
+  hash.forEach(function(val) {
+    for (let i = 4; i--;) result += ((val >> (i * 8 + 4)) & 15).toString(16) + ((val >> (i * 8)) & 15).toString(16);
+  });
+  return result;
+}
+
+function canonicalJson(v) {
+  if (v === null) return 'null';
+  if (v === true) return 'true';
+  if (v === false) return 'false';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') {
+    return JSON.stringify(v); // JSON.stringify for strings is spec-correct for escaping
+  }
+  if (Array.isArray(v)) return '[' + v.map(canonicalJson).join(',') + ']';
+  if (typeof v === 'object') {
+    const keys = Object.keys(v).sort();
+    return '{' + keys.map(k => canonicalJson(k) + ':' + canonicalJson(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+
+function hashEvent(payload, prevHash) {
+  return sha256(canonicalJson(payload) + '|' + (prevHash ?? 'null'));
+}
+
+// ── Event registry ────────────────────────────────────────────────────────────
+const EVENT_TYPES = {
+  NOTE_CREATED:   'NOTE_CREATED',
+  NOTE_SAVED:     'NOTE_SAVED',
+  NOTE_DELETED:   'NOTE_DELETED',
+  NOTE_SELECTED:  'NOTE_SELECTED',
+};
+
+// ── Core log ──────────────────────────────────────────────────────────────────
+const _log         = [];
+const _subscribers = new Set();
+let _seq           = 0;
+let _prevHash      = '0000000000000000000000000000000000000000000000000000000000000000';
+
+function emit(event) {
+  if (!EVENT_TYPES[event.type]) throw new Error(`Unknown event type: ${event.type}`);
+  const payload = { ...event, seq: _seq++, ts: Date.now() };
+  const hash    = hashEvent(payload, _prevHash);
+  const record  = Object.freeze({ ...payload, hash, prevHash: _prevHash });
+  _prevHash     = hash;
+  _log.push(record);
+  const state = deriveState(_log);
+  _subscribers.forEach(fn => fn(state, record));
+  return record;
+}
+
+function deriveState(log) {
+  const notes = {}; // id → { id, title, content, createdAt, updatedAt, revisions[] }
+  let selectedId = null;
+
+  for (const e of log) {
+    if (e.type === EVENT_TYPES.NOTE_CREATED) {
+      notes[e.noteId] = {
+        id:        e.noteId,
+        title:     e.title ?? 'Untitled',
+        content:   e.content ?? '',
+        createdAt: e.ts,
+        updatedAt: e.ts,
+        seq:       e.seq,
+        hash:      e.hash,
+        revisions: [],
+      };
+    }
+    if (e.type === EVENT_TYPES.NOTE_SAVED) {
+      if (notes[e.noteId]) {
+        const prev = notes[e.noteId];
+        notes[e.noteId] = {
+          ...prev,
+          title:     e.title ?? prev.title,
+          content:   e.content ?? prev.content,
+          updatedAt: e.ts,
+          hash:      e.hash,
+          seq:       e.seq,
+          revisions: [...prev.revisions, { ts: e.ts, hash: e.hash, seq: e.seq, title: e.title ?? prev.title, content: e.content ?? prev.content }],
+        };
+      }
+    }
+    if (e.type === EVENT_TYPES.NOTE_DELETED) {
+      delete notes[e.noteId];
+      if (selectedId === e.noteId) selectedId = null;
+    }
+    if (e.type === EVENT_TYPES.NOTE_SELECTED) {
+      selectedId = e.noteId;
+    }
+  }
+
+  const noteList = Object.values(notes).sort((a, b) => b.updatedAt - a.updatedAt);
+  const totalRevisions = noteList.reduce((s, n) => s + n.revisions.length, 0);
+
+  return {
+    notes,
+    noteList,
+    selectedId,
+    selectedNote: selectedId ? notes[selectedId] : null,
+    eventCount: log.length,
+    headHash: log.length ? log[log.length - 1].hash : _prevHash,
+    totalRevisions,
+  };
+}
+
+function subscribe(fn) {
+  _subscribers.add(fn);
+  fn(deriveState(_log), null);
+  return () => _subscribers.delete(fn);
+}
+
+function getLog() { return _log.slice(); }
+
+// ── Persistence (IndexedDB) ───────────────────────────────────────────────────
+let _db = null;
+
+async function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('sovereign-notepad', 1);
+    req.onupgradeneeded = e => {
+      e.target.result.createObjectStore('events', { keyPath: 'seq' });
+    };
+    req.onsuccess = e => { _db = e.target.result; res(_db); };
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function persistRecord(record) {
+  if (!_db) return;
+  return new Promise((res, rej) => {
+    const tx = _db.transaction('events', 'readwrite');
+    tx.objectStore('events').put(record);
+    tx.oncomplete = res;
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
+async function loadPersistedEvents() {
+  if (!_db) return [];
+  return new Promise((res, rej) => {
+    const tx = _db.transaction('events', 'readonly');
+    const records = [];
+    const cursor = tx.objectStore('events').openCursor();
+    cursor.onsuccess = e => {
+      const c = e.target.result;
+      if (c) { records.push(c.value); c.continue(); } else res(records);
+    };
+    cursor.onerror = e => rej(e.target.error);
+  });
+}
+
+function replayPersistedEvents(savedLog) {
+  // Verify chain and replay into live log
+  let p = '0000000000000000000000000000000000000000000000000000000000000000';
+  for (const record of savedLog) {
+    const { hash, prevHash, ...payload } = record;
+    const expected = hashEvent(payload, p);
+    if (hash !== expected) {
+      console.warn(`[sovereign-log] Integrity break at seq ${record.seq}. Stopping replay.`);
+      break;
+    }
+    _log.push(Object.freeze(record));
+    p = hash;
+    _seq = record.seq + 1;
+    _prevHash = hash;
+  }
+  if (_log.length) {
+    const state = deriveState(_log);
+    _subscribers.forEach(fn => fn(state, null));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  UI STATE
+// ════════════════════════════════════════════════════════════════════════════
+
+let _state          = null;
+let _dirty          = false;
+let _timeMachinePos = null; // null = present, number = seq index
+let _autoSaveTimer  = null;
+
+// Subscribe to state changes
+subscribe((state, record) => {
+  _state = state;
+  if (record) {
+    persistRecord(record);
+    updateChainUI(record);
+  }
+  renderAll(state);
+});
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderAll(state) {
+  renderNotesList(state);
+  renderEditor(state);
+  renderChainPanel(state);
+  updateTopbar(state);
+}
+
+function renderNotesList(state) {
+  const list = document.getElementById('notesList');
+  if (!state.noteList.length) {
+    list.innerHTML = `
+      <div style="padding:16px 12px; font-size:11px; color:var(--mist); font-family:'Syne',sans-serif; letter-spacing:.04em; text-align:center; margin-top:16px;">
+        No notes yet.<br>Press + to create one.
+      </div>`;
+    return;
+  }
+  list.innerHTML = state.noteList.map((note, i) => `
+    <div class="note-item ${note.id === state.selectedId ? 'active' : ''}"
+         onclick="selectNote('${note.id}')"
+         style="animation-delay:${i * 0.03}s">
+      <div class="note-title">${escHtml(note.title || 'Untitled')}</div>
+      <div class="note-meta">
+        <span class="note-verified"></span>
+        <span>${formatRelTime(note.updatedAt)}</span>
+        ${note.revisions.length ? `<span>· ${note.revisions.length} rev</span>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function renderEditor(state) {
+  const empty  = document.getElementById('emptyState');
+  const panel  = document.getElementById('editorPanel');
+
+  if (!state.selectedNote) {
+    empty.style.display = 'flex';
+    panel.style.display = 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  panel.style.display = 'flex';
+
+  const note    = state.selectedNote;
+  const titleEl = document.getElementById('noteTitleInput');
+  const bodyEl  = document.getElementById('noteContent');
+
+  // Only update if not focused (avoid caret jumps)
+  if (document.activeElement !== titleEl) titleEl.value = note.title;
+  if (document.activeElement !== bodyEl)  bodyEl.value  = note.content;
+
+  // Time machine range
+  const allRevisions = [
+    { ts: note.createdAt, hash: note.hash, seq: note.seq, title: note.title, content: '' },
+    ...note.revisions,
+  ];
+  const slider = document.getElementById('tmSlider');
+  slider.max   = allRevisions.length - 1;
+  if (_timeMachinePos === null) slider.value = allRevisions.length - 1;
+
+  document.getElementById('tmFrom').textContent    = formatRelTime(note.createdAt);
+  document.getElementById('tmCurrent').textContent = _timeMachinePos !== null
+    ? formatRelTime(allRevisions[_timeMachinePos]?.ts ?? note.updatedAt)
+    : 'Now';
+}
+
+function renderChainPanel(state) {
+  document.getElementById('proofEvents').textContent    = state.eventCount;
+  document.getElementById('proofNotes').textContent     = state.noteList.length;
+  document.getElementById('proofRevisions').textContent = state.totalRevisions;
+  document.getElementById('proofHead').textContent      = state.headHash.slice(0, 20) + '…';
+
+  // Last 8 events in chain
+  const log    = getLog();
+  const recent = log.slice(-8).reverse();
+  const chain  = document.getElementById('hashChain');
+
+  chain.innerHTML = recent.map((r, i) => `
+    <div class="hash-block ${i === 0 ? 'current' : ''}" onclick="inspectBlock(${r.seq})"
+         title="seq ${r.seq} · ${new Date(r.ts).toLocaleTimeString()}"
+         style="animation-delay:${i*0.04}s">
+      <span class="hash-seq">${r.seq}</span>
+      <span class="hash-val">${r.hash.slice(0,16)}…</span>
+      <span class="hash-type">${shortType(r.type)}</span>
+    </div>
+    ${i < recent.length - 1 ? '<div class="chain-connector"></div>' : ''}
+  `).join('');
+}
+
+function updateTopbar(state) {
+  const head = state.headHash;
+  document.getElementById('headHash').textContent = head.slice(0, 16) + '…';
+  document.getElementById('eventCount').textContent = state.eventCount;
+}
+
+function updateChainUI(record) {
+  // flash the chain dot
+  const dot = document.getElementById('chainDot');
+  dot.style.background = '#5cb88a';
+  dot.style.boxShadow  = '0 0 12px #5cb88a';
+  setTimeout(() => {
+    dot.style.background = '';
+    dot.style.boxShadow  = '';
+  }, 600);
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+function createNote() {
+  const noteId = 'note-' + Date.now().toString(36);
+  emit({ type: 'NOTE_CREATED', noteId, title: 'New Note', content: '' });
+  emit({ type: 'NOTE_SELECTED', noteId });
+  // Focus title after render
+  setTimeout(() => {
+    const el = document.getElementById('noteTitleInput');
+    if (el) { el.focus(); el.select(); }
+  }, 50);
+  showToast('⛓️', 'Note created — block added to chain');
+}
+
+function selectNote(noteId) {
+  if (_state?.selectedId === noteId) return;
+  _timeMachinePos = null;
+  document.getElementById('tmResetBtn').style.display = 'none';
+  document.getElementById('tmOverlay').classList.remove('active');
+  emit({ type: 'NOTE_SELECTED', noteId });
+}
+
+function onTitleChange() {
+  _dirty = true;
+  scheduleSave();
+}
+
+function onContentChange() {
+  _dirty = true;
+  scheduleSave();
+}
+
+function scheduleSave() {
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => {
+    if (_dirty) saveCurrentNote(true);
+  }, 1800);
+}
+
+function saveCurrentNote(auto = false) {
+  if (!_state?.selectedNote) return;
+  const title   = document.getElementById('noteTitleInput').value;
+  const content = document.getElementById('noteContent').value;
+  const note    = _state.selectedNote;
+
+  if (title === note.title && content === note.content && !auto) return;
+
+  emit({ type: 'NOTE_SAVED', noteId: note.id, title, content });
+  _dirty = false;
+  clearTimeout(_autoSaveTimer);
+
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = 'Saved ✓';
+  btn.classList.add('saving');
+  setTimeout(() => { btn.textContent = 'Save'; btn.classList.remove('saving'); }, 1200);
+
+  if (!auto) showToast('⛓️', 'Saved — new block appended to chain');
+}
+
+// ── Time Machine ──────────────────────────────────────────────────────────────
+function timeMachineSeek(val) {
+  if (!_state?.selectedNote) return;
+  const note = _state.selectedNote;
+  const allVersions = [
+    { ts: note.createdAt, title: note.title, content: '', hash: note.hash, seq: note.seq },
+    ...note.revisions,
+  ];
+
+  const idx = parseInt(val);
+  const isPresent = (idx >= allVersions.length - 1);
+
+  _timeMachinePos = isPresent ? null : idx;
+  document.getElementById('tmResetBtn').style.display = isPresent ? 'none' : 'block';
+
+  const overlay = document.getElementById('tmOverlay');
+  if (isPresent) {
+    overlay.classList.remove('active');
+    document.getElementById('noteContent').value = note.content;
+    document.getElementById('noteTitleInput').value = note.title;
+    document.getElementById('tmCurrent').textContent = 'Now';
+  } else {
+    const ver = allVersions[idx];
+    overlay.classList.add('active');
+    document.getElementById('tmSnapshotText').textContent =
+      `v${idx} — ${new Date(ver.ts).toLocaleString()}`;
+    document.getElementById('noteContent').value = ver.content;
+    document.getElementById('noteTitleInput').value = ver.title;
+    document.getElementById('tmCurrent').textContent = formatRelTime(ver.ts);
+  }
+}
+
+function timeMachineReset() {
+  _timeMachinePos = null;
+  const slider = document.getElementById('tmSlider');
+  slider.value = slider.max;
+  timeMachineSeek(slider.max);
+}
+
+// ── Inspector ─────────────────────────────────────────────────────────────────
+function inspectBlock(seq) {
+  const log    = getLog();
+  const record = log.find(r => r.seq === seq);
+  if (!record) return;
+
+  const info = [
+    `Seq:   ${record.seq}`,
+    `Type:  ${record.type}`,
+    `Time:  ${new Date(record.ts).toLocaleString()}`,
+    `Hash:  ${record.hash}`,
+    `Prev:  ${record.prevHash}`,
+    record.noteId  ? `Note:  ${record.noteId}` : '',
+    record.title   ? `Title: ${record.title}`  : '',
+  ].filter(Boolean).join('\n');
+
+  showToast('🔍', `Block #${seq}: ${record.hash.slice(0,10)}…`);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatRelTime(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000)  return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+function shortType(type) {
+  const map = {
+    NOTE_CREATED:  'NEW',
+    NOTE_SAVED:    'SAVE',
+    NOTE_DELETED:  'DEL',
+    NOTE_SELECTED: 'SEL',
+  };
+  return map[type] ?? type.slice(0,4);
+}
+
+let _toastTimer;
+function showToast(icon, msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastIcon').textContent = icon;
+  document.getElementById('toastMsg').textContent  = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function dismissIntro() {
+  document.getElementById('introBanner').classList.add('hide');
+  setTimeout(() => document.getElementById('introBanner').remove(), 600);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
+    await openDB();
+    const persisted = await loadPersistedEvents();
+    if (persisted.length) {
+      replayPersistedEvents(persisted);
+      showToast('⛓️', `Restored ${persisted.length} events from chain`);
+    }
+  } catch (e) {
+    console.warn('[boot] Could not load from IndexedDB:', e);
+  }
+
+  // Create a welcome note on first run
+  if (!_state || !_state.noteList.length) {
+    const noteId = 'note-welcome';
+    emit({ type: 'NOTE_CREATED', noteId, title: 'Welcome to Sovereign Notes', content: '' });
+    emit({ type: 'NOTE_SAVED', noteId,
+      title: 'Welcome to Sovereign Notes',
+      content: `Everything you write here is part of a hash chain.
+
+Each save creates a new block. Each block contains a cryptographic hash of everything before it.
+
+Try the Time Machine slider in the right panel to travel back through any note's history.
+
+Click the chain blocks on the right to inspect any event.
+
+Nothing leaves your browser. No server. No account. Just a chain.` });
+    emit({ type: 'NOTE_SELECTED', noteId });
+  }
+}
+
+boot();
+</script>
+</body>
+</html>

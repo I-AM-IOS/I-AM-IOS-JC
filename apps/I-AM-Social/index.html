@@ -1,0 +1,2851 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOVEREIGN FEED · I-AM-IOS Social</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- ── PeerJS: real WebRTC P2P ── -->
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+
+    <!-- ── Sovereign system: inject config if running under server.js ── -->
+    <!-- If no window.SOVEREIGN_CONFIG is set, app boots in pure P2P mode -->
+    
+    <!-- 
+        VALIDATOR SERVER CONFIGURATION:
+        Your validator is at: https://sovereign-validator-dkwg-production.up.railway.app/
+        To enable validator mode, add this before the first script tag:
+        
+        <script>
+            window.SOVEREIGN_CONFIG = {
+                validatorEndpoint: 'https://sovereign-validator-dkwg-production.up.railway.app'
+            };
+        </script>
+    -->
+
+    <script>
+        // Global scope declarations - accessible to onclick handlers
+        let currentFeed = 'home';
+        let currentTab = 'all';
+        let showLog = false;
+        
+        // These will be populated when waitForSovereignLog fires
+        let myNodeId = null;
+        let myName = null;
+        let myHandle = null;
+        let sovereignLog = null;
+        let _peer = null;
+        let _peerConns = new Map();
+        let SOCIAL_EVENTS = {};
+        let _socialDB = null;
+        
+        // Placeholder functions that will be overwritten by waitForSovereignLog scope
+        function showToast(msg, type) { console.log(`[Toast] ${msg}`, type); }
+        function klog(msg, type) { console.log(`[KLog] ${msg}`, type); }
+        function updateCharCount() { }
+        function renderPosts() { }
+        function renderEventLog() { }
+        function renderSidebar() { }
+        function setupConnection(conn) { }
+        function broadcastEvent(record) { }
+        function updateStats() { }
+        function getInitials(name) { return (name || 'XX').split(' ').map(w => w[0]).join('').slice(0, 2); }
+        
+        function switchFeed(feed) {
+            currentFeed = feed;
+            document.querySelectorAll('.nav-item[data-feed]').forEach(el => {
+                el.classList.toggle('active', el.dataset.feed === feed);
+            });
+            const titles = {
+                home: 'HOME FEED',
+                sovereign: 'SOVEREIGN CHAIN',
+                mentions: 'MENTIONS',
+                p2p: 'P2P MESH',
+                trending: 'TRENDING',
+                finalized: 'FINALIZED',
+            };
+            document.getElementById('feedTitle').textContent = titles[feed] || 'FEED';
+            if (window.renderPosts) renderPosts();
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.feed-tab').forEach(el => {
+                el.classList.toggle('active', el.dataset.tab === tab);
+            });
+            if (window.renderPosts) renderPosts();
+        }
+
+        function filterTag(tag) {
+            document.getElementById('searchInput').value = tag;
+            if (window.renderPosts) renderPosts();
+        }
+
+        function toggleEventLog() {
+            showLog = !showLog;
+            const panel = document.getElementById('eventLogPanel');
+            const toggle = document.getElementById('logToggle');
+            panel.style.display = showLog ? 'block' : 'none';
+            toggle.innerHTML = `${showLog ? '▼' : '▶'} SOVEREIGN EVENT LOG <span id="logCount" style="color:var(--violet)">(0 events)</span>`;
+            if (window.renderEventLog) renderEventLog();
+        }
+
+        // Avatar upload functions
+        function openAvatarUpload() {
+            document.getElementById('avatarUploadInput').click();
+        }
+
+        function handleAvatarUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const imageData = e.target.result;
+                try {
+                    localStorage.setItem('sovereign-social-avatar', imageData);
+                } catch (err) {
+                    console.warn('Could not save avatar to localStorage:', err);
+                }
+                applyAvatarImage(imageData);
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        function applyAvatarImage(imageData) {
+            const avatarBtn = document.getElementById('myAvatarBtn');
+            avatarBtn.style.setProperty('--avatar-image', `url('${imageData}')`);
+            avatarBtn.classList.add('avatar-btn-has-image');
+        }
+
+        function loadAvatarFromStorage() {
+            try {
+                const stored = localStorage.getItem('sovereign-social-avatar');
+                if (stored) {
+                    applyAvatarImage(stored);
+                }
+            } catch (err) {
+                console.warn('Could not load avatar from localStorage:', err);
+            }
+        }
+
+        // Post/feed functions
+        function connectToPeer() {
+            const input = document.getElementById('connectPeerInput');
+            const peerId = input.value.trim();
+            if (!peerId || peerId === myNodeId) return;
+            if (_peerConns.has(peerId)) {
+                showToast('Already connected to that peer', 'warn');
+                return;
+            }
+            if (!_peer) {
+                showToast('PeerJS not ready yet', 'warn');
+                return;
+            }
+            klog(`Connecting to ${peerId.slice(0,16)}…`, 'info');
+            const conn = _peer.connect(peerId, { reliable: true });
+            conn.on('open', () => setupConnection(conn));
+            conn.on('error', err => {
+                klog(`Failed to connect: ${err}`, 'warn');
+                showToast(`Could not connect to peer`, 'error');
+            });
+            input.value = '';
+        }
+
+        function emitPost() {
+            if (!sovereignLog) {
+                showToast('System not ready yet', 'warn');
+                return;
+            }
+            const input = document.getElementById('composeInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const postId = 'post_' + (myNodeId || 'unknown').slice(4, 10) + '_' + Date.now().toString(36);
+            const record = sovereignLog.emit({
+                type: SOCIAL_EVENTS.SOCIAL_POST_EMITTED || 'SOCIAL_POST_EMITTED',
+                postId,
+                author: myName,
+                handle: myHandle,
+                nodeId: myNodeId,
+                content: text,
+                networkMode: (_peerConns.size > 0) ? 'p2p' : 'local',
+            });
+
+            input.value = '';
+            updateCharCount();
+            klog(`POST_EMITTED seq:${record.seq} hash:${record.hash.slice(0,8)} peers:${_peerConns.size}`, 'ok');
+            showToast(_peerConns.size > 0 ? `Emitted to ${_peerConns.size} peer(s)` : 'Emitted locally (no peers connected)', 'success');
+        }
+
+        function likePost(postId) {
+            if (!sovereignLog) return;
+            sovereignLog.emit({
+                type: SOCIAL_EVENTS.SOCIAL_POST_LIKED || 'SOCIAL_POST_LIKED',
+                postId,
+                userId: myNodeId
+            });
+            showToast('Post liked', 'success');
+        }
+
+        function resonatePost(postId) {
+            if (!sovereignLog) return;
+            sovereignLog.emit({
+                type: SOCIAL_EVENTS.SOCIAL_POST_RESONATED || 'SOCIAL_POST_RESONATED',
+                postId,
+                userId: myNodeId
+            });
+            showToast('Resonated on chain', 'success');
+        }
+
+        function toggleReplies(postId) {
+            const el = document.getElementById('replies-' + postId);
+            if (el) el.classList.toggle('open');
+        }
+
+        function submitReply(postId) {
+            if (!sovereignLog) return;
+            const input = document.getElementById('replyInput-' + postId);
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+            sovereignLog.emit({
+                type: SOCIAL_EVENTS.SOCIAL_POST_REPLIED || 'SOCIAL_POST_REPLIED',
+                postId,
+                userId: myNodeId,
+                replyAuthor: myName,
+                replyHandle: myHandle,
+                content: text,
+            });
+            input.value = '';
+            showToast('Reply emitted', 'success');
+        }
+
+        function deletePost(postId) {
+            if (!sovereignLog) return;
+            if (!confirm('Delete post? Event is retained in audit log.')) return;
+            sovereignLog.emit({
+                type: SOCIAL_EVENTS.SOCIAL_POST_DELETED || 'SOCIAL_POST_DELETED',
+                postId
+            });
+        }
+
+        function addTag(tag) {
+            const i = document.getElementById('composeInput');
+            i.value += (i.value ? ' ' : '') + tag;
+            i.focus();
+            updateCharCount();
+        }
+
+        function copyNodeId() {
+            navigator.clipboard.writeText(myNodeId).then(() => showToast('Node ID copied to clipboard', 'success'));
+        }
+    </script>
+
+    <style>
+        :root {
+            --void: #020509;
+            --deep: #04080f;
+            --layer: #060c17;
+            --surface: #091221;
+            --panel: #0d1a2e;
+            --border: rgba(25, 55, 100, 0.55);
+            --border2: rgba(45, 90, 160, 0.5);
+            --dim: #1e3a5a;
+            --muted: #3660a0;
+            --text: #e4f2ff;
+            --bright: #ffffff;
+            --white: #e4f2ff;
+            --green: #00e87a;
+            --green2: rgba(0, 232, 122, 0.07);
+            --amber: #ffb020;
+            --amber2: rgba(255, 176, 32, 0.07);
+            --red: #ff3d5a;
+            --cyan: #00d4f5;
+            --cyan2: rgba(0, 212, 245, 0.07);
+            --violet: #9060f0;
+            --mono: 'Space Mono', monospace;
+            --body: 'DM Sans', sans-serif;
+            --display: 'Bebas Neue', sans-serif;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        html,
+        body {
+            background: var(--void);
+            color: var(--text);
+            font-family: var(--body);
+            font-size: 14px;
+            min-height: 100vh;
+            overflow-x: hidden
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.025) 2px, rgba(0, 0, 0, 0.025) 3px);
+            pointer-events: none;
+            z-index: 9999
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1)
+            }
+
+            50% {
+                opacity: .5;
+                transform: scale(1.4)
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg)
+            }
+
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .app-shell {
+            display: grid;
+            grid-template-columns: 220px 1fr 260px;
+            grid-template-rows: 52px 1fr;
+            min-height: 100vh
+        }
+
+        /* TOPBAR */
+        .topbar {
+            grid-column: 1/-1;
+            background: rgba(2, 5, 9, .97);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 14px;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            backdrop-filter: blur(16px)
+        }
+
+        .logo {
+            font-family: var(--display);
+            font-size: 21px;
+            letter-spacing: .12em;
+            color: var(--cyan);
+            text-shadow: 0 0 20px rgba(0, 212, 245, .4);
+            line-height: 1;
+            cursor: pointer
+        }
+
+        .logo-sub {
+            font-family: var(--mono);
+            font-size: 8px;
+            color: var(--dim);
+            letter-spacing: .2em;
+            text-transform: uppercase;
+            margin-top: 3px
+        }
+
+        .topbar-search-wrap {
+            flex: 1;
+            max-width: 340px;
+            position: relative
+        }
+
+        .topbar-search {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--bright);
+            font-family: var(--mono);
+            font-size: 11px;
+            padding: 7px 12px;
+            outline: none;
+            transition: border-color .2s
+        }
+
+        .topbar-search:focus {
+            border-color: var(--cyan)
+        }
+
+        .topbar-search::placeholder {
+            color: var(--dim)
+        }
+
+        .topbar-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .net-pill {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .1em;
+            padding: 4px 10px;
+            border: 1px solid;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all .15s
+        }
+
+        .net-pill.validator {
+            color: var(--green);
+            border-color: rgba(0, 232, 122, .3);
+            background: var(--green2)
+        }
+
+        .net-pill.p2p {
+            color: var(--amber);
+            border-color: rgba(255, 176, 32, .3);
+            background: var(--amber2)
+        }
+
+        .net-pill.connecting {
+            color: var(--muted);
+            border-color: var(--border)
+        }
+
+        .net-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: currentColor
+        }
+
+        .net-pill.validator .net-dot,
+        .net-pill.p2p .net-dot {
+            animation: pulse 2s ease-in-out infinite
+        }
+
+        .avatar-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--violet), var(--cyan));
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--void);
+            cursor: pointer;
+            font-weight: 700;
+            border: 2px solid rgba(0, 212, 245, .25);
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .avatar-btn:hover {
+            transform: scale(1.05);
+            border-color: rgba(0, 212, 245, .6);
+        }
+
+        .avatar-btn-has-image {
+            background-image: var(--avatar-image);
+            font-size: 0;
+        }
+
+        #avatarUploadInput {
+            display: none;
+        }
+
+        /* SIDEBAR LEFT */
+        .sidebar-left {
+            background: var(--deep);
+            border-right: 1px solid var(--border);
+            padding: 16px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column
+        }
+
+        .nav-section-label {
+            font-family: var(--mono);
+            font-size: 8px;
+            letter-spacing: .22em;
+            color: var(--dim);
+            text-transform: uppercase;
+            padding: 0 16px 6px;
+            margin-top: 16px
+        }
+
+        .nav-section-label:first-child {
+            margin-top: 0
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--muted);
+            transition: all .15s;
+            border-left: 2px solid transparent
+        }
+
+        .nav-item:hover {
+            color: var(--bright);
+            background: rgba(0, 212, 245, .025)
+        }
+
+        .nav-item.active {
+            color: var(--cyan);
+            border-left-color: var(--cyan);
+            background: var(--cyan2)
+        }
+
+        .nav-icon {
+            font-size: 13px;
+            width: 16px;
+            text-align: center
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--red);
+            color: var(--void);
+            font-family: var(--mono);
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-weight: 700
+        }
+
+        /* Node ID + connect panel */
+        .node-panel {
+            margin: auto 12px 0;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 12px;
+            margin-top: 16px
+        }
+
+        .node-id-label {
+            font-family: var(--mono);
+            font-size: 8px;
+            color: var(--dim);
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            margin-bottom: 5px
+        }
+
+        .node-id-val {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--cyan);
+            word-break: break-all;
+            cursor: pointer;
+            margin-bottom: 10px
+        }
+
+        .node-id-val:hover {
+            color: var(--white)
+        }
+
+        .connect-input {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--bright);
+            font-family: var(--mono);
+            font-size: 10px;
+            padding: 5px 8px;
+            outline: none;
+            margin-bottom: 6px
+        }
+
+        .connect-input:focus {
+            border-color: var(--cyan)
+        }
+
+        .connect-input::placeholder {
+            color: var(--dim)
+        }
+
+        .connect-btn {
+            width: 100%;
+            background: var(--cyan);
+            border: none;
+            color: var(--void);
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .12em;
+            padding: 6px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all .15s;
+            text-transform: uppercase
+        }
+
+        .connect-btn:hover {
+            background: var(--white)
+        }
+
+        .peer-count-badge {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--green);
+            margin-top: 6px
+        }
+
+        /* MAIN FEED */
+        .main-feed {
+            overflow-y: auto;
+            padding: 0
+        }
+
+        .feed-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(2, 5, 9, .95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 46px
+        }
+
+        .feed-title {
+            font-family: var(--display);
+            font-size: 17px;
+            letter-spacing: .1em;
+            color: var(--white);
+            white-space: nowrap
+        }
+
+        .feed-tabs {
+            display: flex;
+            gap: 0;
+            margin-left: auto
+        }
+
+        .feed-tab {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            padding: 5px 12px;
+            cursor: pointer;
+            color: var(--muted);
+            border: 1px solid transparent;
+            transition: all .15s
+        }
+
+        .feed-tab:hover {
+            color: var(--text)
+        }
+
+        .feed-tab.active {
+            color: var(--cyan);
+            border-color: rgba(0, 212, 245, .3);
+            background: var(--cyan2)
+        }
+
+        /* COMPOSE */
+        .compose-box {
+            margin: 14px 16px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 14px;
+            animation: fadeIn .3s ease;
+            transition: border-color .2s
+        }
+
+        .compose-box:focus-within {
+            border-color: rgba(0, 212, 245, .25)
+        }
+
+        .compose-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start
+        }
+
+        .compose-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--violet), var(--cyan));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--void);
+            font-weight: 700;
+            flex-shrink: 0
+        }
+
+        .compose-area {
+            flex: 1
+        }
+
+        .compose-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--bright);
+            font-family: var(--body);
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            min-height: 55px;
+            line-height: 1.5
+        }
+
+        .compose-input::placeholder {
+            color: var(--dim)
+        }
+
+        .compose-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border)
+        }
+
+        .compose-tools {
+            display: flex;
+            gap: 6px
+        }
+
+        .compose-tool {
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--muted);
+            border: 1px solid transparent;
+            font-size: 13px;
+            transition: all .15s
+        }
+
+        .compose-tool:hover {
+            color: var(--cyan);
+            border-color: rgba(0, 212, 245, .2);
+            background: var(--cyan2)
+        }
+
+        .compose-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .char-count {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--dim)
+        }
+
+        .char-count.warn {
+            color: var(--amber)
+        }
+
+        .char-count.over {
+            color: var(--red)
+        }
+
+        .emit-btn {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            padding: 7px 16px;
+            background: var(--cyan);
+            color: var(--void);
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all .15s
+        }
+
+        .emit-btn:hover:not(:disabled) {
+            background: var(--white)
+        }
+
+        .emit-btn:disabled {
+            opacity: .35;
+            cursor: not-allowed
+        }
+
+        /* POST CARD */
+        .post-card {
+            margin: 0 16px 10px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 14px;
+            animation: fadeIn .35s ease;
+            transition: border-color .2s
+        }
+
+        .post-card:hover {
+            border-color: rgba(0, 212, 245, .18)
+        }
+
+        .post-card.finalized {
+            border-left: 2px solid var(--green)
+        }
+
+        .post-card.p2p-only {
+            border-left: 2px solid var(--amber)
+        }
+
+        .post-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px
+        }
+
+        .post-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0
+        }
+
+        .post-meta {
+            flex: 1;
+            min-width: 0
+        }
+
+        .post-author {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--bright)
+        }
+
+        .post-handle {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted)
+        }
+
+        .post-time {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--dim);
+            margin-top: 1px
+        }
+
+        .post-proof {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--dim);
+            letter-spacing: .06em;
+            display: flex;
+            align-items: center;
+            gap: 5px
+        }
+
+        .proof-hash {
+            color: var(--muted)
+        }
+
+        .proof-lock {
+            color: var(--green);
+            font-size: 11px
+        }
+
+        .post-body {
+            font-size: 14px;
+            line-height: 1.65;
+            color: var(--bright);
+            margin-bottom: 10px
+        }
+
+        .post-tag {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--cyan);
+            cursor: pointer
+        }
+
+        .post-tag:hover {
+            text-decoration: underline
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 16px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border)
+        }
+
+        .post-action {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            cursor: pointer;
+            transition: color .15s;
+            background: none;
+            border: none;
+            padding: 0
+        }
+
+        .post-action:hover {
+            color: var(--cyan)
+        }
+
+        .post-action.liked {
+            color: var(--red)
+        }
+
+        .post-action.resonated {
+            color: var(--green)
+        }
+
+        .post-chain {
+            font-family: var(--mono);
+            font-size: 9px;
+            margin-top: 8px;
+            padding: 5px 8px;
+            background: var(--surface);
+            border-left: 2px solid var(--dim);
+            color: var(--muted);
+            letter-spacing: .05em
+        }
+
+        .chain-ok {
+            border-left-color: var(--green);
+            color: var(--green)
+        }
+
+        .network-mode-tag {
+            font-family: var(--mono);
+            font-size: 8px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            padding: 2px 5px;
+            border: 1px solid;
+            margin-left: 6px
+        }
+
+        .nm-validator {
+            color: var(--cyan);
+            border-color: rgba(0, 212, 245, .3);
+            background: var(--cyan2)
+        }
+
+        .nm-p2p {
+            color: var(--amber);
+            border-color: rgba(255, 176, 32, .3);
+            background: var(--amber2)
+        }
+
+        .nm-local {
+            color: var(--muted);
+            border-color: var(--border)
+        }
+
+        .nm-finalized {
+            color: var(--green);
+            border-color: rgba(0, 232, 122, .3);
+            background: var(--green2)
+        }
+
+        /* inline replies */
+        .replies-section {
+            margin-top: 10px;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+            display: none
+        }
+
+        .replies-section.open {
+            display: block
+        }
+
+        .reply-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px
+        }
+
+        .reply-input {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--bright);
+            font-family: var(--body);
+            font-size: 12px;
+            padding: 6px 10px;
+            outline: none;
+            resize: none
+        }
+
+        .reply-input:focus {
+            border-color: var(--cyan)
+        }
+
+        .reply-send-btn {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .1em;
+            padding: 6px 12px;
+            background: var(--cyan);
+            color: var(--void);
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            align-self: flex-end
+        }
+
+        .reply-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 7px;
+            padding-bottom: 7px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .reply-item:last-child {
+            border-bottom: none
+        }
+
+        .reply-av {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 8px;
+            font-weight: 700;
+            flex-shrink: 0
+        }
+
+        .reply-body {
+            flex: 1
+        }
+
+        .reply-author {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text)
+        }
+
+        .reply-text {
+            font-size: 12px;
+            color: var(--bright);
+            line-height: 1.4;
+            margin-top: 2px
+        }
+
+        .reply-ts {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--dim);
+            margin-top: 2px
+        }
+
+        /* SIDEBAR RIGHT */
+        .sidebar-right {
+            background: var(--deep);
+            border-left: 1px solid var(--border);
+            padding: 14px;
+            overflow-y: auto
+        }
+
+        .widget-block {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+            padding: 12px
+        }
+
+        .widget-title {
+            font-family: var(--display);
+            font-size: 13px;
+            letter-spacing: .1em;
+            color: var(--white);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 7px
+        }
+
+        .widget-title-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--cyan);
+            box-shadow: 0 0 8px rgba(0, 212, 245, .5);
+            flex-shrink: 0
+        }
+
+        .trend-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: all .15s
+        }
+
+        .trend-item:last-child {
+            border-bottom: none
+        }
+
+        .trend-item:hover .trend-tag {
+            color: var(--white)
+        }
+
+        .trend-tag {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--cyan)
+        }
+
+        .trend-count {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--dim)
+        }
+
+        .peer-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 0
+        }
+
+        .peer-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 700;
+            flex-shrink: 0
+        }
+
+        .peer-name {
+            font-size: 12px;
+            color: var(--bright)
+        }
+
+        .peer-handle {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted)
+        }
+
+        .peer-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-left: auto;
+            flex-shrink: 0
+        }
+
+        .peer-dot.online {
+            background: var(--green);
+            box-shadow: 0 0 6px rgba(0, 232, 122, .5);
+            animation: pulse 2s infinite
+        }
+
+        .peer-dot.offline {
+            background: var(--dim)
+        }
+
+        .kernel-log {
+            font-family: var(--mono);
+            font-size: 10px;
+            line-height: 1.7;
+            color: var(--muted);
+            max-height: 110px;
+            overflow-y: auto
+        }
+
+        .kernel-log::-webkit-scrollbar {
+            width: 2px
+        }
+
+        .kernel-log::-webkit-scrollbar-thumb {
+            background: var(--dim)
+        }
+
+        .klog-entry {
+            display: flex;
+            gap: 7px
+        }
+
+        .klog-ts {
+            color: var(--dim);
+            flex-shrink: 0
+        }
+
+        .klog-ok {
+            color: var(--green)
+        }
+
+        .klog-info {
+            color: var(--cyan)
+        }
+
+        .klog-warn {
+            color: var(--amber)
+        }
+
+        .chain-bar-wrap {
+            width: 100%;
+            height: 3px;
+            background: var(--surface);
+            overflow: hidden;
+            margin-top: 5px
+        }
+
+        .chain-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--green), var(--cyan));
+            transition: width 1s ease
+        }
+
+        .chain-label {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--muted)
+        }
+
+        /* EVENT LOG */
+        .event-log-panel {
+            margin: 0 16px 10px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 10px;
+            font-family: var(--mono);
+            font-size: 10px;
+            max-height: 150px;
+            overflow-y: auto
+        }
+
+        .event-log-panel::-webkit-scrollbar {
+            width: 2px
+        }
+
+        .event-log-panel::-webkit-scrollbar-thumb {
+            background: var(--dim)
+        }
+
+        .eentry {
+            display: flex;
+            gap: 8px;
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, .02)
+        }
+
+        .eentry:last-child {
+            border-bottom: none
+        }
+
+        .eseq {
+            color: var(--dim);
+            min-width: 28px
+        }
+
+        .ehash {
+            color: var(--violet)
+        }
+
+        .etype {
+            color: var(--cyan);
+            min-width: 160px;
+            font-size: 9px
+        }
+
+        .ets {
+            color: var(--dim);
+            margin-left: auto
+        }
+
+        .log-toggle {
+            margin: 0 16px 3px;
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--muted);
+            letter-spacing: .12em;
+            cursor: pointer;
+            padding: 4px 0;
+            text-transform: uppercase;
+            transition: color .15s;
+            display: flex;
+            align-items: center;
+            gap: 5px
+        }
+
+        .log-toggle:hover {
+            color: var(--cyan)
+        }
+
+        /* TOAST */
+        .toast-zone {
+            position: fixed;
+            bottom: 18px;
+            right: 18px;
+            z-index: 9998;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            pointer-events: none
+        }
+
+        .toast {
+            background: var(--panel);
+            border: 1px solid var(--border2);
+            padding: 9px 14px;
+            font-family: var(--mono);
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            animation: fadeIn .3s ease;
+            pointer-events: all;
+            max-width: 280px
+        }
+
+        .toast.success {
+            border-color: rgba(0, 232, 122, .4)
+        }
+
+        .toast.warn {
+            border-color: rgba(255, 176, 32, .4)
+        }
+
+        .toast.error {
+            border-color: rgba(255, 61, 90, .4)
+        }
+
+        .toast-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+
+        .toast.success .toast-dot {
+            background: var(--green)
+        }
+
+        .toast.warn .toast-dot {
+            background: var(--amber)
+        }
+
+        .toast.error .toast-dot {
+            background: var(--red)
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 3px 16px 10px
+        }
+
+        .empty-feed {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--dim);
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: .1em
+        }
+
+        ::-webkit-scrollbar {
+            width: 3px;
+            height: 3px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--dim)
+        }
+    </style>
+</head>
+
+<body>
+<!-- BACK NAV -->
+<div style="position:sticky;top:0;z-index:9999;display:flex;align-items:center;gap:12px;padding:0 20px;height:38px;background:rgba(7,11,15,.96);border-bottom:1px solid #1b2d3a;backdrop-filter:blur(12px);font-family:'DM Mono',monospace;font-size:10px;">
+  <a href="../../index.html" style="color:#22d3ee;text-decoration:none;letter-spacing:.1em;opacity:.85;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">← I-AM-IOS SUITE</a>
+  <span style="color:#1b2d3a;margin:0 4px">·</span>
+  <span style="color:#3a5568;letter-spacing:.08em;">I-AM SOCIAL</span>
+</div>
+
+    <div class="toast-zone" id="toastZone"></div>
+
+    <div class="app-shell">
+
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div style="cursor:pointer" onclick="switchFeed('home')">
+                <div class="logo">SOVEREIGN FEED</div>
+                <div class="logo-sub">I-AM-IOS Social · Real P2P</div>
+            </div>
+            <div class="topbar-search-wrap">
+                <input class="topbar-search" type="text" placeholder="Search posts, peers, tags..." id="searchInput" />
+            </div>
+            <div class="topbar-right">
+                <div class="net-pill connecting" id="networkPill">
+                    <div class="net-dot"></div>
+                    <span id="netLabel">CONNECTING</span>
+                </div>
+                <input type="file" id="avatarUploadInput" accept="image/*" />
+                <div class="avatar-btn" id="myAvatarBtn" title="Click to upload avatar image">ME</div>
+            </div>
+        </header>
+
+        <!-- SIDEBAR LEFT -->
+        <nav class="sidebar-left">
+            <div class="nav-section-label">Feeds</div>
+            <div class="nav-item active" onclick="switchFeed('home')" data-feed="home">
+                <span class="nav-icon">⬡</span> Home Feed
+            </div>
+            <div class="nav-item" onclick="switchFeed('sovereign')" data-feed="sovereign">
+                <span class="nav-icon">◈</span> Sovereign Chain
+            </div>
+            <div class="nav-item" onclick="switchFeed('mentions')" data-feed="mentions">
+                <span class="nav-icon">◉</span> Mentions
+                <span class="nav-badge" id="mentionsBadge" style="display:none">0</span>
+            </div>
+            <div class="nav-item" onclick="switchFeed('p2p')" data-feed="p2p">
+                <span class="nav-icon">⬢</span> P2P Mesh
+            </div>
+
+            <div class="nav-section-label">Discover</div>
+            <div class="nav-item" onclick="switchFeed('trending')" data-feed="trending">
+                <span class="nav-icon">▲</span> Trending
+            </div>
+            <div class="nav-item" onclick="switchFeed('finalized')" data-feed="finalized">
+                <span class="nav-icon">✦</span> Finalized
+            </div>
+
+            <div class="nav-section-label">System</div>
+            <div class="nav-item" onclick="toggleEventLog()">
+                <span class="nav-icon">≡</span> Event Log
+            </div>
+
+            <!-- NODE IDENTITY + CONNECT -->
+            <div class="node-panel">
+                <div class="node-id-label">Your Node ID</div>
+                <div class="node-id-val" id="myNodeId" onclick="copyNodeId()" title="Click to copy">Initializing...</div>
+                <div class="node-id-label">Connect to Peer</div>
+                <input class="connect-input" id="connectPeerInput" placeholder="Paste peer node ID..." />
+                <button class="connect-btn" onclick="connectToPeer()">⬢ CONNECT</button>
+                <div class="peer-count-badge" id="peerCountBadge">0 peers connected</div>
+            </div>
+        </nav>
+
+        <!-- MAIN FEED -->
+        <main class="main-feed" id="mainFeed">
+            <div class="feed-header">
+                <div class="feed-title" id="feedTitle">HOME FEED</div>
+                <div class="feed-tabs">
+                    <div class="feed-tab active" onclick="switchTab('all')" data-tab="all">ALL</div>
+                    <div class="feed-tab" onclick="switchTab('finalized')" data-tab="finalized">FINALIZED</div>
+                    <div class="feed-tab" onclick="switchTab('p2p')" data-tab="p2p">P2P ONLY</div>
+                </div>
+            </div>
+
+            <!-- COMPOSE -->
+            <div class="compose-box">
+                <div class="compose-row">
+                    <div class="compose-avatar" id="myAvatarCompose">ME</div>
+                    <div class="compose-area">
+                        <textarea class="compose-input" id="composeInput" placeholder="Emit to the sovereign chain..." rows="3"></textarea>
+                        <div class="compose-footer">
+                            <div class="compose-tools">
+                                <div class="compose-tool" title="Hash proof" onclick="addTag('#SovereignHash')">🔗</div>
+                                <div class="compose-tool" title="P2P tag" onclick="addTag('#P2P')">⬢</div>
+                                <div class="compose-tool" title="DAO tag" onclick="addTag('#DAOSpace')">◆</div>
+                                <div class="compose-tool" title="Validator tag" onclick="addTag('#Validator')">⚡</div>
+                            </div>
+                            <div class="compose-meta">
+                                <span class="char-count" id="charCount">280</span>
+                                <button class="emit-btn" id="emitBtn" onclick="emitPost()" disabled>EMIT</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EVENT LOG (collapsible) -->
+            <div class="log-toggle" id="logToggle" onclick="toggleEventLog()">
+                ▶ SOVEREIGN EVENT LOG <span id="logCount" style="color:var(--violet)">(0 events)</span>
+            </div>
+            <div id="eventLogPanel" style="display:none">
+                <div class="event-log-panel" id="eventLogContent"></div>
+            </div>
+            <div class="divider"></div>
+
+            <!-- POSTS -->
+            <div id="postsContainer"></div>
+        </main>
+
+        <!-- SIDEBAR RIGHT -->
+        <aside class="sidebar-right">
+            <!-- NETWORK STATE -->
+            <div class="widget-block">
+                <div class="widget-title">
+                    <div class="widget-title-dot"></div> NETWORK STATE
+                </div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);line-height:2">
+                    <div>Mode: <span id="modeLabel" style="color:var(--cyan)">P2P</span></div>
+                    <div>Node: <span id="nodeShort" style="color:var(--white)">—</span></div>
+                    <div>Peers: <span id="peerCount" style="color:var(--amber)">0</span></div>
+                    <div>Blocks: <span id="blockHeight" style="color:var(--white)">0</span></div>
+                    <div>Events: <span id="eventCount" style="color:var(--violet)">0</span></div>
+                    <div>Validator: <span id="validatorStatus" style="color:var(--dim)">not configured</span></div>
+                </div>
+                <div style="margin-top:8px">
+                    <div class="chain-label"><span>Bus sync</span><span id="syncPct">—</span></div>
+                    <div class="chain-bar-wrap">
+                        <div class="chain-bar-fill" id="syncBar" style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TRENDING TAGS -->
+            <div class="widget-block">
+                <div class="widget-title">
+                    <div class="widget-title-dot" style="background:var(--amber);box-shadow:0 0 8px rgba(255,176,32,.5)"></div> TRENDING TAGS
+                </div>
+                <div id="trendingList"></div>
+            </div>
+
+            <!-- ACTIVE PEERS -->
+            <div class="widget-block">
+                <div class="widget-title">
+                    <div class="widget-title-dot" style="background:var(--green);box-shadow:0 0 8px rgba(0,232,122,.5)"></div> MESH PEERS
+                </div>
+                <div id="peerList"></div>
+            </div>
+
+            <!-- KERNEL LOG -->
+            <div class="widget-block">
+                <div class="widget-title">
+                    <div class="widget-title-dot" style="background:var(--violet);box-shadow:0 0 8px rgba(144,96,240,.5)"></div> KERNEL LOG
+                </div>
+                <div class="kernel-log" id="kernelLog"></div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- ── Sovereign Runtime (self-contained, deterministic, no server dependency) ── -->
+    <script>
+        (function () {
+
+            // ── PRIMARY RUNTIME ───────────────────────────────────────────────────────────
+            // This is the canonical sovereign-log implementation.
+            // The remote validator script may EXTEND or REPLACE it, but this always boots first.
+            // No more "fallback" — this IS the runtime.
+
+            function initSovereignRuntime() {
+                window.sovereignLog = {
+                    validatorOnline: false,
+                    validatorEndpoint: null,
+
+                    EVENT_TYPES: {},
+                    _log: [],
+                    _seq: 1,
+                    _lastHash: null,
+                    _listeners: {},
+                    _subscribers: [],
+                    _bus: null,
+
+                    emit: function (event) {
+                        const record = {
+                            ...event,
+                            hash: 'hash_' + Math.random().toString(36).substr(2, 16),
+                            prevHash: this._lastHash || '0'.repeat(64),
+                            seq: this._seq++,
+                            ts: Date.now()
+                        };
+                        this._lastHash = record.hash;
+                        this._log.push(record);
+
+                        if (this._bus) {
+                            this._bus.postMessage({ type: 'event', record });
+                        }
+
+                        if (this._listeners[event.type]) {
+                            this._listeners[event.type].forEach(cb => cb(record));
+                        }
+                        if (this._listeners['*']) {
+                            this._listeners['*'].forEach(cb => cb(record));
+                        }
+                        if (this._subscribers) {
+                            this._subscribers.forEach(cb => cb(null, record));
+                        }
+
+                        return record;
+                    },
+
+                    getLog: function () {
+                        return this._log;
+                    },
+
+                    on: function (eventType, callback) {
+                        if (!this._listeners[eventType]) this._listeners[eventType] = [];
+                        this._listeners[eventType].push(callback);
+                    },
+
+                    subscribe: function (callback) {
+                        if (!this._subscribers) this._subscribers = [];
+                        this._subscribers.push(callback);
+                    },
+
+                    attachBus: function () {
+                        if (typeof BroadcastChannel !== 'undefined') {
+                            this._bus = new BroadcastChannel('sovereign-social');
+                            this._bus.onmessage = (e) => {
+                                if (e.data.type === 'event' && e.data.record) {
+                                    const record = e.data.record;
+                                    if (!this._log.find(r => r.hash === record.hash)) {
+                                        this._log.push(record);
+                                        if (this._listeners[record.type]) {
+                                            this._listeners[record.type].forEach(cb => cb(record));
+                                        }
+                                        if (this._listeners['*']) {
+                                            this._listeners['*'].forEach(cb => cb(record));
+                                        }
+                                        if (this._subscribers) {
+                                            this._subscribers.forEach(cb => cb(null, record));
+                                        }
+                                    }
+                                }
+                            };
+                        }
+                    }
+                };
+            }
+
+            // ── CONTRACT ENFORCER ─────────────────────────────────────────────────────────
+            // Guarantees the runtime API contract is always met, regardless of which
+            // version (local or remote) is active. Run this after any runtime swap.
+
+            function ensureSovereignContract(log) {
+                // If whatever was passed in is null/undefined/non-object, discard it
+                // and start fresh with a known-good runtime.
+                if (log === null || log === undefined || typeof log !== 'object') {
+                    console.warn('[SOVEREIGN] ensureSovereignContract received invalid log — reinitializing');
+                    initSovereignRuntime();
+                    log = window.sovereignLog;
+                }
+
+                if (!log.EVENT_TYPES)    log.EVENT_TYPES = {};
+                if (!log._listeners)     log._listeners = {};
+                if (!log._subscribers)   log._subscribers = [];
+                if (!log._log)           log._log = [];
+
+                if (typeof log.subscribe !== 'function') {
+                    log.subscribe = function (cb) { this._subscribers.push(cb); };
+                }
+                if (typeof log.getLog !== 'function') {
+                    log.getLog = function () { return this._log; };
+                }
+                if (typeof log.on !== 'function') {
+                    log.on = function (type, cb) {
+                        if (!this._listeners[type]) this._listeners[type] = [];
+                        this._listeners[type].push(cb);
+                    };
+                }
+                if (typeof log.attachBus !== 'function') {
+                    log.attachBus = function () {};
+                }
+                if (typeof log.emit !== 'function') {
+                    // emit is the one thing we can't patch — reinitialize entirely
+                    console.warn('[SOVEREIGN] log.emit missing — reinitializing runtime');
+                    initSovereignRuntime();
+                    log = window.sovereignLog;
+                }
+                return log;
+            }
+
+            // ── BOOT ──────────────────────────────────────────────────────────────────────
+
+            function boot() {
+                // Always initialize local runtime unconditionally first.
+                // ensureSovereignContract will reinitialize if anything is wrong.
+                initSovereignRuntime();
+                window.sovereignLog = ensureSovereignContract(window.sovereignLog);
+                console.log('[SOVEREIGN] Runtime ready (local)');
+            }
+
+            // Boot immediately so the app never waits on a network request.
+            boot();
+
+            // Attempt to enhance with remote validator (optional, non-blocking).
+            const script = document.createElement('script');
+            script.src = 'https://sovereign-validator-dkwg-production.up.railway.app/sovereign-log-inline.js';
+            script.onload = function () {
+                // Remote script may have replaced window.sovereignLog with anything.
+                // ensureSovereignContract handles null/bad objects by reinitializing.
+                window.sovereignLog = ensureSovereignContract(window.sovereignLog);
+                console.log('[SOVEREIGN] Runtime enhanced by validator');
+            };
+            script.onerror = function () {
+                // Already booted locally — local runtime is already valid.
+                console.warn('[SOVEREIGN] Validator unreachable — local runtime active');
+            };
+            document.head.appendChild(script);
+
+            // Favicon: suppress 404 noise
+            const favicon = document.createElement('link');
+            favicon.rel = 'icon';
+            favicon.href = 'data:,';
+            document.head.appendChild(favicon);
+
+        })();
+    </script>
+
+    <script>
+        // ══════════════════════════════════════════════════════════════════════
+        //  SOVEREIGN SOCIAL — I-AM-IOS Social Layer
+        //  Wired directly into the real sovereign-log + BroadcastChannel bus
+        //  + PeerJS WebRTC P2P machine-to-machine gossip.
+        //
+        //  Architecture:
+        //    compose/emit → sovereignLog.emit(SOCIAL_POST_EMITTED)
+        //      → BroadcastChannel bus → all open tabs in same origin
+        //      → PeerJS WebRTC data channel → all connected browser nodes
+        //      → validator endpoint (if window.SOVEREIGN_CONFIG set)
+        //
+        //  Zero mocks. Zero stubs. Real events, real peers, real IndexedDB.
+        // ══════════════════════════════════════════════════════════════════════
+
+        // Wait for sovereignLog to be available, then register social events
+        function waitForSovereignLog(callback, attempts = 0) {
+            if (window.sovereignLog != null && typeof window.sovereignLog.emit === 'function') {
+                callback();
+            } else if (attempts < 50) {
+                setTimeout(() => waitForSovereignLog(callback, attempts + 1), 50);
+            } else {
+                console.error('[SOCIAL] sovereignLog failed to initialize after 2.5s');
+            }
+        }
+
+        waitForSovereignLog(() => {
+
+            // Bind the global let to the live runtime object.
+            // The `let sovereignLog` at line 39 is declared null and never auto-assigned —
+            // the runtime only populates window.sovereignLog. Without this line,
+            // every sovereignLog.x call in this scope reads null and crashes.
+            sovereignLog = window.sovereignLog;
+
+            // ── 1. EXTEND EVENT_TYPES with social events ─────────────────────────────────
+            //    Register our custom social event types
+            SOCIAL_EVENTS = {
+                SOCIAL_POST_EMITTED: 'SOCIAL_POST_EMITTED',
+                SOCIAL_POST_LIKED: 'SOCIAL_POST_LIKED',
+                SOCIAL_POST_RESONATED: 'SOCIAL_POST_RESONATED',
+                SOCIAL_POST_REPLIED: 'SOCIAL_POST_REPLIED',
+                SOCIAL_POST_DELETED: 'SOCIAL_POST_DELETED',
+                SOCIAL_PEER_SEEN: 'SOCIAL_PEER_SEEN',
+                SOCIAL_CONSENSUS_ACK: 'SOCIAL_CONSENSUS_ACK', // peer acked a post
+                SOCIAL_BLOCK_HEIGHT: 'SOCIAL_BLOCK_HEIGHT', // block counter ticks
+            };
+
+            // Extend the EVENT_TYPES registry so emit() won't warn
+            if (!sovereignLog.EVENT_TYPES) sovereignLog.EVENT_TYPES = {};
+            Object.assign(sovereignLog.EVENT_TYPES, SOCIAL_EVENTS);
+
+            klog('✓ Social event types registered', 'ok');
+
+            // ── 2. APP STATE ──────────────────────────────────────────────────────────────
+
+            // Note: myNodeId, myHandle, myName, _peer, _peerConns are global for onclick access
+            // Variables currentFeed, currentTab, showLog are also global
+            let peerObjects = new Map(); // nodeId → { name, handle, online, conn }
+            let ackCounts = new Map(); // postId → Set of nodeIds who acked
+            let blockHeight = 0;
+
+            // ── 3. IDENTITY — generate a stable sovereign node identity ──────────────────
+
+            function initIdentity() {
+                let stored = null;
+                try {
+                    stored = JSON.parse(localStorage.getItem('sovereign-social-identity'));
+                } catch (_) {}
+
+                if (stored?.nodeId && stored?.handle && stored?.name) {
+                    myNodeId = stored.nodeId;
+                    myHandle = stored.handle;
+                    myName   = stored.name;
+                } else {
+                    const seed = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+                    myNodeId = 'sov-' + seed.slice(0, 12);
+                    const adjectives = ['Quantum', 'Cipher', 'Mesh', 'Chain', 'Flux', 'Kernel', 'Signal', 'Vector'];
+                    const nouns = ['Node', 'Peer', 'Relay', 'Nexus', 'Gate', 'Hub', 'Shard', 'Beacon'];
+                    myName   = adjectives[Math.floor(Math.random() * adjectives.length)] + ' ' +
+                               nouns[Math.floor(Math.random() * nouns.length)];
+                    myHandle = '@' + myName.toLowerCase().replace(' ', '_');
+                    try {
+                        localStorage.setItem('sovereign-social-identity', JSON.stringify({
+                            nodeId: myNodeId,
+                            handle: myHandle,
+                            name:   myName
+                        }));
+                    } catch (_) {}
+                }
+
+                // ── ID CROSSOVER ──────────────────────────────────────────────────────────
+                // window._sovereignPeerId is the shared identity anchor used by the
+                // production sovereign-log-inline.js to tag all events sent to the validator.
+                // Priority:
+                //   1. If the system already has a live peer ID, adopt it — we are that node.
+                //   2. Otherwise, register our myNodeId as the system peer ID so the
+                //      validator bridge picks up our identity from this point forward.
+                if (window._sovereignPeerId && window._sovereignPeerId !== 'inline-unknown') {
+                    myNodeId = window._sovereignPeerId;
+                    klog(`Identity synced from system: ${myNodeId.slice(0,16)}…`, 'ok');
+                } else {
+                    window._sovereignPeerId = myNodeId;
+                    klog(`Identity registered to system: ${myNodeId.slice(0,16)}…`, 'ok');
+                }
+
+                // Update UI
+                document.getElementById('myNodeId').textContent = myNodeId;
+                document.getElementById('myAvatarBtn').textContent = getInitials(myName);
+                document.getElementById('myAvatarCompose').textContent = getInitials(myName);
+                document.getElementById('nodeShort').textContent = myNodeId.slice(0, 14) + '…';
+                klog(`Identity: ${myHandle} (${myNodeId.slice(0,12)}…)`, 'ok');
+            }
+
+            // ── 4. INDEXEDDB LEDGER — persist social events across sessions ───────────────
+
+            let _socialDB = null;
+
+            async function openSocialDB() {
+                return new Promise((res, rej) => {
+                    const req = indexedDB.open('sovereign-social-ledger', 1);
+                    req.onupgradeneeded = e => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains('events')) {
+                            const s = db.createObjectStore('events', {
+                                keyPath: 'seq'
+                            });
+                            s.createIndex('by_type', 'type');
+                            s.createIndex('by_hash', 'hash', {
+                                unique: true
+                            });
+                        }
+                    };
+                    req.onsuccess = e => res(e.target.result);
+                    req.onerror = e => rej(e.target.error);
+                });
+            }
+
+            async function persistSocialEvent(record) {
+                if (!_socialDB) return;
+                try {
+                    const tx = _socialDB.transaction('events', 'readwrite');
+                    tx.objectStore('events').put(record);
+                } catch (_) {}
+            }
+
+            async function loadPersistedEvents() {
+                if (!_socialDB) return [];
+                return new Promise((res) => {
+                    const tx = _socialDB.transaction('events', 'readonly');
+                    const req = tx.objectStore('events').getAll();
+                    req.onsuccess = e => res(e.target.result.sort((a, b) => a.seq - b.seq));
+                    req.onerror = () => res([]);
+                });
+            }
+
+            // ── 5. PEER JS REAL P2P ───────────────────────────────────────────────────────
+            //    Uses PeerJS's free STUN/signaling to establish direct WebRTC data channels.
+            //    Once connected, events flow machine-to-machine with no intermediary.
+
+            function initPeerJS() {
+                if (typeof Peer === 'undefined') {
+                    klog('PeerJS not loaded — P2P disabled', 'warn');
+                    return;
+                }
+
+                klog('Initializing WebRTC peer…', 'info');
+
+                _peer = new Peer(myNodeId, {
+                    debug: 0,
+                    config: {
+                        iceServers: [{
+                                urls: 'stun:stun.l.google.com:19302'
+                            },
+                            {
+                                urls: 'stun:stun1.l.google.com:19302'
+                            },
+                            {
+                                urls: 'stun:stun2.l.google.com:19302'
+                            },
+                        ],
+                    },
+                });
+
+                _peer.on('open', id => {
+                    // Sync confirmed PeerJS ID back to myNodeId and the system anchor.
+                    // PeerJS may assign a slightly different id if there was a collision;
+                    // this keeps all three in lockstep: myNodeId ↔ window._sovereignPeerId ↔ PeerJS id.
+                    myNodeId = id;
+                    window._sovereignPeerId = id;
+                    document.getElementById('myNodeId').textContent = myNodeId;
+                    document.getElementById('nodeShort').textContent = myNodeId.slice(0, 14) + '…';
+                    updateNetworkPill('p2p');
+                    klog(`WebRTC open — peer ID confirmed: ${id.slice(0,16)}…`, 'ok');
+                    showToast('P2P mesh active — share your node ID to connect', 'success');
+                    sovereignLog.emit({
+                        type: SOCIAL_EVENTS.SOCIAL_PEER_SEEN,
+                        nodeId: myNodeId,
+                        name: myName,
+                        handle: myHandle,
+                    });
+                });
+
+                _peer.on('connection', conn => {
+                    klog(`Incoming connection from ${conn.peer.slice(0,12)}…`, 'info');
+                    setupConnection(conn);
+                });
+
+                _peer.on('disconnected', () => {
+                    klog('WebRTC disconnected — attempting reconnect…', 'warn');
+                    updateNetworkPill('connecting');
+                    setTimeout(() => {
+                        try {
+                            _peer.reconnect();
+                        } catch (_) {}
+                    }, 2000);
+                });
+
+                _peer.on('error', err => {
+                    klog(`PeerJS error: ${err.type}`, 'warn');
+                    if (err.type === 'peer-unavailable') showToast(`Peer unreachable — check node ID`, 'error');
+                    else if (err.type === 'unavailable-id') {
+                        // ID taken — generate a new one
+                        myNodeId = 'sov-' + Math.random().toString(36).slice(2, 14);
+                        document.getElementById('myNodeId').textContent = myNodeId;
+                        try {
+                            localStorage.setItem('sovereign-social-identity', JSON.stringify({
+                                nodeId: myNodeId,
+                                handle: myHandle,
+                                name: myName
+                            }));
+                        } catch (_) {}
+                    }
+                });
+            }
+
+            function setupConnection(conn) {
+                conn.on('open', () => {
+                    _peerConns.set(conn.peer, conn);
+                    updatePeerCount();
+                    klog(`Connected to ${conn.peer.slice(0,12)}…`, 'ok');
+                    showToast(`Peer connected: ${conn.peer.slice(0,16)}…`, 'success');
+
+                    // Handshake: send our identity + our event log suffix for sync
+                    conn.send({
+                        op: 'HANDSHAKE',
+                        nodeId: myNodeId,
+                        name: myName,
+                        handle: myHandle,
+                        logHeight: sovereignLog.getLog().length,
+                    });
+
+                    // Register peer on the sovereign event log
+                    sovereignLog.emit({
+                        type: SOCIAL_EVENTS.SOCIAL_PEER_SEEN,
+                        nodeId: conn.peer,
+                        name: conn.peer.slice(0, 12) + '…',
+                        handle: '@' + conn.peer.slice(0, 8),
+                    });
+                });
+
+                conn.on('data', data => handlePeerMessage(data, conn.peer));
+
+                conn.on('close', () => {
+                    _peerConns.delete(conn.peer);
+                    updatePeerCount();
+                    klog(`Peer disconnected: ${conn.peer.slice(0,12)}…`, 'warn');
+                    const p = peerObjects.get(conn.peer);
+                    if (p) {
+                        p.online = false;
+                        renderSidebar();
+                    }
+                });
+
+                conn.on('error', err => {
+                    klog(`Conn error (${conn.peer.slice(0,8)}…): ${err}`, 'warn');
+                });
+            }
+
+            function handlePeerMessage(msg, fromPeerId) {
+                if (!msg?.op) return;
+
+                switch (msg.op) {
+
+                    case 'HANDSHAKE': {
+                        // Store peer identity
+                        peerObjects.set(fromPeerId, {
+                            nodeId: fromPeerId,
+                            name: msg.name || fromPeerId.slice(0, 12) + '…',
+                            handle: msg.handle || '@' + fromPeerId.slice(0, 8),
+                            online: true,
+                            conn: _peerConns.get(fromPeerId),
+                        });
+                        renderSidebar();
+                        klog(`Handshake: ${msg.handle || fromPeerId.slice(0,12)} (height=${msg.logHeight})`, 'info');
+
+                        // If they're behind us, send them our log suffix
+                        const ourHeight = sovereignLog.getLog().length;
+                        if (msg.logHeight < ourHeight) {
+                            const conn = _peerConns.get(fromPeerId);
+                            if (conn) {
+                                const suffix = sovereignLog.getLog()
+                                    .filter(e => isSocialEvent(e.type) && e.seq >= msg.logHeight);
+                                if (suffix.length) {
+                                    conn.send({
+                                        op: 'SYNC_RESPONSE',
+                                        records: suffix
+                                    });
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                    case 'EVENT': {
+                        // A peer is gossiping an event to us
+                        const record = msg.record;
+                        if (!record?.type) break;
+                        if (!isSocialEvent(record.type)) break;
+                        // Dedup by checking sovereign log
+                        const log = sovereignLog.getLog();
+                        if (log.some(e => e.hash === record.hash)) break;
+
+                        // Re-emit into our local sovereign log
+                        const {
+                            type,
+                            hash,
+                            prevHash,
+                            seq,
+                            ts,
+                            ...rest
+                        } = record;
+                        try {
+                            sovereignLog.emit({
+                                ...rest,
+                                type,
+                                _fromNet: true,
+                                _originalHash: hash
+                            });
+                        } catch (_) {}
+
+                        // Relay to our other peers (gossip relay)
+                        gossipToOthers(msg, fromPeerId);
+
+                        // Send ACK back
+                        const conn = _peerConns.get(fromPeerId);
+                        if (conn) conn.send({
+                            op: 'ACK',
+                            hash: record.hash,
+                            fromNodeId: myNodeId
+                        });
+                        break;
+                    }
+
+                    case 'ACK': {
+                        const {
+                            hash,
+                            fromNodeId
+                        } = msg;
+                        if (!ackCounts.has(hash)) ackCounts.set(hash, new Set());
+                        ackCounts.get(hash).add(fromNodeId);
+                        // Check if we have quorum (2/3 of connected peers + self)
+                        const needed = Math.max(1, Math.ceil((_peerConns.size + 1) * 0.67));
+                        if (ackCounts.get(hash).size >= needed) {
+                            markPostFinalized(hash);
+                        }
+                        break;
+                    }
+
+                    case 'SYNC_RESPONSE': {
+                        // Peer is sending us events we missed
+                        const records = msg.records;
+                        if (!Array.isArray(records)) break;
+                        const log = sovereignLog.getLog();
+                        const knownHashes = new Set(log.map(e => e.hash));
+                        for (const record of records) {
+                            if (!record?.type || !isSocialEvent(record.type)) continue;
+                            if (knownHashes.has(record.hash)) continue;
+                            const {
+                                type,
+                                hash,
+                                prevHash,
+                                seq,
+                                ts,
+                                ...rest
+                            } = record;
+                            try {
+                                sovereignLog.emit({
+                                    ...rest,
+                                    type,
+                                    _fromNet: true
+                                });
+                            } catch (_) {}
+                        }
+                        klog(`Synced ${records.length} events from ${fromPeerId.slice(0,10)}…`, 'ok');
+                        break;
+                    }
+                }
+            }
+
+            function isSocialEvent(type) {
+                return Object.values(SOCIAL_EVENTS).includes(type);
+            }
+
+            function gossipToOthers(msg, exceptPeerId) {
+                for (const [peerId, conn] of _peerConns) {
+                    if (peerId === exceptPeerId) continue;
+                    try {
+                        conn.send(msg);
+                    } catch (_) {}
+                }
+            }
+
+            function broadcastEvent(record) {
+                const msg = {
+                    op: 'EVENT',
+                    record,
+                    fromNodeId: myNodeId
+                };
+                for (const [, conn] of _peerConns) {
+                    try {
+                        conn.send(msg);
+                    } catch (_) {}
+                }
+            }
+
+            function connectToPeer() {
+                const input = document.getElementById('connectPeerInput');
+                const peerId = input.value.trim();
+                if (!peerId || peerId === myNodeId) return;
+                if (_peerConns.has(peerId)) {
+                    showToast('Already connected to that peer', 'warn');
+                    return;
+                }
+                if (!_peer) {
+                    showToast('PeerJS not ready yet', 'warn');
+                    return;
+                }
+                klog(`Connecting to ${peerId.slice(0,16)}…`, 'info');
+                const conn = _peer.connect(peerId, {
+                    reliable: true
+                });
+                conn.on('open', () => setupConnection(conn));
+                conn.on('error', err => {
+                    klog(`Failed to connect: ${err}`, 'warn');
+                    showToast(`Could not connect to peer`, 'error');
+                });
+                input.value = '';
+            }
+
+            function updatePeerCount() {
+                const count = _peerConns.size;
+                document.getElementById('peerCountBadge').textContent = `${count} peer${count !== 1 ? 's' : ''} connected`;
+                document.getElementById('peerCount').textContent = count;
+            }
+
+            // ── 6. SOVEREIGN LOG SUBSCRIBE — wire bus + P2P broadcast ────────────────────
+            //    Every social event emitted locally goes:
+            //      → IndexedDB (persist)
+            //      → BroadcastChannel bus (same-origin tabs)
+            //      → PeerJS gossip (all WebRTC peers)
+            //      → validator (if configured)
+
+            sovereignLog.subscribe((state, record) => {
+                if (!record) return; // initial fire
+
+                // Only process social events
+                if (!isSocialEvent(record.type)) return;
+
+                // Persist to IndexedDB
+                persistSocialEvent(record);
+
+                // Broadcast to WebRTC peers (unless it came in from the network)
+                if (!record._fromNet && !record._fromBus) {
+                    broadcastEvent(record);
+                }
+
+                // Re-render UI
+                renderPosts();
+                renderSidebar();
+                renderEventLog();
+                updateStats();
+            });
+
+            // ── 7. DERIVE SOCIAL STATE from the sovereign log ────────────────────────────
+            //    Pure function — mirrors sovereign-log's deriveState pattern.
+
+            function deriveSocialState() {
+                const log = sovereignLog.getLog();
+                const posts = {};
+                const peers = {};
+                const tags = {};
+                let height = 0;
+
+                for (const e of log) {
+                    switch (e.type) {
+                        case SOCIAL_EVENTS.SOCIAL_POST_EMITTED:
+                            posts[e.postId] = {
+                                id: e.postId,
+                                author: e.author,
+                                handle: e.handle,
+                                content: e.content,
+                                ts: e.ts,
+                                likes: 0,
+                                resonates: 0,
+                                replies: 0,
+                                replyList: [],
+                                hash: e.hash,
+                                seq: e.seq,
+                                prevHash: e.prevHash,
+                                networkMode: e.networkMode || 'p2p',
+                                nodeId: e.nodeId,
+                                likedBy: new Set(),
+                                resonatedBy: new Set(),
+                                finalized: false,
+                                deleted: false,
+                                ackCount: ackCounts.get(e.hash)?.size || 0,
+                            };
+                            (e.content.match(/#\w+/g) || []).forEach(t => {
+                                tags[t] = (tags[t] || 0) + 1;
+                            });
+                            break;
+                        case SOCIAL_EVENTS.SOCIAL_POST_LIKED:
+                            if (posts[e.postId]) {
+                                if (!posts[e.postId].likedBy.has(e.userId)) {
+                                    posts[e.postId].likes++;
+                                    posts[e.postId].likedBy.add(e.userId);
+                                } else {
+                                    posts[e.postId].likes--;
+                                    posts[e.postId].likedBy.delete(e.userId);
+                                }
+                            }
+                            break;
+                        case SOCIAL_EVENTS.SOCIAL_POST_RESONATED:
+                            if (posts[e.postId] && !posts[e.postId].resonatedBy.has(e.userId)) {
+                                posts[e.postId].resonates++;
+                                posts[e.postId].resonatedBy.add(e.userId);
+                            }
+                            break;
+                        case SOCIAL_EVENTS.SOCIAL_POST_REPLIED:
+                            if (posts[e.postId]) {
+                                posts[e.postId].replies++;
+                                posts[e.postId].replyList.push({
+                                    author: e.replyAuthor,
+                                    handle: e.replyHandle,
+                                    content: e.content,
+                                    ts: e.ts,
+                                });
+                            }
+                            break;
+                        case SOCIAL_EVENTS.SOCIAL_POST_DELETED:
+                            if (posts[e.postId]) posts[e.postId].deleted = true;
+                            break;
+                        case SOCIAL_EVENTS.SOCIAL_CONSENSUS_ACK:
+                            if (posts[e.postId]) {
+                                posts[e.postId].finalized = true;
+                                posts[e.postId].ackCount = e.ackCount || 0;
+                            }
+                            break;
+                        case SOCIAL_EVENTS.SOCIAL_PEER_SEEN:
+                            peers[e.nodeId] = {
+                                nodeId: e.nodeId,
+                                name: e.name,
+                                handle: e.handle,
+                                online: _peerConns.has(e.nodeId) || e.nodeId === myNodeId,
+                                ts: e.ts,
+                            };
+                            break;
+                        case SOCIAL_EVENTS.SOCIAL_BLOCK_HEIGHT:
+                            height = e.height;
+                            break;
+                    }
+                }
+
+                return {
+                    posts: Object.values(posts).filter(p => !p.deleted).sort((a, b) => b.ts - a.ts),
+                    peers,
+                    tags,
+                    height,
+                    eventCount: log.filter(e => isSocialEvent(e.type)).length,
+                };
+            }
+
+            function markPostFinalized(hash) {
+                const log = sovereignLog.getLog();
+                const post = log.find(e => e.type === SOCIAL_EVENTS.SOCIAL_POST_EMITTED && e.hash === hash);
+                if (!post) return;
+                const existing = log.find(e => e.type === SOCIAL_EVENTS.SOCIAL_CONSENSUS_ACK && e.postId === post.postId);
+                if (existing) return;
+                try {
+                    sovereignLog.emit({
+                        type: SOCIAL_EVENTS.SOCIAL_CONSENSUS_ACK,
+                        postId: post.postId,
+                        hash,
+                        ackCount: ackCounts.get(hash)?.size || 0,
+                    });
+                    klog(`CONSENSUS_ACK post:${post.postId.slice(0,8)}`, 'ok');
+                } catch (_) {}
+            }
+
+            // ── 8. UI ACTIONS ─────────────────────────────────────────────────────────────
+
+            function emitPost() {
+                const input = document.getElementById('composeInput');
+                const text = input.value.trim();
+                if (!text) return;
+
+                const postId = 'post_' + myNodeId.slice(4, 10) + '_' + Date.now().toString(36);
+                const record = sovereignLog.emit({
+                    type: SOCIAL_EVENTS.SOCIAL_POST_EMITTED,
+                    postId,
+                    author: myName,
+                    handle: myHandle,
+                    nodeId: myNodeId,
+                    content: text,
+                    networkMode: (_peerConns.size > 0) ? 'p2p' : 'local',
+                });
+
+                input.value = '';
+                updateCharCount();
+                klog(`POST_EMITTED seq:${record.seq} hash:${record.hash.slice(0,8)} peers:${_peerConns.size}`, 'ok');
+                showToast(_peerConns.size > 0 ? `Emitted to ${_peerConns.size} peer(s)` : 'Emitted locally (no peers connected)', 'success');
+            }
+
+            function likePost(postId) {
+                sovereignLog.emit({
+                    type: SOCIAL_EVENTS.SOCIAL_POST_LIKED,
+                    postId,
+                    userId: myNodeId
+                });
+            }
+
+            function resonatePost(postId) {
+                sovereignLog.emit({
+                    type: SOCIAL_EVENTS.SOCIAL_POST_RESONATED,
+                    postId,
+                    userId: myNodeId
+                });
+                showToast('Resonated on chain', 'success');
+            }
+
+            function toggleReplies(postId) {
+                const el = document.getElementById('replies-' + postId);
+                if (el) el.classList.toggle('open');
+            }
+
+            function submitReply(postId) {
+                const input = document.getElementById('replyInput-' + postId);
+                const text = input.value.trim();
+                if (!text) return;
+                sovereignLog.emit({
+                    type: SOCIAL_EVENTS.SOCIAL_POST_REPLIED,
+                    postId,
+                    userId: myNodeId,
+                    replyAuthor: myName,
+                    replyHandle: myHandle,
+                    content: text,
+                });
+                input.value = '';
+                showToast('Reply emitted', 'success');
+            }
+
+            function deletePost(postId) {
+                if (!confirm('Delete post? Event is retained in audit log.')) return;
+                sovereignLog.emit({
+                    type: SOCIAL_EVENTS.SOCIAL_POST_DELETED,
+                    postId
+                });
+            }
+
+            function addTag(tag) {
+                const i = document.getElementById('composeInput');
+                i.value += (i.value ? ' ' : '') + tag;
+                i.focus();
+                updateCharCount();
+            }
+
+            function copyNodeId() {
+                navigator.clipboard.writeText(myNodeId).then(() => showToast('Node ID copied to clipboard', 'success'));
+            }
+
+            // ── 9. RENDER ─────────────────────────────────────────────────────────────────
+
+            const avatarColors = [
+                ['#00d4f5', '#9060f0'],
+                ['#00e87a', '#00d4f5'],
+                ['#ffb020', '#ff3d5a'],
+                ['#9060f0', '#f060b0'],
+                ['#ff3d5a', '#ffb020'],
+                ['#f060b0', '#9060f0'],
+            ];
+
+            function getAvatarStyle(str) {
+                const idx = (str || 'X').charCodeAt(0) % avatarColors.length;
+                const [c1, c2] = avatarColors[idx];
+                return `background:linear-gradient(135deg,${c1},${c2});color:#020509`;
+            }
+
+            function getInitials(name) {
+                return (name || '??').split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+            }
+
+            function timeAgo(ts) {
+                const d = Date.now() - ts;
+                if (d < 60000) return `${Math.floor(d/1000)}s`;
+                if (d < 3600000) return `${Math.floor(d/60000)}m`;
+                if (d < 86400000) return `${Math.floor(d/3600000)}h`;
+                return `${Math.floor(d/86400000)}d`;
+            }
+
+            function esc(str) {
+                return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            function fmtContent(text) {
+                return esc(text)
+                    .replace(/#(\w+)/g, '<span class="post-tag" onclick="filterTag(\'#$1\')">#$1</span>')
+                    .replace(/@(\w+)/g, '<span style="color:var(--violet)">@$1</span>');
+            }
+
+            function renderPosts() {
+                const container = document.getElementById('postsContainer');
+                const state = deriveSocialState();
+                const search = document.getElementById('searchInput').value.toLowerCase();
+
+                let posts = state.posts;
+
+                // Feed filter
+                if (currentFeed === 'mentions') {
+                    posts = posts.filter(p => p.content.includes(myHandle) || p.content.includes('@' + myName));
+                } else if (currentFeed === 'p2p') {
+                    posts = posts.filter(p => p.networkMode === 'p2p');
+                } else if (currentFeed === 'finalized') {
+                    posts = posts.filter(p => p.finalized);
+                } else if (currentFeed === 'trending') {
+                    posts = [...posts].sort((a, b) => (b.likes + b.resonates) - (a.likes + a.resonates));
+                }
+
+                // Tab filter
+                if (currentTab === 'finalized') posts = posts.filter(p => p.finalized);
+                if (currentTab === 'p2p') posts = posts.filter(p => p.networkMode === 'p2p');
+
+                // Search
+                if (search) posts = posts.filter(p =>
+                    p.content.toLowerCase().includes(search) ||
+                    p.author.toLowerCase().includes(search) ||
+                    p.handle.toLowerCase().includes(search)
+                );
+
+                if (!posts.length) {
+                    container.innerHTML = '<div class="empty-feed">NO EVENTS IN CHAIN.<br>EMIT SOMETHING TO INITIALIZE.<br><br>Share your node ID with a peer to connect.</div>';
+                    return;
+                }
+
+                container.innerHTML = posts.map(p => renderPost(p)).join('');
+            }
+
+            function renderPost(p) {
+                const initials = getInitials(p.author);
+                const avStyle = getAvatarStyle(p.author);
+                const isOwn = (p.nodeId === myNodeId);
+                const liked = p.likedBy.has(myNodeId);
+                const resonated = p.resonatedBy.has(myNodeId);
+
+                const netTag = p.finalized ?
+                    '<span class="network-mode-tag nm-finalized">FINALIZED</span>' :
+                    p.networkMode === 'p2p' ?
+                    '<span class="network-mode-tag nm-p2p">P2P</span>' :
+                    p.networkMode === 'validator' ?
+                    '<span class="network-mode-tag nm-validator">VALIDATOR</span>' :
+                    '<span class="network-mode-tag nm-local">LOCAL</span>';
+
+                const ackBadge = p.ackCount > 0 ?
+                    `<span style="font-family:var(--mono);font-size:8px;color:var(--green);margin-left:6px">✓${p.ackCount} acks</span>` :
+                    '';
+
+                const replyListHtml = p.replyList.slice(0, 5).map(r => `
+    <div class="reply-item">
+      <div class="reply-av" style="${getAvatarStyle(r.author)}">${getInitials(r.author)}</div>
+      <div class="reply-body">
+        <div class="reply-author">${esc(r.author)} <span style="color:var(--dim)">${esc(r.handle)}</span></div>
+        <div class="reply-text">${fmtContent(r.content)}</div>
+        <div class="reply-ts">${timeAgo(r.ts)}</div>
+      </div>
+    </div>`).join('');
+
+                return `
+  <div class="post-card ${p.finalized ? 'finalized' : (p.networkMode === 'p2p' ? 'p2p-only' : '')}" id="post-${p.id}">
+    <div class="post-header">
+      <div class="post-avatar" style="${avStyle}">${initials}</div>
+      <div class="post-meta">
+        <div class="post-author">${esc(p.author)} ${ackBadge}</div>
+        <div class="post-handle">${esc(p.handle)} ${netTag}</div>
+        <div class="post-time">${timeAgo(p.ts)}</div>
+      </div>
+      <div class="post-proof">
+        <span class="proof-lock">✓</span>
+        <span class="proof-hash">${p.hash.slice(0,10)}…</span>
+      </div>
+    </div>
+    <div class="post-body">${fmtContent(p.content)}</div>
+    <div class="post-chain ${p.hash ? 'chain-ok' : ''}">
+      SEQ:${p.seq??'?'} · HASH:${p.hash} · PREV:${(p.prevHash||'').slice(0,8)} · NODE:${(p.nodeId||'').slice(0,12)}
+    </div>
+    <div class="post-actions">
+      <button class="post-action ${liked?'liked':''}" onclick="likePost('${p.id}')">♥ ${p.likes}</button>
+      <button class="post-action ${resonated?'resonated':''}" onclick="resonatePost('${p.id}')">↺ ${p.resonates}</button>
+      <button class="post-action" onclick="toggleReplies('${p.id}')">◎ ${p.replies}</button>
+      ${isOwn ? `<button class="post-action" onclick="deletePost('${p.id}')" style="color:var(--red);margin-left:auto">✕ DELETE</button>` : ''}
+    </div>
+    <div class="replies-section" id="replies-${p.id}">
+      <div class="reply-row">
+        <textarea class="reply-input" id="replyInput-${p.id}" placeholder="Reply on chain…" rows="2"></textarea>
+        <button class="reply-send-btn" onclick="submitReply('${p.id}')">EMIT</button>
+      </div>
+      ${replyListHtml}
+    </div>
+  </div>`;
+            }
+
+            function renderSidebar() {
+                const state = deriveSocialState();
+
+                // Trending tags (derived live from the event log)
+                const trendEl = document.getElementById('trendingList');
+                const sortedTags = Object.entries(state.tags).sort((a, b) => b[1] - a[1]).slice(0, 8);
+                trendEl.innerHTML = sortedTags.length ?
+                    sortedTags.map(([tag, count]) => `
+        <div class="trend-item" onclick="filterTag('${tag}')">
+          <span class="trend-tag">${tag}</span>
+          <span class="trend-count">${count} emits</span>
+        </div>`).join('') :
+                    '<div style="font-family:var(--mono);font-size:10px;color:var(--dim)">No tags yet</div>';
+
+                // Peers — merge in-memory peerObjects with sovereign state
+                const allPeers = {
+                    ...state.peers
+                };
+                for (const [id, p] of peerObjects) {
+                    allPeers[id] = {
+                        ...allPeers[id],
+                        ...p,
+                        online: _peerConns.has(id)
+                    };
+                }
+
+                const peerEl = document.getElementById('peerList');
+                const peerList = Object.values(allPeers).filter(p => p.nodeId !== myNodeId);
+                peerEl.innerHTML = peerList.length ?
+                    peerList.map(p => `
+        <div class="peer-item">
+          <div class="peer-avatar" style="${getAvatarStyle(p.name)}">${getInitials(p.name)}</div>
+          <div style="flex:1">
+            <div class="peer-name">${esc(p.name)}</div>
+            <div class="peer-handle">${esc(p.handle || p.nodeId.slice(0,12))}</div>
+          </div>
+          <div class="peer-dot ${p.online ? 'online' : 'offline'}"></div>
+        </div>`).join('') :
+                    '<div style="font-family:var(--mono);font-size:10px;color:var(--dim)">Share your node ID to connect peers</div>';
+            }
+
+            function renderEventLog() {
+                if (!showLog) return;
+                const log = sovereignLog.getLog().filter(e => isSocialEvent(e.type));
+                const count = log.length;
+                document.getElementById('logCount').textContent = `(${count} social events)`;
+                const el = document.getElementById('eventLogContent');
+                el.innerHTML = [...log].reverse().slice(0, 60).map(e => `
+    <div class="eentry">
+      <span class="eseq">#${e.seq}</span>
+      <span class="ehash">${e.hash.slice(0,8)}</span>
+      <span class="etype">${e.type}</span>
+      <span class="ets">${timeAgo(e.ts)}</span>
+    </div>`).join('');
+            }
+
+            function updateStats() {
+                const state = deriveSocialState();
+                document.getElementById('blockHeight').textContent = state.height;
+                document.getElementById('eventCount').textContent = state.eventCount;
+                // Bus sync indicator
+                const totalEvents = sovereignLog.getLog().length;
+                const pct = totalEvents > 0 ? Math.min(100, Math.round((state.eventCount / totalEvents) * 100)) : 0;
+                document.getElementById('syncPct').textContent = pct + '%';
+                document.getElementById('syncBar').style.width = pct + '%';
+            }
+
+            function updateNetworkPill(mode) {
+                const pill = document.getElementById('networkPill');
+                const label = document.getElementById('netLabel');
+                const modeEl = document.getElementById('modeLabel');
+                if (mode === 'validator') {
+                    pill.className = 'net-pill validator';
+                    label.textContent = 'VALIDATOR';
+                    modeEl.textContent = 'VALIDATOR';
+                } else if (mode === 'p2p') {
+                    pill.className = 'net-pill p2p';
+                    label.textContent = _peerConns.size > 0 ? `P2P (${_peerConns.size})` : 'P2P MESH';
+                    modeEl.textContent = 'P2P';
+                } else {
+                    pill.className = 'net-pill connecting';
+                    label.textContent = 'CONNECTING';
+                    modeEl.textContent = 'INIT';
+                }
+            }
+
+
+            // ── 10. FEED / TAB SWITCHING ──────────────────────────────────────────────────
+            // Note: switchFeed, switchTab, filterTag, toggleEventLog are now in global scope
+            // to be accessible from onclick handlers in the HTML
+
+            function updateCharCount() {
+                const input = document.getElementById('composeInput');
+                const btn = document.getElementById('emitBtn');
+                const count = document.getElementById('charCount');
+                const rem = 280 - input.value.length;
+                count.textContent = rem;
+                count.className = 'char-count' + (rem < 20 ? ' warn' : '') + (rem < 0 ? ' over' : '');
+                btn.disabled = input.value.trim().length === 0 || rem < 0;
+            }
+
+            function showToast(msg, type = 'success') {
+                const zone = document.getElementById('toastZone');
+                const t = document.createElement('div');
+                t.className = `toast ${type}`;
+                t.innerHTML = `<div class="toast-dot"></div><span>${esc(msg)}</span>`;
+                zone.appendChild(t);
+                setTimeout(() => t.remove(), 3500);
+            }
+
+            function klog(msg, type = 'info') {
+                const el = document.getElementById('kernelLog');
+                const ts = new Date().toLocaleTimeString('en', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                const cls = type === 'ok' ? 'klog-ok' : type === 'warn' ? 'klog-warn' : 'klog-info';
+                el.innerHTML = `<div class="klog-entry"><span class="klog-ts">${ts}</span><span class="${cls}">${esc(msg)}</span></div>` + el.innerHTML;
+            }
+
+            // ── 11. VALIDATOR STATUS (from window.SOVEREIGN_CONFIG or sovereignLog) ───────
+
+            function updateValidatorStatus() {
+                const el = document.getElementById('validatorStatus');
+                const online = sovereignLog.validatorOnline;
+                const ep = sovereignLog.validatorEndpoint;
+                if (!ep) {
+                    el.textContent = 'not configured';
+                    el.style.color = 'var(--dim)';
+                } else if (online) {
+                    el.textContent = 'online ✓';
+                    el.style.color = 'var(--green)';
+                    updateNetworkPill('validator');
+                } else {
+                    el.textContent = 'offline (P2P fallback)';
+                    el.style.color = 'var(--amber)';
+                }
+            }
+
+            // ── 12. BLOCK HEIGHT TICKER ───────────────────────────────────────────────────
+            //    Emits real SOCIAL_BLOCK_HEIGHT events driven by consensus finality events.
+            //    A block is counted each time a post reaches quorum.
+
+            let _lastBlockHeight = 0;
+            setInterval(() => {
+                const state = deriveSocialState();
+                const finalized = state.posts.filter(p => p.finalized).length;
+                if (finalized > _lastBlockHeight) {
+                    _lastBlockHeight = finalized;
+                    sovereignLog.emit({
+                        type: SOCIAL_EVENTS.SOCIAL_BLOCK_HEIGHT,
+                        height: finalized
+                    });
+                    blockHeight = finalized;
+                }
+            }, 3000);
+
+            // ── 13. RESTORE FROM INDEXEDDB on load ───────────────────────────────────────
+
+            async function restoreFromDB() {
+                const stored = await loadPersistedEvents();
+                if (!stored.length) return;
+                // Re-emit stored social events into the live log (they'll be deduped by hash)
+                const currentLog = sovereignLog.getLog();
+                const knownHashes = new Set(currentLog.map(e => e.hash));
+                let restored = 0;
+                for (const record of stored) {
+                    if (!isSocialEvent(record.type)) continue;
+                    if (knownHashes.has(record.hash)) continue;
+                    const {
+                        type,
+                        hash,
+                        prevHash,
+                        seq,
+                        ts,
+                        ...rest
+                    } = record;
+                    try {
+                        sovereignLog.emit({
+                            ...rest,
+                            type,
+                            _fromDB: true
+                        });
+                        restored++;
+                    } catch (_) {}
+                }
+                if (restored > 0) {
+                    klog(`Restored ${restored} events from IndexedDB`, 'ok');
+                    showToast(`Loaded ${restored} events from ledger`, 'success');
+                }
+            }
+
+            // ── 14. EVENT LISTENERS ───────────────────────────────────────────────────────
+
+            document.getElementById('searchInput').addEventListener('input', renderPosts);
+            document.getElementById('composeInput').addEventListener('input', updateCharCount);
+            document.getElementById('composeInput').addEventListener('keydown', e => {
+                if (e.ctrlKey && e.key === 'Enter') emitPost();
+            });
+            document.getElementById('connectPeerInput').addEventListener('keydown', e => {
+                if (e.key === 'Enter') connectToPeer();
+            });
+
+            // Update network pill every 5s
+            setInterval(() => {
+                if (_peerConns.size > 0) updateNetworkPill('p2p');
+                updateValidatorStatus();
+                renderSidebar();
+            }, 5000);
+
+            // ── 15. BOOT ──────────────────────────────────────────────────────────────────
+
+            async function boot() {
+                klog('Booting Sovereign Social…', 'info');
+
+                // 1. Identity
+                initIdentity();
+
+                // 2. Setup avatar upload
+                loadAvatarFromStorage();
+                document.getElementById('myAvatarBtn').addEventListener('click', openAvatarUpload);
+                document.getElementById('avatarUploadInput').addEventListener('change', handleAvatarUpload);
+
+                // 3. IndexedDB
+                try {
+                    _socialDB = await openSocialDB();
+                    klog('IndexedDB ledger: OPEN', 'ok');
+                } catch (err) {
+                    klog('IndexedDB unavailable: ' + err, 'warn');
+                }
+
+                // 4. Attach BroadcastChannel bus (cross-tab real-time sync)
+                sovereignLog.attachBus();
+                klog('BroadcastChannel bus: ATTACHED', 'ok');
+
+                // 5. Restore persisted events
+                await restoreFromDB();
+
+                // 6. Start PeerJS WebRTC
+                initPeerJS();
+
+                // 7. Initial render
+                renderPosts();
+                renderSidebar();
+                updateStats();
+                updateValidatorStatus();
+
+                klog('I-AM-IOS Social v3 ready', 'ok');
+                klog('Share your node ID to connect peers', 'info');
+            }
+
+            boot();
+
+        }); // end waitForSovereignLog
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,2363 @@
+<!DOCTYPE html>
+<!--
+  app-builder-v2.html
+  Sovereign App Builder — Merged best of sovereign-intel + app-builder + index1 (Genesis/JSONFlow pipeline)
+  Copyright (c) 2026 Sovereign OS Contributors
+  Licensed under the Sovereign OS Community License
+  Core invariant: VM_stateₙ = deriveState(eventLog[0…n])
+-->
+<html lang="en">
+<head>
+<script src="../sovereign-log-inline.js"></script>
+<script>
+/* sovereign-net boot — injected by packaging */
+(function() {
+  if (typeof sovereignLog === 'undefined') return;
+  sovereignLog.attachBus();
+  sovereignLog.emit({ type: 'FABRIC_NODE_ADDED', nodeId: 'app:app-builder' });
+  console.log('[sovereign-net] app-builder attached to bus');
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sovereign App Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Tokens ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080d;--bg2:#0d0f14;--bg3:#13161d;--bg4:#1a1e28;--bg5:#22273a;
+  --txt:#dde0ea;--txt2:#8b92a8;--muted:rgba(221,224,234,.35);
+  --faint:rgba(221,224,234,.08);--border:rgba(255,255,255,.07);
+  --border-hi:rgba(255,255,255,.16);--shadow:rgba(0,0,0,.55);
+  --acc:#5c7cfa;--acc2:#3b5bdb;--acc3:rgba(92,124,250,.13);--acc-glow:rgba(92,124,250,.35);
+  --ok:#40c057;--ok-bg:rgba(64,192,87,.12);
+  --warn:#fab005;--warn-bg:rgba(250,176,5,.12);
+  --err:#fa5252;--err-bg:rgba(250,82,82,.12);
+  --radius:10px;--radius-lg:14px;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--txt);display:flex;flex-direction:column}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:3px}
+
+/* Grid overlay */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--faint) 1px,transparent 1px),linear-gradient(90deg,var(--faint) 1px,transparent 1px);
+  background-size:48px 48px}
+
+/* ── Shell ── */
+.shell{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── Header ── */
+header{
+  flex-shrink:0;height:54px;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 18px;gap:14px;z-index:50;
+}
+.logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:800;letter-spacing:-.03em;color:var(--txt);white-space:nowrap}
+.logo-mark{
+  width:30px;height:30px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+}
+.logo-mark svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2}
+.header-stages{flex:1;display:flex;align-items:center;justify-content:center;gap:0}
+.stg{
+  display:flex;align-items:center;gap:6px;padding:5px 13px;
+  border-radius:20px;font-size:12px;font-weight:700;color:var(--muted);transition:all .2s;letter-spacing:.02em;
+}
+.stg.active{color:var(--acc);background:var(--acc3)}
+.stg.done{color:var(--ok)}
+.stg-num{
+  width:18px;height:18px;border-radius:50%;border:2px solid currentColor;
+  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;
+}
+.stg-arrow{color:var(--muted);font-size:14px;margin:0 2px}
+.header-right{display:flex;align-items:center;gap:8px}
+.conn-badge{
+  display:flex;align-items:center;gap:6px;padding:5px 12px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:20px;
+  font-size:11px;font-weight:600;color:var(--txt2);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:all .4s;flex-shrink:0}
+.dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2s infinite}
+.dot.err{background:var(--err)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.ibt{
+  width:34px;height:34px;border:1px solid var(--border);background:var(--bg3);border-radius:8px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt2);transition:all .2s;
+}
+.ibt:hover{background:var(--bg4);color:var(--acc);border-color:var(--acc)}
+.ibt svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2}
+
+/* ── Tabs ── */
+.nav-tabs{
+  flex-shrink:0;display:flex;border-bottom:1px solid var(--border);
+  background:var(--bg2);z-index:40;
+}
+.nav-tab{
+  padding:11px 20px;font-family:'IBM Plex Mono',monospace;font-size:11px;
+  letter-spacing:.06em;color:var(--txt2);cursor:pointer;border-bottom:2px solid transparent;
+  transition:all .2s;text-transform:uppercase;user-select:none;
+}
+.nav-tab:hover{color:var(--txt);background:var(--faint)}
+.nav-tab.active{color:var(--acc);border-bottom-color:var(--acc);background:var(--acc3)}
+
+/* ── Body ── */
+.body{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* ── Left Controls Panel ── */
+.controls{
+  width:260px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.ctrl-hdr{
+  padding:10px 14px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);flex-shrink:0;
+}
+.ctrl-scroll{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:14px}
+.section-label{
+  display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--muted);margin-bottom:6px;
+}
+.field-group{margin-bottom:10px}
+.field-label{
+  display:block;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--txt2);margin-bottom:4px;
+}
+.field-input,.field-select,.field-textarea{
+  width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+  background:var(--bg3);color:var(--txt);font-family:'DM Mono',monospace;font-size:11px;
+  transition:border-color .2s;
+}
+.field-input:focus,.field-select:focus,.field-textarea:focus{outline:none;border-color:var(--acc)}
+.field-textarea{resize:vertical;min-height:68px}
+.field-select{cursor:pointer}
+
+/* Template grid */
+.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.tpl-card{
+  padding:7px 9px;border:1px solid var(--border);border-radius:8px;
+  background:var(--bg3);cursor:pointer;transition:all .2s;display:flex;flex-direction:column;gap:2px;
+}
+.tpl-card:hover{border-color:var(--border-hi);background:var(--bg4)}
+.tpl-card.active{border-color:var(--acc);background:var(--acc3)}
+.tpl-icon{font-size:15px;line-height:1}
+.tpl-name{font-size:10px;font-weight:700;color:var(--txt)}
+.tpl-desc{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);line-height:1.3}
+
+/* Accent swatches */
+.swatch-row{display:flex;gap:5px;flex-wrap:wrap}
+.swatch{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .2s}
+.swatch.active{border-color:var(--txt);transform:scale(1.2)}
+
+/* Theme pills */
+.pill-row{display:flex;gap:4px;flex-wrap:wrap}
+.pill{
+  padding:3px 10px;border:1px solid var(--border);border-radius:20px;
+  background:var(--bg3);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;transition:all .2s;
+}
+.pill.active{border-color:var(--acc);color:var(--acc);background:var(--acc3)}
+
+/* Feature toggles */
+.toggles-grid{display:flex;flex-direction:column;gap:5px}
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg3);cursor:pointer;
+}
+.toggle-row:hover{border-color:var(--border-hi)}
+.toggle-label{font-size:11px;font-weight:600;color:var(--txt2)}
+.toggle-sw{
+  width:28px;height:15px;border-radius:8px;background:var(--bg5);
+  position:relative;transition:background .2s;flex-shrink:0;
+}
+.toggle-sw.on{background:var(--acc)}
+.toggle-sw::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:11px;height:11px;border-radius:50%;background:#fff;transition:left .2s;
+}
+.toggle-sw.on::after{left:15px}
+
+/* Ollama config */
+.model-row{display:flex;flex-direction:column;gap:6px}
+
+/* Action buttons */
+.action-col{display:flex;flex-direction:column;gap:5px}
+.btn-build{
+  padding:10px;border:none;border-radius:9px;background:var(--acc);color:#fff;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:800;
+  cursor:pointer;transition:all .2s;letter-spacing:.01em;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-build:hover{background:var(--acc2);transform:translateY(-1px)}
+.btn-build:disabled{background:var(--muted);transform:none;cursor:not-allowed}
+.btn-sec{
+  padding:8px;border:1px solid var(--border);border-radius:9px;background:var(--bg4);color:var(--txt2);
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.btn-sec:hover{border-color:var(--acc);color:var(--acc)}
+.btn-sec:disabled{opacity:.4;cursor:not-allowed}
+
+/* Schema textarea */
+.schema-editor{
+  width:100%;min-height:120px;padding:9px;resize:vertical;
+  border:1px solid var(--border);border-radius:8px;
+  background:var(--bg3);color:var(--txt);font-family:'DM Mono',monospace;font-size:10px;line-height:1.6;
+}
+.schema-editor:focus{outline:none;border-color:var(--acc)}
+
+/* ── Output Panel ── */
+.output{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.progress-strip{height:2px;background:var(--bg4);flex-shrink:0}
+.progress-fill{height:100%;background:var(--acc);width:0%;transition:width .3s;box-shadow:0 0 8px var(--acc-glow)}
+.out-tabs{
+  display:flex;gap:2px;padding:7px 12px;border-bottom:1px solid var(--border);
+  background:var(--bg2);flex-shrink:0;
+}
+.o-tab{
+  padding:5px 13px;border:none;background:transparent;
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;
+  border-radius:7px;transition:all .2s;display:flex;align-items:center;gap:5px;
+}
+.o-tab:hover{background:var(--bg3)}
+.o-tab.active{background:var(--bg3);color:var(--acc);box-shadow:0 0 0 1px var(--border)}
+.o-badge{
+  min-width:15px;height:15px;padding:0 3px;border-radius:8px;
+  background:var(--border);color:var(--txt2);font-size:9px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+}
+.o-tab.active .o-badge{background:var(--acc3);color:var(--acc)}
+.out-content{flex:1;overflow:hidden;position:relative}
+.pane{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+.pane.active{display:flex}
+
+/* Preview iframe */
+.iframe-wrap{flex:1;overflow:hidden;background:#000}
+.preview-iframe{width:100%;height:100%;border:none}
+
+/* Agent log */
+.agent-log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:5px;font-family:'DM Mono',monospace}
+.log-entry{display:flex;align-items:flex-start;gap:8px;animation:fadein .2s ease;font-size:11px;color:var(--txt2)}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.log-tag{
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  padding:2px 6px;border-radius:4px;flex-shrink:0;margin-top:1px;
+}
+.log-tag.plan{background:var(--acc3);color:var(--acc)}
+.log-tag.gen{background:var(--ok-bg);color:var(--ok)}
+.log-tag.err{background:var(--err-bg);color:var(--err)}
+.log-tag.info{background:var(--bg4);color:var(--muted)}
+.log-tag.warn{background:var(--warn-bg);color:var(--warn)}
+.log-tag.done{background:var(--ok-bg);color:var(--ok)}
+.log-tag.sys{background:var(--bg4);color:var(--txt2)}
+
+/* Chat / Pipeline pane */
+.pipeline-pane{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{display:flex;gap:10px;animation:fadein .22s ease}
+.msg-av{
+  width:26px;height:26px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;
+}
+.msg.system .msg-av{background:var(--acc3);color:var(--acc)}
+.msg.user .msg-av{background:var(--bg4);color:var(--txt2)}
+.msg.ai .msg-av{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
+.msg-body{flex:1;min-width:0}
+.msg-role{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px}
+.msg-text{font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;color:var(--txt);white-space:pre-wrap;word-break:break-word}
+.msg-text code{background:var(--bg4);padding:1px 5px;border-radius:3px;font-size:11px}
+.thinking{display:flex;gap:4px;padding:6px 0}
+.dot-anim{width:5px;height:5px;background:var(--acc);border-radius:50%;animation:bounce 1.4s infinite ease-in-out both}
+.dot-anim:nth-child(1){animation-delay:-.32s}.dot-anim:nth-child(2){animation-delay:-.16s}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+.streaming::after{content:'▋';animation:blink .9s infinite;color:var(--acc)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.pipeline-action{
+  margin:3px 0;padding:9px 14px;border:1px solid var(--border);background:var(--bg3);
+  color:var(--txt2);border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:12px;
+  font-weight:700;cursor:pointer;width:100%;text-align:left;transition:all .2s;
+  display:flex;align-items:center;gap:8px;
+}
+.pipeline-action:hover:not(:disabled){background:var(--bg4);color:var(--txt);border-color:var(--acc)}
+.pipeline-action.stage2{border-color:var(--acc2);color:var(--acc);background:var(--acc3)}
+.pipeline-action.stage2:hover:not(:disabled){background:var(--acc2);color:#fff}
+.pipeline-action.stage3{border-color:var(--ok);color:var(--ok);background:var(--ok-bg)}
+.pipeline-action:disabled{opacity:.4;cursor:not-allowed}
+.quick-bar{display:flex;gap:5px;padding:10px 14px;flex-wrap:wrap;border-top:1px solid var(--border);flex-shrink:0}
+.qa{
+  padding:4px 10px;border:1px solid var(--border);background:var(--bg2);
+  font-size:11px;font-weight:600;color:var(--txt2);border-radius:20px;cursor:pointer;transition:all .2s;
+}
+.qa:hover{border-color:var(--acc);color:var(--acc);background:var(--acc3)}
+.input-row{
+  padding:11px 14px;border-top:1px solid var(--border);background:var(--bg3);
+  flex-shrink:0;display:flex;gap:8px;align-items:flex-end;
+}
+.input-row textarea{
+  flex:1;padding:10px 13px;border:1px solid var(--border);border-radius:var(--radius);
+  font-family:'Syne',sans-serif;font-size:13px;resize:none;min-height:42px;max-height:96px;
+  background:var(--bg2);color:var(--txt);transition:border-color .2s;
+}
+.input-row textarea:focus{outline:none;border-color:var(--acc)}
+.input-row textarea::placeholder{color:var(--muted)}
+.send-btn{
+  width:42px;height:42px;border:none;background:var(--acc);color:#fff;border-radius:var(--radius);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;
+}
+.send-btn:hover{background:var(--acc2);transform:translateY(-1px)}
+.send-btn:disabled{background:var(--muted);cursor:not-allowed;transform:none}
+.send-btn svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2}
+
+/* Code blocks */
+.code-block{background:var(--bg3);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:10px;border:1px solid var(--border)}
+.code-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg4);border-bottom:1px solid var(--border);
+}
+.code-file{font-family:'DM Mono',monospace;font-size:11px;color:var(--txt2)}
+.code-actions{display:flex;gap:5px}
+.code-btn{
+  padding:3px 9px;border:1px solid var(--border);background:var(--bg3);color:var(--txt2);
+  font-family:'Syne',sans-serif;font-size:10px;font-weight:700;border-radius:5px;cursor:pointer;transition:all .2s;
+}
+.code-btn:hover{color:var(--acc);border-color:var(--acc)}
+.code-body{padding:14px;overflow-x:auto;max-height:420px;overflow-y:auto}
+.code-body pre{font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;color:#c9d1e9;margin:0;white-space:pre}
+
+/* JSONFlow func bar */
+.jf-func-bar{display:flex;gap:4px;padding:9px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;background:var(--bg3);display:none}
+.jf-func-btn{
+  padding:5px 10px;border:1px solid var(--border);background:var(--bg2);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--txt2);border-radius:7px;cursor:pointer;transition:all .2s;
+}
+.jf-func-btn:hover{border-color:var(--acc);color:var(--acc)}
+.jf-func-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc3)}
+.compile-bar{
+  padding:10px 14px;border-top:1px solid var(--border);display:none;align-items:center;
+  gap:8px;flex-shrink:0;background:var(--bg3);flex-wrap:wrap;
+}
+.lang-select{
+  padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-family:'Syne',sans-serif;
+  font-size:12px;font-weight:700;background:var(--bg2);color:var(--txt);cursor:pointer;
+}
+.lang-select:focus{outline:none;border-color:var(--acc)}
+.compile-info{font-size:11px;color:var(--txt2);font-family:'DM Mono',monospace;flex:1}
+
+/* Validation panel */
+.val-panel{margin-top:12px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);display:none}
+.val-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);margin-bottom:8px}
+.val-items{display:flex;flex-direction:column;gap:4px}
+.val-item{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt2);font-family:'DM Mono',monospace}
+.val-icon{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.val-icon.pass{background:var(--ok-bg);color:var(--ok)}
+.val-icon.fail{background:var(--err-bg);color:var(--err)}
+
+/* HTML source */
+.html-area{flex:1;overflow:auto;padding:12px}
+.code-block2{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.code-hdr2{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);
+}
+.code-fname{font-family:'DM Mono',monospace;font-size:11px;color:var(--txt2)}
+.code-btns{display:flex;gap:5px}
+.cbtn{
+  padding:3px 9px;border:1px solid var(--border);background:var(--bg4);color:var(--txt2);
+  font-family:'Syne',sans-serif;font-size:10px;font-weight:700;border-radius:5px;cursor:pointer;transition:all .2s;
+}
+.cbtn:hover{color:var(--acc);border-color:var(--acc)}
+.code-body2{padding:14px;overflow:auto}
+.code-body2 pre{font-family:'DM Mono',monospace;font-size:11px;line-height:1.7;color:#c9d1e9;margin:0;white-space:pre}
+
+/* Export bar */
+.export-bar{
+  padding:10px 14px;border-top:1px solid var(--border);background:var(--bg2);
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.export-name{
+  flex:1;padding:7px 11px;border:1px solid var(--border);border-radius:8px;
+  background:var(--bg3);color:var(--txt);font-family:'Syne',sans-serif;font-size:12px;font-weight:600;
+}
+.export-name:focus{outline:none;border-color:var(--acc)}
+
+/* Empty state */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px;color:var(--muted)}
+.empty-ico{width:52px;height:52px;background:var(--bg3);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.empty-ico svg{width:24px;height:24px;fill:none;stroke:var(--muted);stroke-width:1.5}
+.empty h3{font-size:15px;font-weight:800;color:var(--txt2);margin-bottom:6px}
+.empty p{font-family:'DM Mono',monospace;font-size:11px;line-height:1.6}
+
+/* Toast */
+.toast-wrap{position:fixed;bottom:16px;right:16px;z-index:300;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{
+  padding:9px 14px;background:var(--bg2);border:1px solid var(--border-hi);border-radius:10px;
+  font-family:'DM Mono',monospace;font-size:11px;color:var(--txt);box-shadow:0 8px 24px var(--shadow);
+  animation:toastIn .25s ease-out;
+}
+.toast.ok{border-color:var(--ok);color:var(--ok)}
+.toast.err{border-color:var(--err);color:var(--err)}
+.toast.warn{border-color:var(--warn);color:var(--warn)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Modal */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+.modal-ov.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:800}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* All-languages grid */
+.all-langs-grid{display:flex;flex-direction:column;gap:10px;padding:14px}
+</style>
+</head>
+<body>
+<!-- BACK NAV -->
+<div style="position:sticky;top:0;z-index:9999;display:flex;align-items:center;gap:12px;padding:0 20px;height:38px;background:rgba(7,11,15,.96);border-bottom:1px solid #1b2d3a;backdrop-filter:blur(12px);font-family:'DM Mono',monospace;font-size:10px;">
+  <a href="../index.html" style="color:#22d3ee;text-decoration:none;letter-spacing:.1em;opacity:.85;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">← I-AM-IOS SUITE</a>
+  <span style="color:#1b2d3a;margin:0 4px">·</span>
+  <span style="color:#3a5568;letter-spacing:.08em;">SOVEREIGN APP BUILDER</span>
+</div>
+<div class="shell">
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    Sovereign App Builder
+  </div>
+  <div class="header-stages">
+    <div class="stg active" id="stg1"><span class="stg-num">1</span> Configure</div>
+    <span class="stg-arrow">›</span>
+    <div class="stg" id="stg2"><span class="stg-num">2</span> Generate</div>
+    <span class="stg-arrow">›</span>
+    <div class="stg" id="stg3"><span class="stg-num">3</span> Pipeline</div>
+    <span class="stg-arrow">›</span>
+    <div class="stg" id="stg4"><span class="stg-num">4</span> Export</div>
+  </div>
+  <div class="header-right">
+    <div class="conn-badge">
+      <div class="dot" id="connDot"></div>
+      <span id="connTxt">Connecting…</span>
+    </div>
+    <button class="ibt" onclick="openSettings()" title="Ollama Settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ── Nav Tabs ── -->
+<div class="nav-tabs">
+  <div class="nav-tab active" data-view="builder">⬡ Builder</div>
+  <div class="nav-tab" data-view="pipeline">◈ Genesis Pipeline</div>
+</div>
+
+<!-- ── BUILDER VIEW ── -->
+<div class="body" id="view-builder">
+
+  <!-- Controls -->
+  <aside class="controls">
+    <div class="ctrl-hdr">Builder Controls</div>
+    <div class="ctrl-scroll">
+
+      <div>
+        <span class="section-label">App Info</span>
+        <div class="field-group">
+          <label class="field-label">App Name</label>
+          <input class="field-input" id="appName" value="My Sovereign App" placeholder="App name">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Description / Intent</label>
+          <textarea class="field-textarea" id="appDesc" placeholder="Describe what the app should do…">A productivity app to manage tasks and track progress.</textarea>
+        </div>
+      </div>
+
+      <div>
+        <span class="section-label">Template</span>
+        <div class="tpl-grid" id="tplGrid"></div>
+      </div>
+
+      <div>
+        <span class="section-label">Accent Color</span>
+        <div class="swatch-row" id="swatchRow"></div>
+      </div>
+
+      <div>
+        <span class="section-label">Theme</span>
+        <div class="pill-row" id="themePills"></div>
+      </div>
+
+      <div>
+        <span class="section-label">Features</span>
+        <div class="toggles-grid" id="featureToggles"></div>
+      </div>
+
+      <div>
+        <span class="section-label">Module Schema (JSON)</span>
+        <textarea class="schema-editor" id="moduleSchema" placeholder="Paste Genesis module JSON here (optional)…"></textarea>
+        <button class="btn-sec" style="margin-top:5px;width:100%" onclick="validateSchema()">✓ Validate JSON</button>
+      </div>
+
+      <div>
+        <span class="section-label">Ollama</span>
+        <div class="model-row">
+          <div class="field-group">
+            <label class="field-label">Model</label>
+            <input class="field-input" id="modelInput" value="llama3.2">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Temperature</label>
+            <input type="number" class="field-input" id="tempInput" value="0.4" min="0" max="2" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <div class="action-col">
+        <button class="btn-build" id="buildBtn" onclick="buildApp()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Generate App
+        </button>
+        <button class="btn-sec" id="regenBtn" onclick="regenerate()" disabled>↺ Regenerate</button>
+        <button class="btn-sec" id="exportBtn" onclick="exportApp()" disabled>↓ Export HTML</button>
+        <button class="btn-sec" onclick="openSchemaModal()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+          Schema Templates
+        </button>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- Output -->
+  <main class="output">
+    <div class="progress-strip"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="out-tabs">
+      <button class="o-tab active" onclick="switchBuilderTab('preview')" id="tab-preview">Preview <span class="o-badge" id="badge-preview">–</span></button>
+      <button class="o-tab" onclick="switchBuilderTab('log')" id="tab-log">Agent Log <span class="o-badge" id="badge-log">0</span></button>
+      <button class="o-tab" onclick="switchBuilderTab('html')" id="tab-html">HTML Source <span class="o-badge" id="badge-html">–</span></button>
+    </div>
+    <div class="out-content">
+      <!-- Preview -->
+      <div class="pane active" id="pane-preview">
+        <div id="previewEmpty" class="empty">
+          <div class="empty-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></div>
+          <h3>No Preview Yet</h3>
+          <p>Configure your app and click<br><strong>Generate App</strong> to build a live preview.</p>
+        </div>
+        <div class="iframe-wrap" style="display:none" id="iframeWrap">
+          <iframe class="preview-iframe" id="previewFrame"></iframe>
+        </div>
+      </div>
+      <!-- Log -->
+      <div class="pane" id="pane-log">
+        <div class="agent-log" id="agentLog"></div>
+      </div>
+      <!-- HTML source -->
+      <div class="pane" id="pane-html">
+        <div class="html-area" id="htmlArea">
+          <div class="empty">
+            <div class="empty-ico"><svg viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
+            <h3>No HTML Yet</h3>
+            <p>Generated app source will appear here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="export-bar">
+      <input class="export-name" id="exportName" value="sovereign-app" placeholder="filename">
+      <button class="btn-sec" id="copyBtn" onclick="copyHtml()" disabled>Copy HTML</button>
+      <button class="btn-build" id="dlBtn" onclick="exportApp()" disabled style="padding:8px 16px;font-size:12px">↓ Download</button>
+    </div>
+  </main>
+
+</div><!-- /builder view -->
+
+<!-- ── GENESIS PIPELINE VIEW ── -->
+<div class="body" id="view-pipeline" style="display:none">
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;gap:1px;background:var(--border)">
+
+    <!-- Left: Chat / Pipeline -->
+    <div class="pipeline-pane" style="background:var(--bg2)">
+      <div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2)">Genesis → JSONFlow → Code</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="stg" id="pstg1" style="font-size:10px;padding:3px 9px"><span class="stg-num" style="width:14px;height:14px;font-size:9px">1</span>NL</div>
+          <span class="stg-arrow">›</span>
+          <div class="stg" id="pstg2" style="font-size:10px;padding:3px 9px"><span class="stg-num" style="width:14px;height:14px;font-size:9px">2</span>JSONFlow</div>
+          <span class="stg-arrow">›</span>
+          <div class="stg" id="pstg3" style="font-size:10px;padding:3px 9px"><span class="stg-num" style="width:14px;height:14px;font-size:9px">3</span>Code</div>
+        </div>
+      </div>
+      <div class="msgs" id="pipelineMsgs"></div>
+      <div class="quick-bar">
+        <button class="qa" onclick="pQuick('Build a task manager app')">Task Manager</button>
+        <button class="qa" onclick="pQuick('Build a real-time dashboard')">Dashboard</button>
+        <button class="qa" onclick="pQuick('Build a chat/messaging app')">Chat App</button>
+        <button class="qa" onclick="pQuick('Build an e-commerce storefront')">E-Commerce</button>
+      </div>
+      <div class="input-row">
+        <textarea id="pipelineInput" rows="1" placeholder="Describe your app idea… (e.g. 'Build a task manager with user auth')"></textarea>
+        <button class="send-btn" id="pipelineSend" onclick="pipelineSubmit()">
+          <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Output -->
+    <div style="background:var(--bg2);display:flex;flex-direction:column;overflow:hidden">
+      <div class="out-tabs">
+        <button class="o-tab active" onclick="switchOutTab('genesis')" id="otab-genesis">Genesis <span class="o-badge" id="badge-genesis">–</span></button>
+        <button class="o-tab" onclick="switchOutTab('jsonflow')" id="otab-jsonflow">JSONFlow <span class="o-badge" id="badge-jsonflow">–</span></button>
+        <button class="o-tab" onclick="switchOutTab('code')" id="otab-code">Code <span class="o-badge" id="badge-code">–</span></button>
+      </div>
+
+      <!-- Genesis pane -->
+      <div class="pane active" id="opane-genesis" style="overflow:auto;padding:14px">
+        <div class="empty" id="genesisEmpty" style="height:auto;padding:30px">
+          <div class="empty-ico"><svg viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20"/></svg></div>
+          <h3>No Module Yet</h3>
+          <p>Describe your app on the left to<br>generate a Genesis module.</p>
+        </div>
+        <div id="genesisDisplay"></div>
+        <div class="val-panel" id="valPanel">
+          <div class="val-title">Invariant Validation</div>
+          <div class="val-items" id="valItems"></div>
+        </div>
+      </div>
+
+      <!-- JSONFlow pane -->
+      <div class="pane" id="opane-jsonflow" style="flex-direction:column">
+        <div class="jf-func-bar" id="jfFuncBar"></div>
+        <div style="flex:1;overflow:auto;padding:14px" id="jfDisplay">
+          <div class="empty"><div class="empty-ico"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><h3>No JSONFlow Yet</h3><p>Complete Stage 1 to generate JSONFlow programs.</p></div>
+        </div>
+        <div class="compile-bar" id="jfCompileBar">
+          <select class="lang-select" id="langSelect">
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="rust">Rust</option>
+            <option value="go">Go</option>
+            <option value="java">Java</option>
+            <option value="csharp">C#</option>
+            <option value="swift">Swift</option>
+            <option value="kotlin">Kotlin</option>
+          </select>
+          <span class="compile-info" id="compileInfo">Select a language and compile</span>
+          <button class="btn-sec" style="font-size:11px;padding:6px 12px" onclick="compileCurrentProgram()">Compile</button>
+          <button class="btn-sec" style="font-size:11px;padding:6px 12px" onclick="compileAllLanguages()">All 9</button>
+        </div>
+      </div>
+
+      <!-- Code pane -->
+      <div class="pane" id="opane-code" style="flex-direction:column">
+        <div style="flex:1;overflow:auto;padding:14px" id="codeDisplay">
+          <div class="empty"><div class="empty-ico"><svg viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div><h3>No Code Yet</h3><p>Complete Stage 2 then compile in the JSONFlow tab.</p></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- Settings Modal -->
+<div class="modal-ov" id="settingsModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title">Ollama Settings</span>
+      <button class="ibt" onclick="closeSettings()"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group">
+        <label class="field-label">Ollama URL</label>
+        <input class="field-input" id="ollamaUrlIn" value="http://localhost:11434">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Model</label>
+        <input class="field-input" id="ollamaModelIn" value="llama3.2">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Temperature</label>
+        <input type="number" class="field-input" id="ollamaTempIn" value="0.4" min="0" max="2" step="0.1">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sec" onclick="closeSettings()">Cancel</button>
+      <button class="btn-build" onclick="saveSettings()" style="padding:8px 18px">Save & Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schema Templates Modal -->
+<div class="modal-ov" id="schemaModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hdr">
+      <span class="modal-title">Schema Templates</span>
+      <button class="ibt" onclick="closeSchemaModal()"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="modal-body" id="schemaTemplateList"></div>
+    <div class="modal-footer">
+      <button class="btn-sec" onclick="closeSchemaModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let ollamaUrl   = 'http://localhost:11434';
+let ollamaModel = 'llama3.2';
+let ollamaTemp  = 0.4;
+let generatedHtml = null;
+let isGenerating  = false;
+let currentStage  = 1;
+let activeView    = 'builder';
+
+// Genesis pipeline state
+let currentModule   = null;
+let jfPrograms      = [];
+let selectedJfIdx   = 0;
+let pipelineStage   = 0;
+let pipelineStreaming = false;
+
+// ── Builder data ──
+let selectedTemplate = 'dashboard';
+let selectedAccent   = 'electric';
+let selectedTheme    = 'void';
+
+const FEATURES = [
+  { id:'darkMode',    label:'Dark Mode',        on:true  },
+  { id:'animations',  label:'CSS Animations',   on:true  },
+  { id:'mockData',    label:'Realistic Mock Data', on:true },
+  { id:'interactive', label:'Interactive Demo',  on:true  },
+  { id:'responsive',  label:'Responsive Layout', on:false },
+  { id:'charts',      label:'Charts / Graphs',   on:false },
+];
+const featureState = Object.fromEntries(FEATURES.map(f => [f.id, f.on]));
+
+const TEMPLATES = [
+  { id:'dashboard', icon:'📊', name:'Dashboard',  desc:'Stats, charts, KPIs' },
+  { id:'crud',      icon:'📋', name:'CRUD App',   desc:'List + edit records' },
+  { id:'chat',      icon:'💬', name:'Chat / Log', desc:'Message feed + input' },
+  { id:'kanban',    icon:'🗂',  name:'Kanban',     desc:'Card task board' },
+  { id:'wizard',    icon:'🧙', name:'Wizard',     desc:'Multi-step form flow' },
+  { id:'landing',   icon:'🚀', name:'Landing',    desc:'Hero + features' },
+  { id:'docs',      icon:'📖', name:'Docs',       desc:'Reference + search' },
+  { id:'settings',  icon:'⚙️', name:'Settings',   desc:'Config + preferences' },
+];
+
+const ACCENTS = [
+  { id:'electric', color:'#5c7cfa' },
+  { id:'violet',   color:'#8b5cf6' },
+  { id:'cyan',     color:'#4af0c4' },
+  { id:'amber',    color:'#fbbf24' },
+  { id:'rose',     color:'#f43f5e' },
+  { id:'lime',     color:'#84cc16' },
+];
+
+const THEMES = [
+  { id:'void',   label:'Void'   },
+  { id:'slate',  label:'Slate'  },
+  { id:'carbon', label:'Carbon' },
+  { id:'ash',    label:'Ash'    },
+];
+
+const THEME_TOKENS = {
+  void:   { bg:'#07080d', bg2:'#0d0f14', bg3:'#13161d', bg4:'#1a1e28', txt:'#dde0ea', txt2:'#8b92a8', border:'rgba(255,255,255,.07)' },
+  slate:  { bg:'#0a0c12', bg2:'#10131c', bg3:'#171b27', bg4:'#1e2333', txt:'#e2e6f3', txt2:'#7e88a3', border:'rgba(255,255,255,.06)' },
+  carbon: { bg:'#080808', bg2:'#0f0f0f', bg3:'#161616', bg4:'#1e1e1e', txt:'#f0f0f0', txt2:'#888',    border:'rgba(255,255,255,.08)' },
+  ash:    { bg:'#111318', bg2:'#181b22', bg3:'#1f222c', bg4:'#272b38', txt:'#d8dce8', txt2:'#7a8299', border:'rgba(255,255,255,.065)' },
+};
+const ACCENT_TOKENS = {
+  electric: { acc:'#5c7cfa', acc2:'#3b5bdb', acc3:'rgba(92,124,250,.13)'   },
+  violet:   { acc:'#8b5cf6', acc2:'#6d28d9', acc3:'rgba(139,92,246,.13)'   },
+  cyan:     { acc:'#4af0c4', acc2:'#00c896', acc3:'rgba(74,240,196,.13)'   },
+  amber:    { acc:'#fbbf24', acc2:'#d97706', acc3:'rgba(251,191,36,.13)'   },
+  rose:     { acc:'#f43f5e', acc2:'#be123c', acc3:'rgba(244,63,94,.13)'    },
+  lime:     { acc:'#84cc16', acc2:'#4d7c0f', acc3:'rgba(132,204,22,.13)'   },
+};
+
+const SCHEMA_TEMPLATES = {
+  'Task Manager':  { name:'Genesis/tasks',     events:{ TaskCreated:{}, TaskCompleted:{}, TaskDeleted:{} } },
+  'User Identity': { name:'Genesis/identity',  events:{ IdentityCreated:{}, IdentityUpdated:{} } },
+  'Messaging':     { name:'Genesis/messaging', events:{ MessageSent:{}, ConversationCreated:{} } },
+  'E-Commerce':    { name:'Genesis/ecommerce', events:{ OrderPlaced:{}, OrderShipped:{}, OrderDelivered:{} } },
+  'CRM':           { name:'Genesis/crm',       events:{ ContactCreated:{}, DealUpdated:{}, ActivityLogged:{} } },
+  'Blog / CMS':    { name:'Genesis/blog',      events:{ PostPublished:{}, PostUpdated:{}, CommentAdded:{} } },
+};
+
+// ── Language config ──
+const LANG_EXT   = { python:'.py', javascript:'.js', typescript:'.ts', rust:'.rs', go:'.go', java:'.java', csharp:'.cs', swift:'.swift', kotlin:'.kt' };
+const LANG_LABEL = { python:'Python', javascript:'JavaScript', typescript:'TypeScript', rust:'Rust', go:'Go', java:'Java', csharp:'C#', swift:'Swift', kotlin:'Kotlin' };
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  initTemplateGrid();
+  initSwatches();
+  initThemePills();
+  initFeatureToggles();
+  initSchemaModal();
+  initNavTabs();
+  checkConnection();
+
+  // Pipeline quick-start message
+  addPipelineMsg('system', '◈ Sovereign Genesis Pipeline ready.\nDescribe an app idea to compile: NL → Genesis Module → JSONFlow Programs → 9-language code.');
+});
+
+// ── Init UI ──
+function initTemplateGrid() {
+  const grid = document.getElementById('tplGrid');
+  TEMPLATES.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'tpl-card' + (t.id === selectedTemplate ? ' active' : '');
+    card.innerHTML = `<div class="tpl-icon">${t.icon}</div><div><div class="tpl-name">${t.name}</div><div class="tpl-desc">${t.desc}</div></div>`;
+    card.onclick = () => {
+      selectedTemplate = t.id;
+      document.querySelectorAll('.tpl-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+    };
+    grid.appendChild(card);
+  });
+}
+
+function initSwatches() {
+  const row = document.getElementById('swatchRow');
+  ACCENTS.forEach(a => {
+    const sw = document.createElement('div');
+    sw.className = 'swatch' + (a.id === selectedAccent ? ' active' : '');
+    sw.style.background = a.color;
+    sw.title = a.id;
+    sw.onclick = () => {
+      selectedAccent = a.id;
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+      applyAccent(a.id);
+    };
+    row.appendChild(sw);
+  });
+}
+
+function initThemePills() {
+  const row = document.getElementById('themePills');
+  THEMES.forEach(th => {
+    const p = document.createElement('button');
+    p.className = 'pill' + (th.id === selectedTheme ? ' active' : '');
+    p.textContent = th.label;
+    p.onclick = () => {
+      selectedTheme = th.id;
+      document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+      p.classList.add('active');
+      applyTheme(th.id);
+    };
+    row.appendChild(p);
+  });
+}
+
+function initFeatureToggles() {
+  const grid = document.getElementById('featureToggles');
+  FEATURES.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'toggle-row';
+    const sw = document.createElement('div');
+    sw.className = 'toggle-sw' + (f.on ? ' on' : '');
+    row.innerHTML = `<span class="toggle-label">${f.label}</span>`;
+    row.appendChild(sw);
+    row.onclick = () => {
+      featureState[f.id] = !featureState[f.id];
+      sw.classList.toggle('on', featureState[f.id]);
+    };
+    grid.appendChild(row);
+  });
+}
+
+function initSchemaModal() {
+  const list = document.getElementById('schemaTemplateList');
+  Object.entries(SCHEMA_TEMPLATES).forEach(([name, schema]) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-sec';
+    btn.style.cssText = 'width:100%;justify-content:flex-start;margin-bottom:6px';
+    btn.textContent = name;
+    btn.onclick = () => {
+      document.getElementById('moduleSchema').value = JSON.stringify(schema, null, 2);
+      closeSchemaModal();
+      toast(`Loaded "${name}" schema`, 'ok');
+    };
+    list.appendChild(btn);
+  });
+}
+
+function initNavTabs() {
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const view = tab.dataset.view;
+      activeView = view;
+      document.getElementById('view-builder').style.display = view === 'builder' ? 'flex' : 'none';
+      document.getElementById('view-pipeline').style.display = view === 'pipeline' ? 'flex' : 'none';
+    };
+  });
+}
+
+function applyTheme(id) {
+  const t = THEME_TOKENS[id] || THEME_TOKENS.void;
+  const r = document.documentElement.style;
+  r.setProperty('--bg',  t.bg);
+  r.setProperty('--bg2', t.bg2);
+  r.setProperty('--bg3', t.bg3);
+  r.setProperty('--bg4', t.bg4);
+  r.setProperty('--txt', t.txt);
+  r.setProperty('--txt2', t.txt2);
+  r.setProperty('--border', t.border);
+}
+
+function applyAccent(id) {
+  const a = ACCENT_TOKENS[id] || ACCENT_TOKENS.electric;
+  const r = document.documentElement.style;
+  r.setProperty('--acc',  a.acc);
+  r.setProperty('--acc2', a.acc2);
+  r.setProperty('--acc3', a.acc3);
+  r.setProperty('--acc-glow', a.acc.replace(')', ',.35)').replace('rgb','rgba'));
+}
+
+// ═══════════════════════════════════════════════════════
+// CONNECTION CHECK
+// ═══════════════════════════════════════════════════════
+async function checkConnection() {
+  const dot = document.getElementById('connDot');
+  const txt = document.getElementById('connTxt');
+  try {
+    const r = await fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    const models = (d.models || []).map(m => m.name);
+    dot.className = 'dot ok';
+    txt.textContent = models.length + ' model' + (models.length !== 1 ? 's' : '');
+    if (models.length && !ollamaModel) ollamaModel = models[0];
+    // Auto-pick model
+    const pref = ['llama3.3','llama3.2','llama3','mistral','qwen2.5','deepseek','phi'];
+    for (const p of pref) {
+      const found = models.find(m => m.toLowerCase().includes(p));
+      if (found) { ollamaModel = found; document.getElementById('modelInput').value = found; break; }
+    }
+  } catch(e) {
+    dot.className = 'dot err';
+    txt.textContent = 'Ollama offline';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILDER — STAGE MANAGEMENT
+// ═══════════════════════════════════════════════════════
+function setBuilderStage(n) {
+  currentStage = n;
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById('stg' + i);
+    if (!el) return;
+    el.className = 'stg' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+}
+
+function switchBuilderTab(name) {
+  ['preview','log','html'].forEach(t => {
+    document.getElementById('pane-' + t).classList.toggle('active', t === name);
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+  });
+}
+
+function setProgress(p) {
+  document.getElementById('progressFill').style.width = p + '%';
+}
+
+let logCount = 0;
+function alog(type, text) {
+  const log = document.getElementById('agentLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-tag ${type}">${type.toUpperCase()}</span><span>${escHtml(text)}</span>`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+  logCount++;
+  document.getElementById('badge-log').textContent = logCount;
+}
+
+
+// ═══════════════════════════════════════════════════════
+// BUILDER — PROMPT  (feeds Ollama for content data only)
+// ═══════════════════════════════════════════════════════
+function buildPrompt() {
+  const name   = document.getElementById('appName').value.trim() || 'My App';
+  const desc   = document.getElementById('appDesc').value.trim();
+  const schema = document.getElementById('moduleSchema').value.trim();
+
+  const TEMPLATE_SCHEMAS = {
+    dashboard:`{"stats":[{"label":"string","value":"string","delta":"string","trend":"up|down|flat"}],"chart_bars":[{"label":"string","value":0}],"recent_activity":[{"user":"string","action":"string","time":"string","avatar_letter":"string"}],"top_items":[{"name":"string","metric":"string","pct":0}]}`,
+    crud:`{"resource_name":"string","columns":["col1","col2","col3","col4","col5"],"rows":[{"col1":"val","col2":"val","col3":"val","col4":"val","col5":"val","status":"active|inactive|pending"}],"filters":["All","Active","Inactive","Pending"],"form_fields":[{"label":"string","type":"text|email|select|number","placeholder":"string"}]}`,
+    chat:`{"channel_name":"string","participants":[{"name":"string","status":"online|away|offline","avatar":"string"}],"messages":[{"from":"string","text":"string","time":"string","avatar":"string","self":false}],"channels":["#general","#random","#dev"]}`,
+    kanban:`{"board_name":"string","columns":[{"title":"string","color":"string","cards":[{"title":"string","tags":["string"],"priority":"low|medium|high","assignee":"string"}]}]}`,
+    wizard:`{"wizard_title":"string","steps":[{"title":"string","description":"string","fields":[{"label":"string","type":"text|email|select|radio","options":["opt1"],"placeholder":"string"}]}]}`,
+    landing:`{"hero_headline":"string","hero_sub":"string","cta_primary":"string","cta_secondary":"string","features":[{"icon":"emoji","title":"string","desc":"string"}],"testimonials":[{"quote":"string","name":"string","role":"string","company":"string"}],"pricing":[{"plan":"string","price":"string","per":"string","features":["string"],"highlight":false}],"stats":[{"label":"string","value":"string"}]}`,
+    docs:`{"product_name":"string","nav_sections":[{"title":"string","items":["string"]}],"active_doc":{"title":"string","breadcrumb":["string"],"content_blocks":[{"type":"text|code|callout","lang":"string","text":"string"}]},"search_placeholder":"string"}`,
+    settings:`{"app_name":"string","sections":[{"title":"string","icon":"emoji","fields":[{"label":"string","type":"text|email|select|toggle","value":"string","desc":"string"}]}]}`
+  };
+  return `Generate realistic mock data for a "${selectedTemplate}" app called "${name}".
+${desc?'Description: '+desc:''}
+${schema?'Schema context: '+schema:''}
+Output ONLY valid JSON matching this structure (no markdown, no commentary):
+${TEMPLATE_SCHEMAS[selectedTemplate]||TEMPLATE_SCHEMAS.dashboard}
+Populate ALL fields with realistic, specific data for "${name}". Be detailed and varied.
+Return 4-8 items per array unless structure says otherwise.
+JSON ONLY:`;
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILDER — HYDRATE TEMPLATE (8 full per-template renderers)
+// ═══════════════════════════════════════════════════════
+function hydrateTemplate(data) {
+  const T  = THEME_TOKENS[selectedTheme]  || THEME_TOKENS.void;
+  const A  = ACCENT_TOKENS[selectedAccent] || ACCENT_TOKENS.electric;
+  const title   = document.getElementById('appName').value.trim() || 'App';
+  const animate = featureState.animations;
+  const ad = (i) => animate ? `animation:fadeUp .35s ease ${i*0.06}s both` : '';
+
+  const BASE_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Syne',sans-serif;background:${T.bg};color:${T.txt};overflow:hidden}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+button{font-family:'Syne',sans-serif;cursor:pointer}
+input,select,textarea{font-family:'DM Mono',monospace;outline:none}
+${animate?`@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`:''}
+`.trim();
+
+  const RENDERERS = {dashboard,crud,chat,kanban,wizard,landing,docs,settings};
+  const renderer  = RENDERERS[selectedTemplate] || RENDERERS.dashboard;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escHtml(title)}</title>
+<style>${BASE_CSS}</style>
+</head>
+<body>
+${renderer(data,T,A,title,animate,ad)}
+</body>
+</html>`;
+
+  // ── DASHBOARD ─────────────────────────────────────────
+  function dashboard(d,T,A,title,animate,ad){
+    const stats = d.stats||[
+      {label:'Total Revenue',value:'$128,450',delta:'+18.2%',trend:'up'},
+      {label:'Active Users',value:'9,241',delta:'+6.7%',trend:'up'},
+      {label:'Conversion',value:'4.38%',delta:'-0.4%',trend:'down'},
+      {label:'Avg Session',value:'5m 44s',delta:'+11%',trend:'up'},
+    ];
+    const bars = d.chart_bars||[
+      {label:'Mon',value:52},{label:'Tue',value:74},{label:'Wed',value:63},
+      {label:'Thu',value:88},{label:'Fri',value:79},{label:'Sat',value:41},{label:'Sun',value:33}
+    ];
+    const activity = d.recent_activity||[
+      {user:'Sarah Chen',action:'Closed deal #4821 — $18K',time:'3m ago',avatar_letter:'S'},
+      {user:'Marcus Webb',action:'Deployed v2.4 to production',time:'22m ago',avatar_letter:'M'},
+      {user:'Priya Nair',action:'Imported 240 new contacts',time:'1h ago',avatar_letter:'P'},
+      {user:'Tom Bryson',action:'Completed onboarding flow',time:'2h ago',avatar_letter:'T'},
+      {user:'Lena Park',action:'Scheduled 4 demo calls',time:'3h ago',avatar_letter:'L'},
+    ];
+    const topItems = d.top_items||[
+      {name:'Enterprise Tier',metric:'$54,200',pct:86},
+      {name:'Pro Tier',metric:'$38,100',pct:60},
+      {name:'Starter Tier',metric:'$22,400',pct:35},
+      {name:'Add-ons',metric:'$13,750',pct:22},
+    ];
+    const maxBar = Math.max(...bars.map(b=>b.value),1);
+    const trendColor = t => t==='up'?'#40c057':t==='down'?'#fa5252':'#8b92a8';
+    const trendArrow = t => t==='up'?'↑':t==='down'?'↓':'→';
+    return `
+<div style="display:flex;flex-direction:column;height:100vh">
+  <header style="flex-shrink:0;height:54px;background:${T.bg2};border-bottom:1px solid ${T.border};display:flex;align-items:center;padding:0 20px;gap:12px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:15px;font-weight:800;letter-spacing:-.02em">${escHtml(title)}</span>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:${T.bg3};border:1px solid ${T.border};border-radius:20px;font-size:11px;font-weight:600;color:${T.txt2}">
+      <span style="width:6px;height:6px;border-radius:50%;background:#40c057;box-shadow:0 0 6px #40c057"></span>Live
+    </div>
+    <div style="width:32px;height:32px;border-radius:50%;background:${A.acc};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">A</div>
+  </header>
+  <div style="flex:1;display:flex;overflow:hidden">
+    <nav style="width:200px;flex-shrink:0;background:${T.bg2};border-right:1px solid ${T.border};padding:14px 0;display:flex;flex-direction:column;gap:2px">
+      ${[['📊','Overview',true],['📈','Analytics',false],['👥','Customers',false],['📦','Products',false],['💳','Revenue',false],['⚙️','Settings',false]].map(([icon,label,active])=>`
+      <div style="display:flex;align-items:center;gap:9px;padding:8px 16px;margin:0 8px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:${active?700:600};color:${active?A.acc:T.txt2};background:${active?A.acc3:'transparent'}" onmouseenter="this.style.background='${T.bg3}'" onmouseleave="this.style.background='${active?A.acc3:'transparent'}'"><span>${icon}</span>${label}</div>`).join('')}
+    </nav>
+    <main style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        ${stats.map((s,i)=>`
+        <div style="${ad(i)};background:${T.bg2};border:1px solid ${T.border};border-radius:12px;padding:18px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${T.txt2};margin-bottom:10px">${escHtml(s.label)}</div>
+          <div style="font-size:28px;font-weight:800;letter-spacing:-.03em;color:${T.txt};margin-bottom:8px">${escHtml(String(s.value))}</div>
+          <div style="font-size:12px;font-weight:600;color:${trendColor(s.trend)}">${trendArrow(s.trend)} ${escHtml(String(s.delta))}</div>
+        </div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 310px;gap:12px">
+        <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:12px;padding:18px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <span style="font-size:14px;font-weight:700;color:${T.txt}">Weekly Activity</span>
+            <div style="display:flex;gap:4px">
+              ${['7d','30d','90d'].map((l,i)=>`<button style="padding:3px 10px;border-radius:6px;border:1px solid ${i===0?A.acc:T.border};background:${i===0?A.acc3:'transparent'};color:${i===0?A.acc:T.txt2};font-size:11px;font-weight:700">${l}</button>`).join('')}
+            </div>
+          </div>
+          <div style="flex:1;min-height:140px;display:flex;align-items:flex-end;gap:8px">
+            ${bars.map(b=>`
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              <div style="width:100%;background:linear-gradient(to top,${A.acc},${A.acc2});border-radius:4px 4px 0 0;height:${Math.round((b.value/maxBar)*130)}px;opacity:${0.45+0.55*(b.value/maxBar)}"></div>
+              <span style="font-size:9px;font-weight:600;color:${T.txt2}">${escHtml(b.label)}</span>
+            </div>`).join('')}
+          </div>
+        </div>
+        <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:0">
+          <div style="font-size:14px;font-weight:700;color:${T.txt};margin-bottom:14px">Recent Activity</div>
+          ${activity.map(a=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid ${T.border}">
+            <div style="width:30px;height:30px;border-radius:50%;background:${A.acc3};border:1px solid ${A.acc}44;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${A.acc};flex-shrink:0">${escHtml(a.avatar_letter||a.user[0])}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:700;color:${T.txt};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(a.user)}</div>
+              <div style="font-size:11px;color:${T.txt2};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(a.action)}</div>
+            </div>
+            <div style="font-size:10px;color:${T.txt2};flex-shrink:0;font-family:'DM Mono',monospace">${escHtml(a.time)}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:12px;padding:18px">
+        <div style="font-size:14px;font-weight:700;color:${T.txt};margin-bottom:16px">Revenue by Segment</div>
+        ${topItems.map(item=>`
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:600;color:${T.txt};width:150px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(item.name)}</div>
+          <div style="flex:1;height:8px;background:${T.bg4};border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${item.pct}%;background:linear-gradient(90deg,${A.acc},${A.acc2});border-radius:4px;transition:width .6s ease"></div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:${T.txt};width:70px;text-align:right;flex-shrink:0">${escHtml(item.metric)}</div>
+          <div style="font-size:11px;color:${T.txt2};width:38px;text-align:right;flex-shrink:0">${item.pct}%</div>
+        </div>`).join('')}
+      </div>
+    </main>
+  </div>
+</div>`;
+  }
+
+  // ── CRUD ──────────────────────────────────────────────
+  function crud(d,T,A,title,animate,ad){
+    const resource = d.resource_name||'Records';
+    const cols = d.columns||['Name','Email','Role','Status','Joined'];
+    const rows = d.rows||[
+      {Name:'Alice Morgan',Email:'alice@corp.io',Role:'Admin',Status:'active',Joined:'Jan 12 2024'},
+      {Name:'Ben Torres',Email:'ben@corp.io',Role:'Editor',Status:'active',Joined:'Feb 3 2024'},
+      {Name:'Carol Smith',Email:'carol@corp.io',Role:'Viewer',Status:'inactive',Joined:'Mar 7 2024'},
+      {Name:'Dan Park',Email:'dan@corp.io',Role:'Editor',Status:'pending',Joined:'Apr 19 2024'},
+      {Name:'Ella Russo',Email:'ella@corp.io',Role:'Admin',Status:'active',Joined:'May 2 2024'},
+      {Name:'Frank Lin',Email:'frank@corp.io',Role:'Viewer',Status:'active',Joined:'Jun 11 2024'},
+      {Name:'Grace Kim',Email:'grace@corp.io',Role:'Editor',Status:'inactive',Joined:'Jul 8 2024'},
+      {Name:'Henry Zhou',Email:'henry@corp.io',Role:'Viewer',Status:'pending',Joined:'Aug 22 2024'},
+    ];
+    const filters  = d.filters||['All','Active','Inactive','Pending'];
+    const formFields = d.form_fields||[
+      {label:'Full Name',type:'text',placeholder:'Jane Smith'},
+      {label:'Email',type:'email',placeholder:'jane@example.com'},
+      {label:'Role',type:'select',placeholder:'Select role'},
+      {label:'Department',type:'text',placeholder:'Engineering'},
+    ];
+    const sc = s=>{const v=String(s).toLowerCase();return v==='active'?'#40c057':v==='pending'?'#fab005':'#fa5252';};
+    return `
+<div style="display:flex;flex-direction:column;height:100vh">
+  <header style="flex-shrink:0;height:54px;background:${T.bg2};border-bottom:1px solid ${T.border};display:flex;align-items:center;padding:0 20px;gap:12px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:15px;font-weight:800;letter-spacing:-.02em">${escHtml(title)}</span>
+    <span style="font-size:11px;color:${T.txt2};margin-left:2px">/ ${escHtml(resource)}</span>
+    <div style="flex:1"></div>
+    <button style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:${A.acc};color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700" onclick="document.getElementById('newModal').style.display='flex'">+ Add ${escHtml(resource.replace(/s$/,''))}</button>
+  </header>
+  <div style="flex:1;display:flex;overflow:hidden">
+    <nav style="width:200px;flex-shrink:0;background:${T.bg2};border-right:1px solid ${T.border};padding:14px 0">
+      ${[['📋',resource,true],['📊','Reports',false],['🔍','Search',false],['📤','Import',false],['⚙️','Settings',false]].map(([icon,label,active])=>`
+      <div style="display:flex;align-items:center;gap:9px;padding:8px 16px;margin:0 8px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:${active?700:600};color:${active?A.acc:T.txt2};background:${active?A.acc3:'transparent'}">${icon} ${label}</div>`).join('')}
+    </nav>
+    <main style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <input placeholder="Search ${escHtml(resource.toLowerCase())}…" style="flex:1;max-width:280px;padding:8px 12px;background:${T.bg2};border:1px solid ${T.border};border-radius:8px;color:${T.txt};font-size:12px">
+        <div style="display:flex;gap:4px">
+          ${filters.map((f,i)=>`<button onclick="this.parentNode.querySelectorAll('button').forEach((b,j)=>{b.style.background=j===${i}?'${A.acc3}':'transparent';b.style.color=j===${i}?'${A.acc}':'${T.txt2}';b.style.borderColor=j===${i}?'${A.acc}':'${T.border}';})" style="padding:5px 12px;border-radius:8px;border:1px solid ${i===0?A.acc:T.border};background:${i===0?A.acc3:'transparent'};color:${i===0?A.acc:T.txt2};font-size:11px;font-weight:700">${escHtml(f)}</button>`).join('')}
+        </div>
+        <span style="margin-left:auto;font-size:12px;color:${T.txt2}">${rows.length} total</span>
+      </div>
+      <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:${T.bg3}">
+              <th style="width:36px;padding:11px 14px"><input type="checkbox" style="accent-color:${A.acc}"></th>
+              ${cols.map(c=>`<th style="padding:11px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${T.txt2}">${escHtml(c)}</th>`).join('')}
+              <th style="padding:11px 14px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${T.txt2}">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(row=>`
+            <tr style="border-top:1px solid ${T.border}" onmouseenter="this.style.background='${T.bg3}'" onmouseleave="this.style.background='transparent'">
+              <td style="padding:11px 14px"><input type="checkbox" style="accent-color:${A.acc}"></td>
+              ${cols.map((c,ci)=>{
+                const val = row[c]??Object.values(row)[ci]??'';
+                const low = String(val).toLowerCase();
+                const isStatus = c.toLowerCase()==='status'||c.toLowerCase()==='state';
+                return `<td style="padding:11px 14px;font-size:13px;color:${T.txt}">
+                  ${isStatus
+                    ?`<span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${sc(val)}22;color:${sc(val)};border:1px solid ${sc(val)}55">${escHtml(String(val))}</span>`
+                    :escHtml(String(val))}
+                </td>`;
+              }).join('')}
+              <td style="padding:11px 14px;text-align:right;display:flex;justify-content:flex-end;gap:5px">
+                <button style="padding:3px 9px;border:1px solid ${T.border};background:transparent;color:${T.txt2};border-radius:6px;font-size:11px;font-weight:700" onmouseenter="this.style.borderColor='${A.acc}';this.style.color='${A.acc}'" onmouseleave="this.style.borderColor='${T.border}';this.style.color='${T.txt2}'">Edit</button>
+                <button style="padding:3px 9px;border:1px solid ${T.border};background:transparent;color:${T.txt2};border-radius:6px;font-size:11px;font-weight:700" onmouseenter="this.style.borderColor='#fa5252';this.style.color='#fa5252'" onmouseleave="this.style.borderColor='${T.border}';this.style.color='${T.txt2}'">Del</button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        ${[1,2,3,'…',12].map((p,i)=>`<button style="width:32px;height:32px;border-radius:8px;border:1px solid ${i===0?A.acc:T.border};background:${i===0?A.acc3:'transparent'};color:${i===0?A.acc:T.txt2};font-size:12px;font-weight:700">${p}</button>`).join('')}
+        <span style="margin-left:auto;font-size:12px;color:${T.txt2}">1–${rows.length} of ${rows.length}</span>
+      </div>
+    </main>
+  </div>
+</div>
+<div id="newModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)">
+  <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:14px;width:460px;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="padding:16px 20px;border-bottom:1px solid ${T.border};display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:800">New ${escHtml(resource.replace(/s$/,''))}</span>
+      <button onclick="document.getElementById('newModal').style.display='none'" style="background:transparent;border:none;color:${T.txt2};font-size:20px;line-height:1">×</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      ${formFields.map(f=>`
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${T.txt2};margin-bottom:5px">${escHtml(f.label)}</label>
+        ${f.type==='select'
+          ?`<select style="width:100%;padding:9px 12px;background:${T.bg3};border:1px solid ${T.border};border-radius:8px;color:${T.txt};font-size:13px"><option>-- Select --</option></select>`
+          :`<input type="${f.type}" placeholder="${escHtml(f.placeholder||'')}" style="width:100%;padding:9px 12px;background:${T.bg3};border:1px solid ${T.border};border-radius:8px;color:${T.txt};font-size:13px">`}
+      </div>`).join('')}
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid ${T.border};display:flex;justify-content:flex-end;gap:8px">
+      <button onclick="document.getElementById('newModal').style.display='none'" style="padding:8px 16px;border:1px solid ${T.border};background:transparent;color:${T.txt2};border-radius:8px;font-size:12px;font-weight:700">Cancel</button>
+      <button onclick="document.getElementById('newModal').style.display='none'" style="padding:8px 16px;background:${A.acc};color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700">Create</button>
+    </div>
+  </div>
+</div>`;
+  }
+
+  // ── CHAT ──────────────────────────────────────────────
+  function chat(d,T,A,title,animate,ad){
+    const channel = d.channel_name||'#general';
+    const channels = d.channels||['#general','#random','#dev','#design','#ops'];
+    const participants = d.participants||[
+      {name:'Alice Chen',status:'online',avatar:'A'},
+      {name:'Bob Marks',status:'away',avatar:'B'},
+      {name:'Clara Voss',status:'online',avatar:'C'},
+      {name:'Dev Kumar',status:'offline',avatar:'D'},
+      {name:'Eve Torres',status:'online',avatar:'E'},
+    ];
+    const messages = d.messages||[
+      {from:'Alice Chen',text:'Hey team, just pushed the auth changes to staging 🚀',time:'10:02',avatar:'A',self:false},
+      {from:'Bob Marks',text:'Nice! I tested the flow, looks solid. Minor thing: the error state needs better copy.',time:'10:04',avatar:'B',self:false},
+      {from:'You',text:'Good catch Bob. Can you open a ticket? I\'ll fix it before EOD.',time:'10:06',avatar:'Y',self:true},
+      {from:'Bob Marks',text:'Done — ticket #482. Also added a screenshot.',time:'10:07',avatar:'B',self:false},
+      {from:'Clara Voss',text:'Updated Figma specs for the new onboarding screens. Check #design for the link.',time:'10:15',avatar:'C',self:false},
+      {from:'You',text:'@Clara perfect timing. I was about to ask. Will review by EOD.',time:'10:18',avatar:'Y',self:true},
+      {from:'Dev Kumar',text:'API latency is down to 38ms avg after the caching changes 🎉',time:'10:34',avatar:'D',self:false},
+      {from:'Alice Chen',text:'That is a massive improvement. Great work Dev!',time:'10:35',avatar:'A',self:false},
+      {from:'Eve Torres',text:'Reminder: design review at 3pm. Loom recording will be shared for async folks.',time:'11:02',avatar:'E',self:false},
+      {from:'You',text:'I\'ll be there 👍',time:'11:04',avatar:'Y',self:true},
+    ];
+    const sc = s=>s==='online'?'#40c057':s==='away'?'#fab005':'#6b7280';
+    return `
+<div style="display:flex;flex-direction:column;height:100vh">
+  <header style="flex-shrink:0;height:54px;background:${T.bg2};border-bottom:1px solid ${T.border};display:flex;align-items:center;padding:0 20px;gap:12px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:15px;font-weight:800;letter-spacing:-.02em">${escHtml(title)}</span>
+    <div style="flex:1"></div>
+    <button style="padding:5px 12px;background:${T.bg3};border:1px solid ${T.border};border-radius:8px;color:${T.txt2};font-size:12px;font-weight:700">+ Invite</button>
+    <div style="width:32px;height:32px;border-radius:50%;background:${A.acc};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">Y</div>
+  </header>
+  <div style="flex:1;display:flex;overflow:hidden">
+    <nav style="width:220px;flex-shrink:0;background:${T.bg2};border-right:1px solid ${T.border};display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:12px 16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${T.txt2};border-bottom:1px solid ${T.border}">Channels</div>
+      <div style="padding:8px 0">
+        ${channels.map((ch,i)=>`<div style="padding:7px 16px;cursor:pointer;font-size:13px;font-weight:${i===0?700:500};color:${i===0?A.acc:T.txt2};background:${i===0?A.acc3:'transparent'};border-right:${i===0?`2px solid ${A.acc}`:'none'}">${escHtml(ch)}</div>`).join('')}
+      </div>
+      <div style="padding:10px 16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${T.txt2};border-top:1px solid ${T.border}">Direct Messages</div>
+      <div style="overflow-y:auto;flex:1;padding:4px 0">
+        ${participants.slice(0,4).map(p=>`
+        <div style="display:flex;align-items:center;gap:9px;padding:7px 16px;cursor:pointer" onmouseenter="this.style.background='${T.bg3}'" onmouseleave="this.style.background='transparent'">
+          <div style="position:relative;flex-shrink:0">
+            <div style="width:26px;height:26px;border-radius:50%;background:${A.acc3};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${A.acc}">${escHtml(p.avatar||p.name[0])}</div>
+            <div style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:${sc(p.status)};border:2px solid ${T.bg2}"></div>
+          </div>
+          <span style="font-size:13px;color:${T.txt2}">${escHtml(p.name)}</span>
+        </div>`).join('')}
+      </div>
+    </nav>
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:12px 20px;border-bottom:1px solid ${T.border};display:flex;align-items:center;gap:10px;flex-shrink:0;background:${T.bg2}">
+        <span style="font-size:15px;font-weight:700">${escHtml(channel)}</span>
+        <span style="font-size:12px;color:${T.txt2}">— ${participants.length} members</span>
+        <div style="flex:1"></div>
+        <div style="display:flex;align-items:center">
+          ${participants.slice(0,4).map(p=>`<div style="width:24px;height:24px;border-radius:50%;background:${A.acc3};border:2px solid ${T.bg2};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${A.acc};margin-left:-6px">${escHtml(p.avatar||p.name[0])}</div>`).join('')}
+        </div>
+      </div>
+      <div id="msgList" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px">
+        ${messages.map((m,mi)=>`
+        <div style="display:flex;gap:10px;flex-direction:${m.self?'row-reverse':'row'};${ad(mi)}">
+          ${!m.self?`<div style="width:32px;height:32px;border-radius:50%;background:${A.acc3};border:1px solid ${A.acc}44;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${A.acc};flex-shrink:0;margin-top:16px">${escHtml(m.avatar||m.from[0])}</div>`:''}
+          <div style="max-width:62%">
+            ${!m.self?`<div style="font-size:11px;font-weight:700;color:${T.txt2};margin-bottom:4px">${escHtml(m.from)} <span style="font-weight:400;font-family:'DM Mono',monospace;font-size:10px">${escHtml(m.time)}</span></div>`:''}
+            <div style="padding:10px 14px;border-radius:${m.self?'12px 3px 12px 12px':'3px 12px 12px 12px'};background:${m.self?A.acc:T.bg3};border:1px solid ${m.self?A.acc2:T.border};font-size:13px;color:${m.self?'#fff':T.txt};line-height:1.5">${escHtml(m.text)}</div>
+            ${m.self?`<div style="font-size:10px;color:${T.txt2};margin-top:3px;text-align:right;font-family:'DM Mono',monospace">${escHtml(m.time)}</div>`:''}
+          </div>
+        </div>`).join('')}
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid ${T.border};background:${T.bg2};flex-shrink:0">
+        <div style="display:flex;gap:8px;align-items:flex-end;background:${T.bg3};border:1px solid ${T.border};border-radius:10px;padding:8px 12px">
+          <textarea placeholder="Message ${escHtml(channel)}…" rows="1" style="flex:1;background:transparent;border:none;color:${T.txt};font-size:13px;resize:none;min-height:22px;max-height:80px;line-height:1.5"></textarea>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+            <button style="background:transparent;border:none;color:${T.txt2};font-size:16px">😊</button>
+            <button style="background:transparent;border:none;color:${T.txt2};font-size:16px">📎</button>
+            <button style="width:32px;height:32px;background:${A.acc};border:none;border-radius:8px;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="width:200px;flex-shrink:0;background:${T.bg2};border-left:1px solid ${T.border};padding:14px;overflow-y:auto">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${T.txt2};margin-bottom:12px">Members</div>
+      ${participants.map(p=>`
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
+        <div style="position:relative;flex-shrink:0">
+          <div style="width:30px;height:30px;border-radius:50%;background:${A.acc3};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${A.acc}">${escHtml(p.avatar||p.name[0])}</div>
+          <div style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:${sc(p.status)};border:2px solid ${T.bg2}"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:${T.txt}">${escHtml(p.name)}</div>
+          <div style="font-size:10px;color:${T.txt2};text-transform:capitalize">${escHtml(p.status)}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>
+</div>
+<script>document.getElementById('msgList').scrollTop=99999;<\/script>`;
+  }
+
+  // ── KANBAN ────────────────────────────────────────────
+  function kanban(d,T,A,title,animate,ad){
+    const board = d.board_name||title;
+    const cols = d.columns||[
+      {title:'Backlog',color:'#6b7280',cards:[
+        {title:'Implement OAuth2 login flow',tags:['auth','backend'],priority:'high',assignee:'AC'},
+        {title:'Design token system audit',tags:['design'],priority:'medium',assignee:'CV'},
+        {title:'Add API rate limiting middleware',tags:['backend','ops'],priority:'low',assignee:'BM'},
+        {title:'Write onboarding copy',tags:['content'],priority:'medium',assignee:'ET'},
+      ]},
+      {title:'In Progress',color:'#3b82f6',cards:[
+        {title:'Dashboard chart components',tags:['frontend','charts'],priority:'high',assignee:'DK'},
+        {title:'Mobile responsive layout pass',tags:['frontend','css'],priority:'high',assignee:'ET'},
+        {title:'Unit tests for auth module',tags:['testing'],priority:'medium',assignee:'AC'},
+      ]},
+      {title:'Review',color:'#f59e0b',cards:[
+        {title:'Email notification templates',tags:['email','design'],priority:'medium',assignee:'CV'},
+        {title:'Performance profiling report',tags:['ops','monitoring'],priority:'low',assignee:'DK'},
+      ]},
+      {title:'Done',color:'#10b981',cards:[
+        {title:'CI/CD pipeline configuration',tags:['devops'],priority:'high',assignee:'BM'},
+        {title:'DB schema migrations v2',tags:['backend','db'],priority:'high',assignee:'AC'},
+        {title:'Error boundary components',tags:['frontend'],priority:'medium',assignee:'ET'},
+      ]},
+    ];
+    const pc = p=>p==='high'?'#fa5252':p==='medium'?'#fab005':'#40c057';
+    return `
+<div style="display:flex;flex-direction:column;height:100vh">
+  <header style="flex-shrink:0;height:54px;background:${T.bg2};border-bottom:1px solid ${T.border};display:flex;align-items:center;padding:0 20px;gap:12px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:15px;font-weight:800;letter-spacing:-.02em">${escHtml(board)}</span>
+    <div style="flex:1"></div>
+    <div style="display:flex;gap:5px">
+      ${['Board','List','Timeline'].map((v,i)=>`<button style="padding:5px 12px;border-radius:8px;border:1px solid ${i===0?A.acc:T.border};background:${i===0?A.acc3:'transparent'};color:${i===0?A.acc:T.txt2};font-size:11px;font-weight:700">${v}</button>`).join('')}
+    </div>
+    <button style="padding:6px 14px;background:${A.acc};color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700">+ Add Task</button>
+  </header>
+  <div style="flex:1;display:flex;gap:12px;padding:16px;overflow-x:auto;overflow-y:hidden;background:${T.bg}">
+    ${cols.map((col,ci)=>`
+    <div style="flex:0 0 272px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:${T.bg2};border:1px solid ${T.border};border-radius:10px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${col.color}"></div>
+        <span style="font-size:12px;font-weight:700;color:${T.txt}">${escHtml(col.title)}</span>
+        <span style="margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:${T.bg3};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${T.txt2}">${col.cards.length}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px;overflow-y:auto;flex:1">
+        ${col.cards.map((card,ki)=>`
+        <div style="${ad(ki)};background:${T.bg2};border:1px solid ${T.border};border-radius:10px;padding:12px;cursor:pointer;transition:border-color .15s" onmouseenter="this.style.borderColor='${A.acc}';this.style.background='${T.bg3}'" onmouseleave="this.style.borderColor='${T.border}';this.style.background='${T.bg2}'">
+          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:9px">
+            <span style="flex:1;font-size:13px;font-weight:600;color:${T.txt};line-height:1.4">${escHtml(card.title)}</span>
+            <div style="width:8px;height:8px;border-radius:50%;background:${pc(card.priority)};flex-shrink:0;margin-top:4px" title="${escHtml(card.priority)} priority"></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+            ${(card.tags||[]).map(tag=>`<span style="padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;background:${A.acc3};color:${A.acc};border:1px solid ${A.acc}44">${escHtml(tag)}</span>`).join('')}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="width:24px;height:24px;border-radius:50%;background:${A.acc3};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${A.acc}" title="${escHtml(card.assignee)}">${escHtml(card.assignee||'?')}</div>
+            <span style="font-size:10px;color:${T.txt2}">${pc(card.priority)==='#fa5252'?'🔴':pc(card.priority)==='#fab005'?'🟡':'🟢'} ${escHtml(card.priority)}</span>
+          </div>
+        </div>`).join('')}
+        <button style="padding:9px;border:1px dashed ${T.border};background:transparent;color:${T.txt2};border-radius:10px;font-size:12px;font-weight:600;transition:all .15s" onmouseenter="this.style.borderColor='${A.acc}';this.style.color='${A.acc}'" onmouseleave="this.style.borderColor='${T.border}';this.style.color='${T.txt2}'">+ Add card</button>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>`;
+  }
+
+  // ── WIZARD ────────────────────────────────────────────
+  function wizard(d,T,A,title,animate,ad){
+    const wizTitle = d.wizard_title||title;
+    const steps = d.steps||[
+      {title:'Account Details',description:'Set up your login credentials',fields:[
+        {label:'Full Name',type:'text',placeholder:'Jane Smith',options:[]},
+        {label:'Email',type:'email',placeholder:'jane@company.com',options:[]},
+        {label:'Password',type:'text',placeholder:'Min 8 characters',options:[]},
+      ]},
+      {title:'Your Organization',description:'Tell us about your company or team',fields:[
+        {label:'Company Name',type:'text',placeholder:'Acme Inc.',options:[]},
+        {label:'Team Size',type:'select',placeholder:'',options:['Just me','2–10','11–50','51–200','200+']},
+        {label:'Industry',type:'select',placeholder:'',options:['Technology','Finance','Healthcare','Education','Retail','Other']},
+      ]},
+      {title:'Preferences',description:'Customize your experience',fields:[
+        {label:'Timezone',type:'select',placeholder:'',options:['UTC','US/Eastern','US/Pacific','Europe/London','Asia/Tokyo']},
+        {label:'Notifications',type:'radio',placeholder:'',options:['All updates','Important only','None']},
+        {label:'Primary use case',type:'radio',placeholder:'',options:['Personal','Team','Enterprise']},
+      ]},
+      {title:'Ready to Launch',description:'All set! Review and go.',fields:[]},
+    ];
+    const cur = d.current_step??0;
+    return `
+<div style="display:flex;flex-direction:column;height:100vh">
+  <header style="flex-shrink:0;height:54px;background:${T.bg2};border-bottom:1px solid ${T.border};display:flex;align-items:center;padding:0 20px;gap:12px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:15px;font-weight:800;letter-spacing:-.02em">${escHtml(wizTitle)}</span>
+  </header>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px;background:${T.bg};overflow-y:auto">
+    <div style="width:100%;max-width:580px">
+      <div style="display:flex;align-items:center;margin-bottom:36px">
+        ${steps.map((step,i)=>`
+        ${i>0?`<div style="flex:1;height:2px;background:${i<=cur?A.acc:T.border};margin:0 4px;margin-bottom:22px"></div>`:''}
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+          <div style="width:34px;height:34px;border-radius:50%;border:2px solid ${i<=cur?A.acc:T.border};background:${i<cur?A.acc:i===cur?A.acc3:'transparent'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${i<cur?'#fff':i===cur?A.acc:T.txt2}">${i<cur?'✓':i+1}</div>
+          <span style="font-size:10px;font-weight:700;color:${i===cur?A.acc:T.txt2};text-align:center;max-width:76px;line-height:1.3">${escHtml(step.title)}</span>
+        </div>`).join('')}
+      </div>
+      <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:14px;overflow:hidden">
+        <div style="padding:24px 28px;border-bottom:1px solid ${T.border}">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${A.acc};margin-bottom:6px">Step ${cur+1} of ${steps.length}</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:${T.txt};margin-bottom:6px">${escHtml(steps[cur].title)}</div>
+          <div style="font-size:13px;color:${T.txt2}">${escHtml(steps[cur].description)}</div>
+        </div>
+        <div style="padding:24px 28px;display:flex;flex-direction:column;gap:16px">
+          ${steps[cur].fields.length===0
+            ?`<div style="text-align:center;padding:24px 0">
+                <div style="font-size:52px;margin-bottom:14px">🎉</div>
+                <div style="font-size:20px;font-weight:800;color:${T.txt};margin-bottom:8px">You're all set!</div>
+                <div style="font-size:14px;color:${T.txt2};line-height:1.6">Your workspace is configured and ready to go.<br>Click Launch to get started.</div>
+              </div>`
+            :steps[cur].fields.map(f=>`
+          <div>
+            <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${T.txt2};margin-bottom:6px">${escHtml(f.label)}</label>
+            ${f.type==='select'
+              ?`<select style="width:100%;padding:10px 13px;background:${T.bg3};border:1px solid ${T.border};border-radius:9px;color:${T.txt};font-size:13px">${(f.options||[]).map(o=>`<option>${escHtml(o)}</option>`).join('')}</select>`
+              :f.type==='radio'
+              ?`<div style="display:flex;gap:8px;flex-wrap:wrap">${(f.options||[]).map((o,oi)=>`<label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid ${oi===0?A.acc:T.border};border-radius:8px;cursor:pointer;font-size:13px;color:${oi===0?A.acc:T.txt2};background:${oi===0?A.acc3:'transparent'}"><input type="radio" name="${f.label.replace(/ /g,'_')}" ${oi===0?'checked':''} style="accent-color:${A.acc}">${escHtml(o)}</label>`).join('')}</div>`
+              :`<input type="${f.type}" placeholder="${escHtml(f.placeholder||'')}" style="width:100%;padding:10px 13px;background:${T.bg3};border:1px solid ${T.border};border-radius:9px;color:${T.txt};font-size:13px">`}
+          </div>`).join('')}
+        </div>
+        <div style="padding:16px 28px;border-top:1px solid ${T.border};display:flex;justify-content:space-between;align-items:center">
+          <button style="padding:9px 20px;border:1px solid ${T.border};background:transparent;color:${T.txt2};border-radius:9px;font-size:13px;font-weight:700;opacity:${cur===0?.35:1};cursor:${cur===0?'not-allowed':'pointer'}">← Back</button>
+          <div style="font-size:12px;color:${T.txt2}">${cur+1} / ${steps.length}</div>
+          <button style="padding:9px 22px;background:${A.acc};color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700">${cur===steps.length-1?'🚀 Launch':'Continue →'}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>`;
+  }
+
+  // ── LANDING ───────────────────────────────────────────
+  function landing(d,T,A,title,animate,ad){
+    const headline = d.hero_headline||`The modern platform for ${title.toLowerCase()}`;
+    const sub = d.hero_sub||'Ship faster, scale effortlessly, and collaborate without friction.';
+    const ctaP = d.cta_primary||'Start for Free';
+    const ctaS = d.cta_secondary||'Watch Demo';
+    const features = d.features||[
+      {icon:'⚡',title:'Blazing Fast',desc:'Sub-100ms response times powered by edge infrastructure worldwide.'},
+      {icon:'🔒',title:'Enterprise Security',desc:'SOC2 Type II, end-to-end encryption, and SSO out of the box.'},
+      {icon:'🌐',title:'Global Scale',desc:'Auto-scaling across 30+ regions with 99.99% uptime SLA.'},
+      {icon:'🔗',title:'150+ Integrations',desc:'Connect your existing tools in minutes with zero custom code.'},
+      {icon:'📊',title:'Real-time Analytics',desc:'Full observability into every action, user, and workflow.'},
+      {icon:'🤝',title:'Built for Teams',desc:'Collaborative by default — from 2 people to 20,000.'},
+    ];
+    const stats = d.stats||[{label:'Teams',value:'12K+'},{label:'Uptime',value:'99.99%'},{label:'Countries',value:'94+'},{label:'NPS Score',value:'78'}];
+    const testimonials = d.testimonials||[
+      {quote:'This completely changed how we ship. Deployment time dropped 80% in the first week.',name:'Sarah Chen',role:'CTO',company:'Stripe'},
+      {quote:'The developer experience is unlike anything I have used. Absolutely world class.',name:'Marcus Webb',role:'VP Engineering',company:'Linear'},
+      {quote:'We evaluated 12 tools. This was the only one that actually worked as advertised.',name:'Priya Nair',role:'Platform Lead',company:'Figma'},
+    ];
+    const pricing = d.pricing||[
+      {plan:'Starter',price:'Free',per:'',features:['5 projects','1 GB storage','Community support','Basic analytics'],highlight:false},
+      {plan:'Pro',price:'$29',per:'/mo',features:['Unlimited projects','50 GB storage','Priority support','Advanced analytics','Team collaboration'],highlight:true},
+      {plan:'Enterprise',price:'Custom',per:'',features:['Unlimited everything','99.99% SLA','Dedicated CSM','Custom integrations','SSO & audit logs'],highlight:false},
+    ];
+    return `
+<div style="height:100vh;overflow-y:auto;background:${T.bg}">
+  <nav style="position:sticky;top:0;z-index:50;background:${T.bg}dd;backdrop-filter:blur(14px);border-bottom:1px solid ${T.border};padding:0 40px;height:60px;display:flex;align-items:center;gap:16px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:16px;font-weight:800;letter-spacing:-.02em">${escHtml(title)}</span>
+    <div style="flex:1;display:flex;justify-content:center;gap:28px">
+      ${['Features','Pricing','Docs','Blog','Changelog'].map(n=>`<span style="font-size:13px;font-weight:600;color:${T.txt2};cursor:pointer">${n}</span>`).join('')}
+    </div>
+    <button style="padding:7px 16px;border:1px solid ${T.border};background:transparent;color:${T.txt};border-radius:8px;font-size:13px;font-weight:700">Sign in</button>
+    <button style="padding:7px 16px;background:${A.acc};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700">${escHtml(ctaP)}</button>
+  </nav>
+  <section style="max-width:860px;margin:0 auto;padding:72px 40px 56px;text-align:center">
+    <div style="display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border:1px solid ${A.acc}55;background:${A.acc3};border-radius:20px;font-size:11px;font-weight:700;color:${A.acc};margin-bottom:24px">✨ Now in public beta — join 12,000+ teams</div>
+    <h1 style="font-size:54px;font-weight:800;letter-spacing:-.04em;color:${T.txt};line-height:1.1;margin-bottom:20px">${escHtml(headline)}</h1>
+    <p style="font-size:19px;color:${T.txt2};line-height:1.65;max-width:560px;margin:0 auto 36px">${escHtml(sub)}</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:48px">
+      <button style="padding:13px 30px;background:${A.acc};color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700">${escHtml(ctaP)}</button>
+      <button style="padding:13px 28px;border:1px solid ${T.border};background:transparent;color:${T.txt};border-radius:10px;font-size:15px;font-weight:700">▷ ${escHtml(ctaS)}</button>
+    </div>
+    <div style="display:flex;gap:40px;justify-content:center">
+      ${stats.map(s=>`<div><div style="font-size:32px;font-weight:800;color:${A.acc}">${escHtml(s.value)}</div><div style="font-size:12px;color:${T.txt2};font-weight:600;margin-top:3px">${escHtml(s.label)}</div></div>`).join('')}
+    </div>
+  </section>
+  <section style="max-width:1080px;margin:0 auto;padding:20px 40px 64px">
+    <h2 style="text-align:center;font-size:34px;font-weight:800;letter-spacing:-.02em;color:${T.txt};margin-bottom:12px">Everything you need</h2>
+    <p style="text-align:center;font-size:15px;color:${T.txt2};margin-bottom:40px">All the tools your team needs, none of the complexity.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+      ${features.map((f,i)=>`
+      <div style="${ad(i)};background:${T.bg2};border:1px solid ${T.border};border-radius:12px;padding:22px">
+        <div style="font-size:30px;margin-bottom:12px">${f.icon}</div>
+        <div style="font-size:15px;font-weight:700;color:${T.txt};margin-bottom:7px">${escHtml(f.title)}</div>
+        <div style="font-size:13px;color:${T.txt2};line-height:1.65">${escHtml(f.desc)}</div>
+      </div>`).join('')}
+    </div>
+  </section>
+  <section style="max-width:1080px;margin:0 auto;padding:0 40px 64px">
+    <h2 style="text-align:center;font-size:34px;font-weight:800;color:${T.txt};margin-bottom:40px">Loved by engineering teams</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+      ${testimonials.map(t=>`
+      <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:12px;padding:22px">
+        <div style="color:${A.acc};font-size:18px;letter-spacing:2px;margin-bottom:12px">★★★★★</div>
+        <div style="font-size:14px;color:${T.txt};line-height:1.7;margin-bottom:18px;font-style:italic">"${escHtml(t.quote)}"</div>
+        <div style="font-size:13px;font-weight:700;color:${T.txt}">${escHtml(t.name)}</div>
+        <div style="font-size:11px;color:${T.txt2};margin-top:2px">${escHtml(t.role)}, ${escHtml(t.company)}</div>
+      </div>`).join('')}
+    </div>
+  </section>
+  <section style="max-width:860px;margin:0 auto;padding:0 40px 80px">
+    <h2 style="text-align:center;font-size:34px;font-weight:800;color:${T.txt};margin-bottom:12px">Simple, transparent pricing</h2>
+    <p style="text-align:center;font-size:15px;color:${T.txt2};margin-bottom:40px">No hidden fees. Cancel anytime.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+      ${pricing.map(p=>`
+      <div style="background:${T.bg2};border:2px solid ${p.highlight?A.acc:T.border};border-radius:14px;padding:26px;position:relative">
+        ${p.highlight?`<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:3px 14px;background:${A.acc};color:#fff;border-radius:20px;font-size:10px;font-weight:700">MOST POPULAR</div>`:''}
+        <div style="font-size:13px;font-weight:700;color:${T.txt2};margin-bottom:8px">${escHtml(p.plan)}</div>
+        <div style="margin-bottom:18px"><span style="font-size:40px;font-weight:800;color:${T.txt}">${escHtml(p.price)}</span><span style="font-size:14px;color:${T.txt2}">${escHtml(p.per)}</span></div>
+        <button style="width:100%;margin-bottom:18px;padding:10px;background:${p.highlight?A.acc:'transparent'};color:${p.highlight?'#fff':A.acc};border:${p.highlight?'none':'1px solid '+A.acc};border-radius:9px;font-size:13px;font-weight:700">Get ${escHtml(p.plan)}</button>
+        ${p.features.map(f=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:${T.txt2};margin-bottom:8px"><span style="color:${A.acc};font-weight:700">✓</span>${escHtml(f)}</div>`).join('')}
+      </div>`).join('')}
+    </div>
+  </section>
+</div>`;
+  }
+
+  // ── DOCS ──────────────────────────────────────────────
+  function docs(d,T,A,title,animate,ad){
+    const product = d.product_name||title;
+    const navSecs = d.nav_sections||[
+      {title:'Getting Started',items:['Introduction','Installation','Quick Start','Configuration']},
+      {title:'Core Concepts',items:['Architecture','Event System','State Management','Data Model']},
+      {title:'API Reference',items:['Authentication','REST Endpoints','Webhooks','Rate Limits']},
+      {title:'Guides',items:['Deployment','Monitoring','Security','Performance Tuning']},
+      {title:'SDKs',items:['JavaScript','Python','Go','Rust','Java']},
+    ];
+    const doc = d.active_doc||{
+      title:'Quick Start Guide',
+      breadcrumb:['Getting Started','Quick Start'],
+      content_blocks:[
+        {type:'text',lang:'',text:'Get up and running in under 5 minutes. This guide walks through installation, authentication, and your first API call.'},
+        {type:'callout',lang:'',text:'Prerequisites: Node.js 18 or higher, npm or yarn, and a free account at app.example.com.'},
+        {type:'code',lang:'bash',text:'# Install the SDK\nnpm install @example/sdk\n\n# Or with yarn\nyarn add @example/sdk'},
+        {type:'text',lang:'',text:'Once installed, initialize the client with your API key. The SDK handles retries, error formatting, and automatic token refresh.'},
+        {type:'code',lang:'javascript',text:"import { Client } from '@example/sdk';\n\nconst client = new Client({\n  apiKey: process.env.EXAMPLE_API_KEY,\n  region: 'us-east-1', // optional, defaults to nearest\n});\n\n// Make your first API call\nconst result = await client.items.list({\n  limit: 20,\n  status: 'active',\n});\n\nconsole.log(result.data); // [{id: '...', name: '...'}]"},
+        {type:'callout',lang:'',text:'Tip: Set EXAMPLE_API_KEY in your .env file to keep credentials out of source code.'},
+      ],
+    };
+    return `
+<div style="display:flex;flex-direction:column;height:100vh">
+  <header style="flex-shrink:0;height:54px;background:${T.bg2};border-bottom:1px solid ${T.border};display:flex;align-items:center;padding:0 20px;gap:12px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:15px;font-weight:800;letter-spacing:-.02em">${escHtml(product)} Docs</span>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:${T.bg3};border:1px solid ${T.border};border-radius:9px;min-width:200px">
+      <span style="color:${T.txt2};font-size:13px">🔍</span>
+      <input placeholder="${escHtml(d.search_placeholder||'Search the docs…')}" style="background:transparent;border:none;color:${T.txt};font-size:12px;flex:1">
+      <kbd style="padding:2px 7px;background:${T.bg4};border:1px solid ${T.border};border-radius:4px;font-family:'DM Mono',monospace;font-size:10px;color:${T.txt2}">⌘K</kbd>
+    </div>
+  </header>
+  <div style="flex:1;display:flex;overflow:hidden">
+    <nav style="width:240px;flex-shrink:0;background:${T.bg2};border-right:1px solid ${T.border};overflow-y:auto;padding:14px 0">
+      ${navSecs.map((sec,si)=>`
+      <div style="margin-bottom:18px">
+        <div style="padding:6px 16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${T.txt2}">${escHtml(sec.title)}</div>
+        ${(sec.items||[]).map((item,ii)=>`
+        <div style="padding:7px 20px;cursor:pointer;font-size:13px;font-weight:${si===0&&ii===2?700:500};color:${si===0&&ii===2?A.acc:T.txt2};background:${si===0&&ii===2?A.acc3:'transparent'};border-right:2px solid ${si===0&&ii===2?A.acc:'transparent'}" onmouseenter="this.style.color='${A.acc}'" onmouseleave="if(!(${si}===0&&${ii}===2))this.style.color='${T.txt2}'">${escHtml(item)}</div>`).join('')}
+      </div>`).join('')}
+    </nav>
+    <main style="flex:1;overflow-y:auto;padding:32px 40px;max-width:800px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:20px;font-size:12px;color:${T.txt2}">
+        ${(doc.breadcrumb||[]).map((b,bi)=>`${bi>0?'<span>›</span>':''}${bi===doc.breadcrumb.length-1?`<span style="color:${T.txt};font-weight:600">${escHtml(b)}</span>`:`<span style="cursor:pointer">${escHtml(b)}</span>`}`).join('')}
+      </div>
+      <h1 style="font-size:30px;font-weight:800;letter-spacing:-.02em;color:${T.txt};margin-bottom:28px">${escHtml(doc.title)}</h1>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        ${(doc.content_blocks||[]).map(block=>{
+          if(block.type==='text') return `<p style="font-size:15px;color:${T.txt2};line-height:1.8">${escHtml(block.text)}</p>`;
+          if(block.type==='callout') return `<div style="padding:14px 18px;background:${A.acc3};border:1px solid ${A.acc}55;border-left:3px solid ${A.acc};border-radius:8px;font-size:13px;color:${T.txt};line-height:1.65">${escHtml(block.text)}</div>`;
+          if(block.type==='code') return `<div style="background:${T.bg3};border:1px solid ${T.border};border-radius:10px;overflow:hidden">
+            <div style="padding:8px 14px;background:${T.bg4};border-bottom:1px solid ${T.border};display:flex;align-items:center;justify-content:space-between">
+              <span style="font-family:'DM Mono',monospace;font-size:11px;color:${T.txt2}">${escHtml(block.lang||'code')}</span>
+              <button style="background:transparent;border:1px solid ${T.border};color:${T.txt2};border-radius:5px;padding:2px 9px;font-size:10px;font-weight:700">Copy</button>
+            </div>
+            <pre style="padding:18px;font-family:'DM Mono',monospace;font-size:12px;color:#c9d1e9;line-height:1.75;overflow-x:auto;margin:0">${escHtml(block.text)}</pre>
+          </div>`;
+          return '';
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:52px;padding-top:24px;border-top:1px solid ${T.border}">
+        <button style="padding:9px 16px;border:1px solid ${T.border};background:transparent;color:${T.txt2};border-radius:8px;font-size:13px;font-weight:700">← Previous</button>
+        <button style="padding:9px 16px;background:${A.acc};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700">Next →</button>
+      </div>
+    </main>
+    <div style="width:196px;flex-shrink:0;padding:32px 16px;border-left:1px solid ${T.border}">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${T.txt2};margin-bottom:12px">On this page</div>
+      ${['Overview','Prerequisites','Installation','Basic Usage','Configuration','Next Steps'].map((h,i)=>`<div style="padding:5px 0 5px 10px;font-size:12px;color:${i===2?A.acc:T.txt2};cursor:pointer;border-left:2px solid ${i===2?A.acc:'transparent'}">${h}</div>`).join('')}
+    </div>
+  </div>
+</div>`;
+  }
+
+  // ── SETTINGS ──────────────────────────────────────────
+  function settings(d,T,A,title,animate,ad){
+    const appName = d.app_name||title;
+    const sections = d.sections||[
+      {title:'Profile',icon:'👤',fields:[
+        {label:'Full Name',type:'text',value:'Alex Johnson',desc:'Your public display name'},
+        {label:'Email',type:'email',value:'alex@company.com',desc:'Login email and notifications'},
+        {label:'Username',type:'text',value:'@alexj',desc:'Your unique handle'},
+        {label:'Bio',type:'text',value:'Building the sovereign web.',desc:'Short bio shown on your profile'},
+      ]},
+      {title:'Notifications',icon:'🔔',fields:[
+        {label:'Weekly digest',type:'toggle',value:'true',desc:'Summary of activity every Monday'},
+        {label:'Security alerts',type:'toggle',value:'true',desc:'Immediate alerts on suspicious login'},
+        {label:'Product updates',type:'toggle',value:'false',desc:'New features and changelog'},
+        {label:'Marketing emails',type:'toggle',value:'false',desc:'Tips, offers, and announcements'},
+      ]},
+      {title:'Security',icon:'🔒',fields:[
+        {label:'Two-factor auth',type:'toggle',value:'true',desc:'Require 2FA on every login'},
+        {label:'Session timeout',type:'select',value:'30 minutes',desc:'Auto-logout after inactivity'},
+        {label:'Active sessions',type:'text',value:'3 sessions active',desc:'Manage all logged-in devices'},
+        {label:'API key',type:'text',value:'sk_live_••••••••4f2a',desc:'Your current production key'},
+      ]},
+      {title:'Appearance',icon:'🎨',fields:[
+        {label:'Interface theme',type:'select',value:'Dark',desc:'Color scheme for the UI'},
+        {label:'Accent color',type:'select',value:'Electric Blue',desc:'Highlight color throughout'},
+        {label:'Font size',type:'select',value:'Medium (14px)',desc:'Base text size'},
+        {label:'Compact mode',type:'toggle',value:'false',desc:'Reduce padding and spacing'},
+      ]},
+      {title:'Billing',icon:'💳',fields:[
+        {label:'Current plan',type:'text',value:'Pro — $29/month',desc:'Your active subscription tier'},
+        {label:'Next billing',type:'text',value:'Feb 1, 2025',desc:'Date of next charge'},
+        {label:'Payment method',type:'text',value:'Visa •••• 4242 (exp 09/26)',desc:'Card currently on file'},
+        {label:'Usage this month',type:'text',value:'8,432 / 50,000 calls',desc:'Resets Feb 1, 2025'},
+      ]},
+    ];
+    return `
+<div style="display:flex;flex-direction:column;height:100vh">
+  <header style="flex-shrink:0;height:54px;background:${T.bg2};border-bottom:1px solid ${T.border};display:flex;align-items:center;padding:0 20px;gap:12px">
+    <div style="width:28px;height:28px;background:${A.acc};border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">${escHtml(title[0].toUpperCase())}</div>
+    <span style="font-size:15px;font-weight:800;letter-spacing:-.02em">${escHtml(appName)}</span>
+    <span style="font-size:11px;color:${T.txt2}">/ Settings</span>
+    <div style="flex:1"></div>
+    <div style="width:32px;height:32px;border-radius:50%;background:${A.acc};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px">A</div>
+  </header>
+  <div style="flex:1;display:flex;overflow:hidden">
+    <nav style="width:220px;flex-shrink:0;background:${T.bg2};border-right:1px solid ${T.border};padding:14px 0">
+      ${sections.map((sec,i)=>`
+      <div onclick="document.querySelectorAll('[id^=sp]').forEach(p=>p.style.display='none');document.getElementById('sp${i}').style.display='flex';document.querySelectorAll('[id^=sn]').forEach((n,j)=>{n.style.background=j===${i}?'${A.acc3}':'transparent';n.style.color=j===${i}?'${A.acc}':'${T.txt2}';})" id="sn${i}" style="display:flex;align-items:center;gap:9px;padding:9px 16px;margin:0 8px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:${i===0?700:600};color:${i===0?A.acc:T.txt2};background:${i===0?A.acc3:'transparent'}">
+        <span style="font-size:15px">${sec.icon}</span>${escHtml(sec.title)}
+      </div>`).join('')}
+    </nav>
+    <main style="flex:1;overflow-y:auto;padding:28px 36px">
+      ${sections.map((sec,si)=>`
+      <div id="sp${si}" style="display:${si===0?'flex':'none'};flex-direction:column;gap:0;max-width:620px">
+        <h2 style="font-size:21px;font-weight:800;color:${T.txt};margin-bottom:5px">${escHtml(sec.title)}</h2>
+        <p style="font-size:13px;color:${T.txt2};margin-bottom:24px">Manage your ${sec.title.toLowerCase()} preferences and configuration.</p>
+        <div style="background:${T.bg2};border:1px solid ${T.border};border-radius:12px;overflow:hidden">
+          ${sec.fields.map((f,fi)=>`
+          <div style="display:flex;align-items:center;padding:16px 20px;${fi<sec.fields.length-1?`border-bottom:1px solid ${T.border}`:''};gap:16px">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:700;color:${T.txt};margin-bottom:3px">${escHtml(f.label)}</div>
+              <div style="font-size:12px;color:${T.txt2}">${escHtml(f.desc)}</div>
+            </div>
+            <div style="flex-shrink:0">
+              ${f.type==='toggle'
+                ?`<div onclick="const on=this.dataset.on==='1';this.dataset.on=on?'0':'1';this.style.background=on?'${T.bg4}':'${A.acc}';this.children[0].style.left=on?'3px':'20px'" data-on="${f.value==='true'?'1':'0'}" style="width:40px;height:22px;border-radius:11px;background:${f.value==='true'?A.acc:T.bg4};cursor:pointer;position:relative;transition:background .2s"><div style="position:absolute;top:3px;left:${f.value==='true'?'20px':'3px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s"></div></div>`
+                :f.type==='select'
+                ?`<select style="padding:7px 12px;background:${T.bg3};border:1px solid ${T.border};border-radius:8px;color:${T.txt};font-size:13px"><option>${escHtml(f.value)}</option></select>`
+                :`<input value="${escHtml(f.value)}" readonly style="padding:7px 12px;background:${T.bg3};border:1px solid ${T.border};border-radius:8px;color:${T.txt};font-size:13px;min-width:220px;font-family:'DM Mono',monospace">`}
+            </div>
+          </div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
+          <button style="padding:9px 18px;border:1px solid ${T.border};background:transparent;color:${T.txt2};border-radius:8px;font-size:13px;font-weight:700">Reset</button>
+          <button style="padding:9px 18px;background:${A.acc};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700">Save changes</button>
+        </div>
+      </div>`).join('')}
+    </main>
+  </div>
+</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILDER — GENERATE
+// ═══════════════════════════════════════════════════════
+async function buildApp() {
+  if (isGenerating) return;
+  isGenerating = true;
+  logCount = 0;
+  const buildBtn = document.getElementById('buildBtn');
+  buildBtn.disabled = true;
+  document.getElementById('badge-log').textContent = '0';
+  setBuilderStage(2);
+  switchBuilderTab('log');
+
+  alog('plan', `Template: ${selectedTemplate} | Accent: ${selectedAccent} | Theme: ${selectedTheme}`);
+  alog('plan', `App: ${document.getElementById('appName').value}`);
+  alog('plan', `Features: ${Object.entries(featureState).filter(([,v])=>v).map(([k])=>k).join(', ')}`);
+  setProgress(15);
+  alog('plan', 'Constructing Ollama prompt…');
+
+  const prompt = buildPrompt();
+  const model  = document.getElementById('modelInput').value.trim() || 'llama3.2';
+  const temp   = parseFloat(document.getElementById('tempInput').value) || 0.4;
+  setProgress(25);
+  alog('gen', `Calling Ollama [${model}] — streaming…`);
+
+  try {
+    const resp = await fetch(`${ollamaUrl}/api/generate`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ model, prompt, stream:true, options:{ temperature:temp, seed:42 } })
+    });
+    if (!resp.ok) throw new Error(`Ollama HTTP ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder('utf-8', { fatal:false });
+    let full='', carry='', prog=25;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        const tail = carry + dec.decode();
+        for (const line of tail.split('\n')) {
+          if (!line.trim()) continue;
+          try { const j = JSON.parse(line); if (j.response) full += j.response; } catch {}
+        }
+        break;
+      }
+      const chunk = carry + dec.decode(value, { stream:true });
+      const lines = chunk.split('\n');
+      carry = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { const j = JSON.parse(line); if (j.response) full += j.response; } catch {}
+      }
+      prog = Math.min(90, 25 + Math.floor((full.length/8000)*65));
+      setProgress(prog);
+    }
+
+    setProgress(93);
+    alog('gen', `Stream done — ${full.length.toLocaleString()} chars.`);
+
+    let appData;
+    try {
+      let clean = full.replace(/^```json\s*/i,'').replace(/```\s*$/,'').trim();
+      const m = clean.match(/\{[\s\S]*\}/);
+      clean = m ? m[0] : clean;
+      clean = clean.replace(/[\uFFFD\uD800-\uDFFF]/g,'◆').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g,'');
+      try {
+        appData = JSON.parse(clean);
+      } catch(e1) {
+        alog('warn', 'JSON parse failed — attempting repair…');
+        clean = clean.replace(/,\s*([}\]])/g,'$1');
+        const qc = (clean.match(/(?<!\\)"/g)||[]).length;
+        if (qc%2 !== 0) clean += '"';
+        const stack=[];let inStr=false,esc=false;
+        for (const ch of clean) {
+          if(esc){esc=false;continue}if(ch==='\\'){esc=true;continue}
+          if(ch==='"'){inStr=!inStr;continue}if(inStr)continue;
+          if(ch==='{')stack.push('}');else if(ch==='[')stack.push(']');
+          else if(ch==='}'||ch===']')stack.pop();
+        }
+        clean += stack.reverse().join('');
+        appData = JSON.parse(clean);
+        alog('warn','JSON repair succeeded.');
+      }
+    } catch(e) {
+      alog('err','Could not parse JSON: ' + e.message);
+      isGenerating = false; buildBtn.disabled = false; setProgress(0); return;
+    }
+
+    alog('gen','✓ Hydrating template…');
+    generatedHtml = hydrateTemplate(appData);
+    setProgress(100);
+
+    const iframe = document.getElementById('previewFrame');
+    document.getElementById('previewEmpty').style.display = 'none';
+    document.getElementById('iframeWrap').style.display = 'block';
+    iframe.srcdoc = generatedHtml;
+    document.getElementById('badge-preview').textContent = '✓';
+
+    const area = document.getElementById('htmlArea');
+    area.innerHTML = '';
+    const block = document.createElement('div');
+    block.className = 'code-block2';
+    const fname = (document.getElementById('exportName').value || 'app') + '.html';
+    block.innerHTML = `<div class="code-hdr2"><span class="code-fname">${fname}</span><div class="code-btns"><button class="cbtn" onclick="copyHtml()">Copy</button><button class="cbtn" onclick="exportApp()">↓ Download</button></div></div><div class="code-body2"><pre>${escHtml(generatedHtml)}</pre></div>`;
+    area.appendChild(block);
+    document.getElementById('badge-html').textContent = (generatedHtml.length/1024).toFixed(1)+'KB';
+
+    document.getElementById('regenBtn').disabled = false;
+    document.getElementById('exportBtn').disabled = false;
+    document.getElementById('copyBtn').disabled   = false;
+    document.getElementById('dlBtn').disabled     = false;
+    setBuilderStage(4);
+    alog('done', `✓ App generated — ${(new Blob([generatedHtml]).size/1024).toFixed(1)}KB`);
+    setTimeout(() => switchBuilderTab('preview'), 600);
+    toast('App generated!', 'ok');
+    setTimeout(() => setProgress(0), 2500);
+  } catch(err) {
+    alog('err', 'Error: ' + err.message);
+    toast('Error: ' + err.message, 'err');
+    setBuilderStage(1);
+    setProgress(0);
+  } finally {
+    isGenerating = false;
+    buildBtn.disabled = false;
+  }
+}
+
+async function regenerate() {
+  generatedHtml = null;
+  ['exportBtn','copyBtn','dlBtn'].forEach(id => document.getElementById(id).disabled = true);
+  document.getElementById('badge-preview').textContent = '–';
+  document.getElementById('badge-html').textContent    = '–';
+  await buildApp();
+}
+
+function copyHtml() {
+  if (generatedHtml) { navigator.clipboard.writeText(generatedHtml); toast('HTML copied!','ok'); }
+}
+
+function exportApp() {
+  if (!generatedHtml) return;
+  const name = (document.getElementById('exportName').value.trim() || 'sovereign-app') + '.html';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([generatedHtml], {type:'text/html'}));
+  a.download = name; a.click();
+  toast('Downloading ' + name, 'ok');
+}
+
+function validateSchema() {
+  const v = document.getElementById('moduleSchema').value.trim();
+  if (!v) { toast('Schema is empty','warn'); return; }
+  try { JSON.parse(v); toast('Valid JSON ✓','ok'); }
+  catch(e) { toast('Invalid JSON: ' + e.message,'err'); }
+}
+
+// ═══════════════════════════════════════════════════════
+// GENESIS PIPELINE — STAGE MANAGEMENT
+// ═══════════════════════════════════════════════════════
+function setPipelineStage(n) {
+  pipelineStage = n;
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('pstg' + i);
+    if (!el) return;
+    el.className = 'stg' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+}
+
+function switchOutTab(name) {
+  ['genesis','jsonflow','code'].forEach(t => {
+    document.getElementById('opane-' + t).classList.toggle('active', t === name);
+    document.getElementById('otab-' + t).classList.toggle('active', t === name);
+  });
+}
+
+function addPipelineMsg(role, text) {
+  const msgs = document.getElementById('pipelineMsgs');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const av = { system:'⬡', user:'U', ai:'AI' }[role] || '?';
+  const avBg = role === 'ai' ? 'background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff'
+             : role === 'user' ? 'background:var(--bg4);color:var(--txt2)'
+             : 'background:var(--acc3);color:var(--acc)';
+  div.innerHTML = `<div class="msg-av" style="${avBg}">${av}</div><div class="msg-body"><div class="msg-role">${role}</div><div class="msg-text" id="pmsg-${Date.now()}">${escHtml(text)}</div></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div.querySelector('.msg-text');
+}
+
+function pQuick(text) {
+  document.getElementById('pipelineInput').value = text;
+  pipelineSubmit();
+}
+
+async function pipelineSubmit() {
+  const ta   = document.getElementById('pipelineInput');
+  const text = ta.value.trim();
+  if (!text || pipelineStreaming) return;
+  ta.value = '';
+  addPipelineMsg('user', text);
+  await runPipelineStage1(text);
+}
+
+// ═══════════════════════════════════════════════════════
+// GENESIS PIPELINE — STAGE 1: NL → MODULE
+// ═══════════════════════════════════════════════════════
+async function runPipelineStage1(description) {
+  pipelineStreaming = true;
+  document.getElementById('pipelineSend').disabled = true;
+  setPipelineStage(1);
+
+  const thinkDiv = document.createElement('div');
+  thinkDiv.className = 'msg system';
+  thinkDiv.innerHTML = `<div class="msg-av" style="background:var(--acc3);color:var(--acc)">⬡</div><div class="msg-body"><div class="msg-role">system</div><div class="thinking"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div></div></div>`;
+  const msgs = document.getElementById('pipelineMsgs');
+  msgs.appendChild(thinkDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  const prompt = `You are a Genesis module compiler. Given this app description, generate a complete Genesis module JSON.
+
+Description: "${description}"
+
+Output ONLY valid JSON with this structure (no markdown, no commentary):
+{
+  "name": "Genesis/<kebab-case-name>",
+  "version": "1.0.0",
+  "description": "...",
+  "dependencies": ["DDC/core", "DDC/crypto"],
+  "derived_state": { "structure": { "enforced": true }, "fields": {} },
+  "emitted_events": { "structure": { "enforced": true }, "events": {} },
+  "reducers": { "deriveState": "function(state, event) { return state; }" },
+  "signal_functions": { "energy": "function(state) { return 1.0; }" },
+  "schedulers": { "scheduleNextAction": "function(state) { return null; }" },
+  "invariants": ["deterministic","immutable","content-addressed","event-sourced","schema-validated","merkle-chained","reproducible","auditable","decentralized","sovereign","composable"],
+  "outputs": { "ENFORCED_OUTPUTS": ["state","events","hash"] }
+}
+
+Populate fields, events, and reducers meaningfully for: "${description}"
+
+JSON ONLY:`;
+
+  let full = '';
+  try {
+    const resp = await fetch(`${ollamaUrl}/api/generate`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ model: ollamaModel || 'llama3.2', prompt, stream:true, options:{ temperature:0.3 } })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let carry = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) { full += carry; break; }
+      const chunk = carry + dec.decode(value, { stream:true });
+      const lines = chunk.split('\n'); carry = lines.pop();
+      for (const line of lines) {
+        try { const j = JSON.parse(line); if (j.response) full += j.response; } catch {}
+      }
+    }
+  } catch(e) {
+    thinkDiv.remove();
+    addPipelineMsg('system', '⚠ Ollama error: ' + e.message + '\n\nMake sure Ollama is running at ' + ollamaUrl);
+    pipelineStreaming = false;
+    document.getElementById('pipelineSend').disabled = false;
+    return;
+  }
+
+  thinkDiv.remove();
+
+  // Parse module
+  let mod;
+  try {
+    let clean = full.replace(/^```json\s*/i,'').replace(/```\s*$/,'').trim();
+    const m = clean.match(/\{[\s\S]*\}/); clean = m ? m[0] : clean;
+    mod = JSON.parse(clean);
+  } catch(e) {
+    addPipelineMsg('system', '⚠ Could not parse Genesis module JSON.\nRaw output (first 200 chars):\n' + full.substring(0,200));
+    pipelineStreaming = false;
+    document.getElementById('pipelineSend').disabled = false;
+    return;
+  }
+
+  // Normalize
+  if (!mod.invariants || mod.invariants.length < 11) {
+    mod.invariants = ['deterministic','immutable','content-addressed','event-sourced','schema-validated','merkle-chained','reproducible','auditable','decentralized','sovereign','composable'];
+  }
+  if (!mod.derived_state?.structure?.enforced) mod.derived_state = { structure:{ enforced:true }, fields:{} };
+  if (!mod.emitted_events?.structure?.enforced) mod.emitted_events = { structure:{ enforced:true }, events:{} };
+  if (!mod.reducers?.deriveState) mod.reducers = { deriveState:'function(state,event){return state;}' };
+  if (!mod.signal_functions?.energy) mod.signal_functions = { energy:'function(state){return 1.0;}' };
+  if (!mod.schedulers?.scheduleNextAction) mod.schedulers = { scheduleNextAction:'function(state){return null;}' };
+  if (!mod.outputs?.ENFORCED_OUTPUTS) mod.outputs = { ENFORCED_OUTPUTS:['state','events','hash'] };
+  if (!mod.dependencies || mod.dependencies.length < 2) mod.dependencies = ['DDC/core','DDC/crypto'];
+
+  currentModule = mod;
+  renderGenesisModule(mod);
+  setPipelineStage(2);
+
+  addPipelineMsg('system', `✓ Stage 1 complete — Genesis module compiled.\nModule: ${mod.name}\nInvariants: ${mod.invariants.length}\nDependencies: ${mod.dependencies.join(', ')}`);
+
+  const msgs2 = document.getElementById('pipelineMsgs');
+  const btn = document.createElement('button');
+  btn.className = 'pipeline-action stage2';
+  btn.innerHTML = '◈ Stage 2: Convert to JSONFlow Programs';
+  btn.onclick = () => { btn.disabled = true; convertToJSONFlow(); };
+  msgs2.appendChild(btn);
+  msgs2.scrollTop = msgs2.scrollHeight;
+
+  pipelineStreaming = false;
+  document.getElementById('pipelineSend').disabled = false;
+}
+
+function renderGenesisModule(mod) {
+  document.getElementById('genesisEmpty').style.display = 'none';
+  const d = document.getElementById('genesisDisplay');
+  d.innerHTML = '';
+  const block = document.createElement('div');
+  block.className = 'code-block';
+  block.innerHTML = `<div class="code-hdr"><span class="code-file">${(mod.name||'module').replace('/','_')}.json</span><div class="code-actions"><button class="code-btn" onclick="copyGenesis()">Copy</button></div></div><div class="code-body"><pre>${escHtml(JSON.stringify(mod,null,2))}</pre></div>`;
+  d.appendChild(block);
+  document.getElementById('badge-genesis').textContent = '✓';
+  renderValidation(mod);
+  switchOutTab('genesis');
+}
+
+function renderValidation(mod) {
+  const panel = document.getElementById('valPanel');
+  const items = document.getElementById('valItems');
+  panel.style.display = 'block';
+  const checks = [
+    ['derived_state enforced', !!(mod.derived_state?.structure?.enforced)],
+    ['emitted_events enforced', !!(mod.emitted_events?.structure?.enforced)],
+    ['reducers.deriveState present', !!(mod.reducers?.deriveState)],
+    ['signal_functions present', !!(mod.signal_functions?.energy)],
+    ['schedulers present', !!(mod.schedulers?.scheduleNextAction)],
+    ['All 11 invariants', !!(mod.invariants?.length >= 11)],
+    ['Canonical outputs', !!(mod.outputs?.ENFORCED_OUTPUTS)],
+    ['Genesis dependencies', !!(mod.dependencies?.length >= 2)],
+  ];
+  items.innerHTML = checks.map(([lbl,ok]) =>
+    `<div class="val-item"><div class="val-icon ${ok?'pass':'fail'}">${ok?'✓':'✗'}</div><div>${lbl}</div></div>`
+  ).join('');
+}
+
+function copyGenesis() {
+  if (currentModule) { navigator.clipboard.writeText(JSON.stringify(currentModule,null,2)); toast('Genesis module copied','ok'); }
+}
+
+// ═══════════════════════════════════════════════════════
+// GENESIS PIPELINE — STAGE 2: MODULE → JSONFLOW
+// ═══════════════════════════════════════════════════════
+function convertToJSONFlow() {
+  addPipelineMsg('system', '◈ Stage 2: Compiling JSONFlow programs…');
+  setPipelineStage(2);
+  let programs;
+  try {
+    programs = buildJSONFlowFromModule(currentModule);
+  } catch(err) {
+    addPipelineMsg('system', '⚠ JSONFlow compiler error: ' + err.message);
+    return;
+  }
+  jfPrograms = programs;
+  selectedJfIdx = 0;
+  renderJSONFlowPane();
+  addPipelineMsg('system', `✓ Compiled ${programs.length} JSONFlow programs.`);
+  document.getElementById('badge-jsonflow').textContent = programs.length;
+  setPipelineStage(3);
+
+  const msgs = document.getElementById('pipelineMsgs');
+  const btn = document.createElement('button');
+  btn.className = 'pipeline-action stage3';
+  btn.innerHTML = '◆ Stage 3: Compile to Code → select language in JSONFlow tab';
+  btn.onclick = () => switchOutTab('jsonflow');
+  msgs.appendChild(btn);
+  msgs.scrollTop = msgs.scrollHeight;
+  switchOutTab('jsonflow');
+}
+
+function buildJSONFlowFromModule(mod) {
+  const name = mod.name?.split('/').pop() || 'module';
+  const events = Object.keys(mod.emitted_events?.events || {});
+  const fields  = Object.keys(mod.derived_state?.fields   || {});
+  const programs = [];
+
+  // deriveState reducer
+  programs.push({
+    function: 'deriveState',
+    version:  '1.0',
+    inputs:   [{ name:'state',type:'object' }, { name:'event',type:'object' }],
+    outputs:  [{ name:'nextState',type:'object' }],
+    steps: [
+      { op:'assert',   args:['event.type', 'not_null'],                       doc:'Validate event type' },
+      { op:'switch',   args:['event.type', events.length ? events : ['DEFAULT']], doc:'Route by event type' },
+      { op:'reduce',   args:['state', 'event'],                               doc:'Apply reducer' },
+      { op:'hash',     args:['nextState'],                                    doc:'Content-address state' },
+      { op:'return',   args:['nextState'],                                    doc:'Emit new state' },
+    ],
+  });
+
+  // Event handlers
+  events.slice(0,5).forEach(ev => {
+    programs.push({
+      function: `handle${ev}`,
+      version:  '1.0',
+      inputs:   [{ name:'state',type:'object' }, { name:'payload',type:'object' }],
+      outputs:  [{ name:'result',type:'object' }],
+      steps: [
+        { op:'validate', args:['payload', 'schema'],     doc:'Validate payload schema' },
+        { op:'merge',    args:['state', 'payload'],      doc:'Merge into state' },
+        { op:'emit',     args:[ev, 'payload'],           doc:`Emit ${ev} event` },
+        { op:'hash',     args:['result'],                doc:'Content-address result' },
+        { op:'return',   args:['result'],                doc:'Return updated state' },
+      ],
+    });
+  });
+
+  // Signal function
+  programs.push({
+    function: 'computeEnergy',
+    version:  '1.0',
+    inputs:   [{ name:'state',type:'object' }],
+    outputs:  [{ name:'energy',type:'number' }],
+    steps: [
+      { op:'load',   args:['state'],     doc:'Load current state' },
+      { op:'score',  args:fields.slice(0,4).map(f => `state.${f}`), doc:'Score state fields' },
+      { op:'clamp',  args:['score','0','1'], doc:'Clamp 0–1' },
+      { op:'return', args:['energy'],    doc:'Return energy score' },
+    ],
+  });
+
+  // Scheduler
+  programs.push({
+    function: 'scheduleNextAction',
+    version:  '1.0',
+    inputs:   [{ name:'state',type:'object' }],
+    outputs:  [{ name:'action',type:'object' }],
+    steps: [
+      { op:'evaluate', args:['state.energy'],  doc:'Evaluate energy level' },
+      { op:'branch',   args:['energy > 0.5','schedule_high','schedule_low'], doc:'Branch on energy' },
+      { op:'schedule', args:['action','now'],  doc:'Schedule action' },
+      { op:'return',   args:['action'],        doc:'Return scheduled action' },
+    ],
+  });
+
+  return programs;
+}
+
+function renderJSONFlowPane() {
+  const bar      = document.getElementById('jfFuncBar');
+  const compBar  = document.getElementById('jfCompileBar');
+  bar.style.display      = 'flex';
+  compBar.style.display  = 'flex';
+  bar.innerHTML = jfPrograms.map((p,i) =>
+    `<button class="jf-func-btn ${i===selectedJfIdx?'active':''}" onclick="selectJfFunc(${i})">${p.function}</button>`
+  ).join('');
+  renderSelectedJfFunc();
+}
+
+function selectJfFunc(idx) {
+  selectedJfIdx = idx;
+  document.querySelectorAll('.jf-func-btn').forEach((b,i) => b.className='jf-func-btn'+(i===idx?' active':''));
+  renderSelectedJfFunc();
+}
+
+function renderSelectedJfFunc() {
+  const prog = jfPrograms[selectedJfIdx];
+  if (!prog) return;
+  const d = document.getElementById('jfDisplay');
+  d.innerHTML = '';
+  const block = document.createElement('div');
+  block.className = 'code-block';
+  block.innerHTML = `<div class="code-hdr"><span class="code-file">${prog.function}.json</span><div class="code-actions"><button class="code-btn" onclick="copyJF()">Copy JSON</button></div></div><div class="code-body"><pre>${escHtml(JSON.stringify(prog,null,2))}</pre></div>`;
+  d.appendChild(block);
+  document.getElementById('compileInfo').textContent = `Function: ${prog.function} — select language and compile`;
+}
+
+function copyJF() {
+  const p = jfPrograms[selectedJfIdx];
+  if (p) { navigator.clipboard.writeText(JSON.stringify(p,null,2)); toast('JSONFlow copied','ok'); }
+}
+
+// ═══════════════════════════════════════════════════════
+// GENESIS PIPELINE — STAGE 3: JSONFLOW → CODE
+// ═══════════════════════════════════════════════════════
+function compileCurrentProgram() {
+  const lang = document.getElementById('langSelect').value;
+  const prog = jfPrograms[selectedJfIdx];
+  if (!prog) { addPipelineMsg('system','No JSONFlow program selected'); return; }
+  const code = jfCompile(prog, lang);
+  renderCode(lang, code, prog.function);
+  document.getElementById('badge-code').textContent = '✓';
+}
+
+function compileAllLanguages() {
+  const prog = jfPrograms[selectedJfIdx];
+  if (!prog) { addPipelineMsg('system','No JSONFlow program selected'); return; }
+  const langs = ['python','javascript','typescript','rust','go','java','csharp','swift','kotlin'];
+  const d = document.getElementById('codeDisplay');
+  d.innerHTML = '<div class="all-langs-grid" id="allLangsGrid"></div>';
+  const grid = document.getElementById('allLangsGrid');
+  langs.forEach(lang => {
+    const code  = jfCompile(prog, lang);
+    const fname = lang==='java' ? toPascal(prog.function)+'.java' : `${prog.function}${LANG_EXT[lang]||'.txt'}`;
+    const block = document.createElement('div');
+    block.className = 'code-block';
+    block.innerHTML = `<div class="code-hdr"><span class="code-file">${fname}</span><div class="code-actions"><span class="code-file" style="margin-right:8px;opacity:.6">${LANG_LABEL[lang]}</span><button class="code-btn" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('pre').textContent)">Copy</button><button class="code-btn" onclick="dlCode('${fname}',this.closest('.code-block').querySelector('pre').textContent)">↓</button></div></div><div class="code-body"><pre>${escHtml(code)}</pre></div>`;
+    grid.appendChild(block);
+  });
+  document.getElementById('badge-code').textContent = '9';
+  switchOutTab('code');
+  addPipelineMsg('system', `✓ Compiled ${prog.function} in all 9 languages.`);
+}
+
+function renderCode(lang, code, funcName) {
+  const d = document.getElementById('codeDisplay');
+  d.innerHTML = '';
+  const fname = lang==='java' ? toPascal(funcName)+'.java' : `${funcName}${LANG_EXT[lang]||'.txt'}`;
+  const block = document.createElement('div');
+  block.className = 'code-block';
+  block.innerHTML = `<div class="code-hdr"><span class="code-file">${fname}</span><div class="code-actions"><span class="code-file" style="margin-right:8px;opacity:.6">${LANG_LABEL[lang]||lang}</span><button class="code-btn" onclick="copyCode()">Copy</button><button class="code-btn" onclick="downloadCode()">↓ Download</button></div></div><div class="code-body"><pre id="codeContent">${escHtml(code)}</pre></div>`;
+  d.appendChild(block);
+  d._lang = lang; d._code = code; d._fname = fname;
+  switchOutTab('code');
+}
+
+function copyCode() {
+  const d = document.getElementById('codeDisplay');
+  if (d._code) { navigator.clipboard.writeText(d._code); toast('Code copied','ok'); }
+}
+function downloadCode() {
+  const d = document.getElementById('codeDisplay');
+  if (d._code) dlCode(d._fname, d._code);
+}
+function dlCode(fname, code) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([code],{type:'text/plain'}));
+  a.download = fname; a.click();
+}
+
+// ═══════════════════════════════════════════════════════
+// JSONFLOW COMPILER
+// ═══════════════════════════════════════════════════════
+function jfCompile(prog, lang) {
+  const fn    = prog.function || 'fn';
+  const steps = prog.steps || [];
+  const ins   = (prog.inputs  || []).map(i => i.name);
+  const outs  = (prog.outputs || []).map(o => o.name);
+  const comments = steps.map(s => `// ${s.doc||s.op}: ${(s.args||[]).join(', ')}`);
+  const body  = comments.join('\n  ');
+
+  switch(lang) {
+    case 'python': return `# ${fn} — JSONFlow compiled\ndef ${toSnake(fn)}(${ins.join(', ')}):\n    """\n    JSONFlow program: ${fn}\n    Outputs: ${outs.join(', ')}\n    """\n    ${steps.map(s=>`# ${s.op}: ${(s.args||[]).join(', ')}`).join('\n    ')}\n    return ${outs[0]||'None'}\n`;
+    case 'javascript': return `// ${fn} — JSONFlow compiled\nexport function ${fn}(${ins.join(', ')}) {\n  ${body}\n  return ${outs[0]||'null'};\n}\n`;
+    case 'typescript': return `// ${fn} — JSONFlow compiled\nexport function ${fn}(${ins.map(i=>i+': unknown').join(', ')}): unknown {\n  ${body}\n  return ${outs[0]||'null'};\n}\n`;
+    case 'rust': return `// ${fn} — JSONFlow compiled\npub fn ${toSnake(fn)}(${ins.map(i=>i+': serde_json::Value').join(', ')}) -> serde_json::Value {\n    ${steps.map(s=>`// ${s.op}: ${(s.args||[]).join(', ')}`).join('\n    ')}\n    serde_json::Value::Null\n}\n`;
+    case 'go': return `// ${fn} — JSONFlow compiled\nfunc ${toPascal(fn)}(${ins.map(i=>i+' interface{}').join(', ')}) interface{} {\n\t${steps.map(s=>`// ${s.op}: ${(s.args||[]).join(', ')}`).join('\n\t')}\n\treturn nil\n}\n`;
+    case 'java': return `// ${fn} — JSONFlow compiled\npublic class ${toPascal(fn)} {\n    public Object execute(${ins.map(i=>'Object '+i).join(', ')}) {\n        ${steps.map(s=>`// ${s.op}: ${(s.args||[]).join(', ')}`).join('\n        ')}\n        return null;\n    }\n}\n`;
+    case 'csharp': return `// ${fn} — JSONFlow compiled\npublic class ${toPascal(fn)} {\n    public object Execute(${ins.map(i=>'object '+i).join(', ')}) {\n        ${steps.map(s=>`// ${s.op}: ${(s.args||[]).join(', ')}`).join('\n        ')}\n        return null;\n    }\n}\n`;
+    case 'swift': return `// ${fn} — JSONFlow compiled\nfunc ${fn}(${ins.map(i=>i+': Any').join(', ')}) -> Any? {\n    ${steps.map(s=>`// ${s.op}: ${(s.args||[]).join(', ')}`).join('\n    ')}\n    return nil\n}\n`;
+    case 'kotlin': return `// ${fn} — JSONFlow compiled\nfun ${fn}(${ins.map(i=>i+': Any').join(', ')}): Any? {\n    ${steps.map(s=>`// ${s.op}: ${(s.args||[]).join(', ')}`).join('\n    ')}\n    return null\n}\n`;
+    default: return `/* ${fn} — Unknown language */\n`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════
+function openSettings() {
+  document.getElementById('ollamaUrlIn').value   = ollamaUrl;
+  document.getElementById('ollamaModelIn').value = ollamaModel;
+  document.getElementById('ollamaTempIn').value  = ollamaTemp;
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
+function saveSettings() {
+  ollamaUrl   = document.getElementById('ollamaUrlIn').value.trim();
+  ollamaModel = document.getElementById('ollamaModelIn').value.trim();
+  ollamaTemp  = parseFloat(document.getElementById('ollamaTempIn').value);
+  document.getElementById('modelInput').value = ollamaModel;
+  document.getElementById('tempInput').value  = ollamaTemp;
+  closeSettings();
+  checkConnection();
+}
+function openSchemaModal()  { document.getElementById('schemaModal').classList.add('open'); }
+function closeSchemaModal() { document.getElementById('schemaModal').classList.remove('open'); }
+
+// ═══════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toPascal(s) {
+  return (s||'').replace(/(?:^|[-_])(\w)/g,(_,c)=>c.toUpperCase());
+}
+function toSnake(s) {
+  return (s||'').replace(/([A-Z])/g,'_$1').toLowerCase().replace(/^_/,'');
+}
+function toast(msg, type='info') {
+  const wrap = document.getElementById('toastWrap');
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type||'');
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+</script>
+</body>
+</html>

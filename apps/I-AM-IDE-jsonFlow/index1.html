@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<!--
+  index1.html
+  Genesis/JSONFlow IDE — Remix-style 4-panel IDE
+  NL → Genesis Module → JSONFlow IR → Multi-Language Code
+  Panels: File Explorer | Code Editor | Chat/Pipeline | Output/Terminal
+
+  Copyright (c) 2026 Sovereign OS Contributors
+  Licensed under the Sovereign OS Community License (LICENSE-COMMUNITY)
+  Core invariant: VM_stateₙ = deriveState(eventLog[0…n])
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genesis/JSONFlow IDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Tokens ──────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0c10;--bg2:#0e1117;--bg3:#141820;--bg4:#1c2130;--bg5:#242b3a;
+  --txt:#d4d8e8;--txt2:#7b84a0;--muted:#454d63;
+  --acc:#5c7cfa;--acc2:#3b5bdb;--acc3:rgba(92,124,250,.12);--acc4:rgba(92,124,250,.06);
+  --ok:#37b24d;--ok-bg:rgba(55,178,77,.1);
+  --warn:#f59f00;--warn-bg:rgba(245,159,0,.1);
+  --err:#f03e3e;--err-bg:rgba(240,62,62,.1);
+  --stage1:#7950f2;--stage2:#1098ad;--stage3:#e67700;
+  --border:#1e2535;--border2:#252d3d;
+  --shadow:rgba(0,0,0,.6);
+  --radius:8px;--radius-lg:12px;
+  --font-ui:'Space Grotesk',sans-serif;
+  --font-code:'IBM Plex Mono',monospace;
+  --sidebar:220px;--chat:340px;--hdr:42px;--tabbar:36px;--statusbar:24px;
+}
+html,body{height:100%;overflow:hidden;font-family:var(--font-ui)}
+body{background:var(--bg);color:var(--txt);display:flex;flex-direction:column}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+button{font-family:var(--font-ui);cursor:pointer;border:none;outline:none}
+input,textarea,select{font-family:var(--font-code);outline:none;border:none}
+
+/* ── Titlebar ────────────────────────────────────────────────────────── */
+#titlebar{
+  height:var(--hdr);flex-shrink:0;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 12px;gap:12px;
+}
+.logo{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;letter-spacing:-.02em;color:var(--txt);user-select:none}
+.logo-gem{
+  width:26px;height:26px;border-radius:7px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+}
+.pipeline-badges{display:flex;align-items:center;gap:4px}
+.pb{
+  display:flex;align-items:center;gap:5px;padding:3px 9px;
+  border-radius:20px;font-size:11px;font-weight:600;
+  border:1px solid var(--border2);color:var(--txt2);
+  transition:all .2s;
+}
+.pb.active{color:var(--acc);border-color:var(--acc);background:var(--acc3)}
+.pb.done{color:var(--ok);border-color:var(--ok);background:var(--ok-bg)}
+.pb-arrow{color:var(--muted);font-size:12px;margin:0 2px}
+.pb-badge{
+  min-width:16px;height:16px;border-radius:8px;
+  background:var(--bg4);display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:var(--txt2);
+}
+.pb.active .pb-badge{background:var(--acc3);color:var(--acc)}
+.pb.done .pb-badge{background:var(--ok-bg);color:var(--ok)}
+.hdr-tools{display:flex;align-items:center;gap:6px}
+.hdr-btn{
+  padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  background:var(--bg4);color:var(--txt2);border:1px solid var(--border2);
+  transition:all .15s;letter-spacing:.02em;
+}
+.hdr-btn:hover{background:var(--bg5);color:var(--txt);border-color:var(--muted)}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:all .4s;flex-shrink:0}
+.conn-dot.ok{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.conn-dot.err{background:var(--err)}
+.conn-lbl{font-size:11px;color:var(--txt2);display:flex;align-items:center;gap:5px}
+
+/* ── Main layout ─────────────────────────────────────────────────────── */
+#layout{flex:1;display:flex;min-height:0;overflow:hidden}
+
+/* ── Sidebar / File Explorer ─────────────────────────────────────────── */
+#sidebar{
+  width:var(--sidebar);flex-shrink:0;
+  background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.side-section{padding:8px 0}
+.side-hdr{
+  padding:4px 12px 4px 10px;font-size:10px;font-weight:700;
+  color:var(--muted);letter-spacing:.08em;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.side-hdr-btn{
+  font-size:14px;background:none;color:var(--muted);
+  width:18px;height:18px;display:flex;align-items:center;justify-content:center;
+  border-radius:4px;
+}
+.side-hdr-btn:hover{background:var(--bg4);color:var(--txt2)}
+.file-tree{overflow-y:auto;flex:1}
+.file-item{
+  display:flex;align-items:center;gap:6px;padding:4px 10px;
+  font-size:12px;font-family:var(--font-code);color:var(--txt2);
+  cursor:pointer;border-radius:0;transition:all .1s;user-select:none;
+}
+.file-item:hover{background:var(--bg4);color:var(--txt)}
+.file-item.active{background:var(--acc4);color:var(--acc);border-left:2px solid var(--acc)}
+.file-item.active{padding-left:8px}
+.file-icon{font-size:11px;flex-shrink:0;opacity:.7}
+.file-item.dir{font-weight:600;color:var(--txt2)}
+.file-item.dir .file-icon{color:var(--warn)}
+.file-indent{padding-left:22px}
+.side-divider{height:1px;background:var(--border);margin:4px 0}
+
+/* ── Center pane: editor + tabs ──────────────────────────────────────── */
+#center{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+#tabs-bar{
+  height:var(--tabbar);flex-shrink:0;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;
+}
+#tabs-bar::-webkit-scrollbar{height:2px}
+.tab{
+  display:flex;align-items:center;gap:6px;
+  padding:0 14px;font-size:12px;font-family:var(--font-code);
+  color:var(--txt2);cursor:pointer;border-right:1px solid var(--border);
+  transition:all .15s;white-space:nowrap;flex-shrink:0;
+  border-bottom:2px solid transparent;
+}
+.tab:hover{background:var(--bg3);color:var(--txt)}
+.tab.active{background:var(--bg);color:var(--txt);border-bottom-color:var(--acc)}
+.tab-close{
+  font-size:14px;color:var(--muted);margin-left:2px;
+  width:14px;height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;
+  background:none;
+}
+.tab-close:hover{background:var(--bg4);color:var(--txt)}
+.tab-dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex-shrink:0}
+#editor-area{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.editor-pane{flex:1;overflow:hidden;display:none;flex-direction:column}
+.editor-pane.active{display:flex}
+.code-editor{
+  flex:1;padding:16px;overflow:auto;
+  font-family:var(--font-code);font-size:13px;line-height:1.65;
+  background:var(--bg);color:var(--txt);
+  white-space:pre;resize:none;
+}
+.code-editor:focus{outline:none}
+
+/* Monaco-lite: fake line numbers */
+.editor-wrap{flex:1;display:flex;overflow:hidden;min-height:0}
+.line-nums{
+  padding:16px 8px 16px 12px;
+  font-family:var(--font-code);font-size:13px;line-height:1.65;
+  color:var(--muted);background:var(--bg);
+  user-select:none;text-align:right;border-right:1px solid var(--border);
+  overflow:hidden;flex-shrink:0;min-width:44px;
+}
+textarea.code-editor{
+  border:none;tab-size:2;caret-color:var(--acc);
+  background:var(--bg);color:var(--txt);
+  width:100%;
+}
+/* Editor toolbar */
+.editor-toolbar{
+  height:32px;flex-shrink:0;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 10px;gap:6px;
+}
+.et-btn{
+  padding:3px 8px;border-radius:5px;font-size:11px;font-weight:600;
+  background:var(--bg4);color:var(--txt2);border:1px solid var(--border2);
+  transition:all .15s;
+}
+.et-btn:hover{background:var(--bg5);color:var(--txt)}
+.et-btn.primary{background:var(--acc3);color:var(--acc);border-color:var(--acc)}
+.et-btn.primary:hover{background:var(--acc);color:#fff}
+.et-label{font-size:11px;color:var(--muted);margin-left:4px}
+.et-sep{width:1px;height:16px;background:var(--border);margin:0 4px}
+select.et-select{
+  padding:3px 6px;border-radius:5px;font-size:11px;font-weight:600;
+  background:var(--bg4);color:var(--txt2);border:1px solid var(--border2);
+  cursor:pointer;
+}
+select.et-select:hover{background:var(--bg5);color:var(--txt)}
+
+/* Syntax highlight shims (applied via JS) */
+.kw{color:#7c8cfc}.str{color:#69db7c}.num{color:#fcc419}.cmt{color:#536382;font-style:italic}
+.key{color:#74c0fc}.bool{color:#f783ac}.op{color:#e599f7}
+
+/* ── Right pane: Chat + Output ───────────────────────────────────────── */
+#right{
+  width:var(--chat);flex-shrink:0;
+  background:var(--bg2);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#right-tabs{
+  display:flex;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.rt{
+  flex:1;padding:7px 0;text-align:center;font-size:11px;font-weight:600;
+  letter-spacing:.04em;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.rt:hover{color:var(--txt2)}
+.rt.active{color:var(--acc);border-bottom-color:var(--acc)}
+
+/* Chat panel */
+#chat-panel{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#msgs{
+  flex:1;overflow-y:auto;padding:10px 10px 6px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.msg{padding:8px 10px;border-radius:var(--radius);font-size:12px;line-height:1.6;word-break:break-word}
+.msg.user{background:var(--acc3);color:var(--txt);border-left:2px solid var(--acc);font-family:var(--font-code)}
+.msg.ai{background:var(--bg3);color:var(--txt);border-left:2px solid var(--stage1)}
+.msg.system{background:var(--bg4);color:var(--txt2);font-size:11px;border-left:2px solid var(--muted)}
+.msg.ok-msg{background:var(--ok-bg);border-left:2px solid var(--ok);color:var(--txt)}
+.msg.err-msg{background:var(--err-bg);border-left:2px solid var(--err);color:var(--txt)}
+.msg.streaming::after{content:'▋';animation:blink .8s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.pipeline-action{
+  padding:7px 12px;border-radius:var(--radius);font-size:11px;font-weight:600;
+  cursor:pointer;width:100%;text-align:left;margin-top:4px;
+  border:1px solid;transition:all .2s;font-family:var(--font-code);
+}
+.pipeline-action.stage2{background:rgba(16,152,173,.12);color:#1098ad;border-color:#1098ad}
+.pipeline-action.stage3{background:rgba(230,119,0,.12);color:var(--stage3);border-color:var(--stage3)}
+.pipeline-action:disabled{opacity:.4;cursor:not-allowed}
+.pipeline-action:not(:disabled):hover{filter:brightness(1.2)}
+.chat-input-wrap{
+  padding:8px;border-top:1px solid var(--border);flex-shrink:0;
+}
+#userInput{
+  width:100%;background:var(--bg3);color:var(--txt);
+  border:1px solid var(--border2);border-radius:var(--radius);
+  padding:7px 10px;font-size:12px;line-height:1.5;resize:none;
+  min-height:48px;max-height:120px;overflow-y:auto;
+  transition:border-color .2s;
+}
+#userInput:focus{border-color:var(--acc)}
+.chat-actions{display:flex;gap:6px;margin-top:6px;align-items:center}
+#sendBtn{
+  flex:1;padding:6px 10px;border-radius:6px;
+  background:var(--acc);color:#fff;font-size:12px;font-weight:700;
+  transition:all .15s;
+}
+#sendBtn:hover{background:var(--acc2)}
+#sendBtn:disabled{opacity:.4;cursor:not-allowed}
+.chat-setting{
+  padding:4px 8px;border-radius:6px;font-size:11px;background:var(--bg4);
+  color:var(--txt2);border:1px solid var(--border2);
+}
+.chat-cfg{
+  display:flex;gap:6px;align-items:center;padding:0 8px 6px;
+  font-size:11px;color:var(--txt2);flex-wrap:wrap;
+}
+.cfg-item{display:flex;align-items:center;gap:4px}
+input.cfg-input{
+  background:var(--bg3);color:var(--txt);border:1px solid var(--border2);
+  border-radius:4px;padding:2px 6px;font-size:11px;width:130px;
+}
+input.cfg-input:focus{border-color:var(--acc)}
+
+/* Output / Terminal panel */
+#out-panel{flex:1;display:none;flex-direction:column;min-height:0;overflow:hidden}
+#out-panel.active{display:flex}
+#chat-panel.hidden{display:none}
+.out-tabs{
+  display:flex;border-bottom:1px solid var(--border);flex-shrink:0;
+  padding:0 8px;gap:2px;
+}
+.ot{
+  padding:5px 10px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.ot.active{color:var(--txt2);border-bottom-color:var(--muted)}
+.ot:hover{color:var(--txt)}
+.out-view{flex:1;overflow:auto;display:none;padding:0}
+.out-view.active{display:block}
+.terminal{
+  font-family:var(--font-code);font-size:12px;line-height:1.7;
+  padding:12px;color:#adb5bd;background:var(--bg);min-height:100%;
+}
+.t-line{display:flex;gap:8px;margin-bottom:2px}
+.t-ps{color:#5c7cfa;flex-shrink:0}.t-ok{color:var(--ok)}.t-err{color:var(--err)}
+.t-warn{color:var(--warn)}.t-dim{color:var(--muted)}.t-hi{color:var(--txt)}
+.t-inp{background:none;color:var(--txt);font-family:var(--font-code);font-size:12px;border:none;width:100%;outline:none;caret-color:var(--acc)}
+.test-list{padding:8px}
+.test-item{
+  display:flex;align-items:flex-start;gap:8px;padding:7px 10px;
+  border-radius:6px;font-size:12px;margin-bottom:4px;
+  background:var(--bg3);border:1px solid var(--border);font-family:var(--font-code);
+}
+.test-status{width:14px;height:14px;border-radius:50%;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+.ts-pass{background:var(--ok-bg);color:var(--ok)}.ts-fail{background:var(--err-bg);color:var(--err)}.ts-idle{background:var(--bg4);color:var(--muted)}
+.test-label{color:var(--txt2);flex:1}.test-dur{color:var(--muted);font-size:10px;margin-left:auto}
+.test-toolbar{padding:8px;border-bottom:1px solid var(--border);display:flex;gap:6px}
+.run-tests-btn{
+  padding:5px 12px;border-radius:6px;background:var(--ok-bg);color:var(--ok);
+  font-size:11px;font-weight:700;border:1px solid var(--ok);
+  transition:all .15s;
+}
+.run-tests-btn:hover{background:var(--ok);color:#fff}
+.test-summary{font-size:11px;color:var(--txt2);padding:4px 8px;display:flex;gap:8px;align-items:center}
+.ts-cnt{font-weight:700;color:var(--txt)}
+
+/* JSONFlow output pane */
+.jf-toolbar{
+  padding:6px 8px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0;
+}
+.jf-func-btns{display:flex;gap:4px;flex-wrap:wrap}
+.jf-func-btn{
+  padding:3px 8px;border-radius:5px;font-size:11px;font-weight:600;
+  background:var(--bg4);color:var(--txt2);border:1px solid var(--border2);
+  transition:all .15s;
+}
+.jf-func-btn.active{background:var(--acc3);color:var(--acc);border-color:var(--acc)}
+.jf-func-btn:hover{background:var(--bg5);color:var(--txt)}
+
+/* Validation panel */
+.val-panel{
+  margin:8px;border-radius:var(--radius);
+  background:var(--bg3);border:1px solid var(--border);overflow:hidden;
+}
+.val-hdr{
+  padding:7px 12px;font-size:11px;font-weight:700;
+  background:var(--bg4);color:var(--txt2);border-bottom:1px solid var(--border);
+  letter-spacing:.05em;text-transform:uppercase;
+}
+.val-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.val-item{
+  display:flex;align-items:center;gap:7px;padding:5px 10px;
+  font-size:11px;color:var(--txt2);border-bottom:1px solid var(--border);
+  font-family:var(--font-code);
+}
+.val-item:nth-child(odd){border-right:1px solid var(--border)}
+.val-icon{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.val-icon.pass{background:var(--ok-bg);color:var(--ok)}.val-icon.fail{background:var(--err-bg);color:var(--err)}
+
+/* ── Status bar ──────────────────────────────────────────────────────── */
+#statusbar{
+  height:var(--statusbar);flex-shrink:0;
+  background:var(--acc2);color:rgba(255,255,255,.75);
+  display:flex;align-items:center;padding:0 10px;gap:12px;
+  font-size:10px;font-family:var(--font-code);font-weight:600;
+  letter-spacing:.03em;
+}
+.sb-item{display:flex;align-items:center;gap:4px}
+.sb-sep{opacity:.3;margin:0 2px}|
+
+/* ── Resizer ─────────────────────────────────────────────────────────── */
+.resizer{
+  width:4px;background:var(--border);cursor:col-resize;flex-shrink:0;
+  transition:background .15s;
+}
+.resizer:hover,.resizer.dragging{background:var(--acc)}
+
+/* ── Overlay / modal ─────────────────────────────────────────────────── */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);
+  display:none;align-items:center;justify-content:center;z-index:100;
+}
+.overlay.open{display:flex}
+.modal{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:var(--radius-lg);padding:20px;width:460px;max-width:90vw;
+}
+.modal-hdr{font-size:14px;font-weight:700;margin-bottom:14px;color:var(--txt)}
+.modal-row{margin-bottom:10px;display:flex;flex-direction:column;gap:4px}
+.modal-lbl{font-size:11px;color:var(--txt2)}
+.modal-inp{
+  background:var(--bg3);color:var(--txt);border:1px solid var(--border2);
+  border-radius:6px;padding:7px 10px;font-size:12px;font-family:var(--font-code);
+  transition:border-color .2s;
+}
+.modal-inp:focus{border-color:var(--acc)}
+.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.modal-cancel{padding:6px 14px;border-radius:6px;font-size:12px;background:var(--bg4);color:var(--txt2);border:1px solid var(--border2)}
+.modal-ok{padding:6px 14px;border-radius:6px;font-size:12px;background:var(--acc);color:#fff;font-weight:700}
+
+/* ── Code block (output display) ─────────────────────────────────────── */
+.code-block{border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);margin:8px}
+.code-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);
+  font-size:11px;font-family:var(--font-code);
+}
+.code-file{color:var(--txt2)}.code-actions{display:flex;gap:6px;align-items:center}
+.code-btn{
+  padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;
+  background:var(--bg4);color:var(--txt2);border:1px solid var(--border2);
+  transition:all .15s;cursor:pointer;
+}
+.code-btn:hover{background:var(--bg5);color:var(--txt)}
+.code-body{overflow:auto;max-height:400px}
+.code-body pre{padding:12px 14px;font-family:var(--font-code);font-size:12px;line-height:1.65;color:var(--txt);background:var(--bg);tab-size:2}
+.all-langs-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.all-langs-grid .code-block{margin:4px}
+
+/* ── Scrollable output panes ─────────────────────────────────────────── */
+#genesis-view,#jsonflow-view,#code-view{
+  flex:1;overflow-y:auto;display:none;
+}
+#genesis-view.active,#jsonflow-view.active,#code-view.active{display:block}
+</style>
+</head>
+<body>
+<!-- BACK NAV -->
+<div style="position:sticky;top:0;z-index:9999;display:flex;align-items:center;gap:12px;padding:0 20px;height:38px;background:rgba(7,11,15,.96);border-bottom:1px solid #1b2d3a;backdrop-filter:blur(12px);font-family:'DM Mono',monospace;font-size:10px;">
+  <a href="../../index.html" style="color:#22d3ee;text-decoration:none;letter-spacing:.1em;opacity:.85;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">← I-AM-IOS SUITE</a>
+  <span style="color:#1b2d3a;margin:0 4px">·</span>
+  <span style="color:#3a5568;letter-spacing:.08em;">GENESIS / JSONFLOW IDE</span>
+</div>
+
+<!-- ── Titlebar ────────────────────────────────────────────────────────── -->
+<div id="titlebar">
+  <div class="logo">
+    <div class="logo-gem">◈</div>
+    Genesis / JSONFlow IDE
+  </div>
+  <div class="pipeline-badges">
+    <div class="pb active" id="pb1">
+      <span>1</span><span>Genesis</span>
+      <span class="pb-badge" id="badge-genesis">—</span>
+    </div>
+    <span class="pb-arrow">›</span>
+    <div class="pb" id="pb2">
+      <span>2</span><span>JSONFlow</span>
+      <span class="pb-badge" id="badge-jsonflow">—</span>
+    </div>
+    <span class="pb-arrow">›</span>
+    <div class="pb" id="pb3">
+      <span>3</span><span>Code</span>
+      <span class="pb-badge" id="badge-code">—</span>
+    </div>
+  </div>
+  <div class="hdr-tools">
+    <div class="conn-lbl">
+      <span class="conn-dot" id="conn-dot"></span>
+      <span id="conn-label">Ollama</span>
+    </div>
+    <button class="hdr-btn" onclick="openSettings()">⚙ Settings</button>
+    <button class="hdr-btn" onclick="exportAll()">↓ Export</button>
+  </div>
+</div>
+
+<!-- ── Main layout ──────────────────────────────────────────────────────── -->
+<div id="layout">
+
+  <!-- File Explorer -->
+  <div id="sidebar">
+    <div class="side-section">
+      <div class="side-hdr">
+        Explorer
+        <button class="side-hdr-btn" onclick="newFile()" title="New file">+</button>
+      </div>
+      <div class="file-tree" id="file-tree"></div>
+    </div>
+    <div class="side-divider"></div>
+    <div class="side-section">
+      <div class="side-hdr">Pipeline Output</div>
+      <div class="file-tree" id="output-tree"></div>
+    </div>
+  </div>
+
+  <div class="resizer" id="res1"></div>
+
+  <!-- Center Editor Pane -->
+  <div id="center">
+    <!-- Tab bar -->
+    <div id="tabs-bar" id="tabs-bar">
+      <div class="tab active" data-tab="welcome" onclick="switchEditorTab('welcome')">
+        <span>welcome.md</span>
+      </div>
+    </div>
+
+    <!-- Editor area -->
+    <div id="editor-area">
+      <!-- Welcome pane -->
+      <div class="editor-pane active" id="pane-welcome">
+        <div class="editor-toolbar">
+          <span class="et-label">README — Genesis/JSONFlow IDE</span>
+        </div>
+        <div class="editor-wrap">
+          <div style="flex:1;overflow:auto;padding:24px 32px;font-size:13px;line-height:1.9;color:var(--txt2)">
+            <div style="max-width:560px">
+              <div style="font-size:22px;font-weight:700;color:var(--txt);margin-bottom:8px;font-family:var(--font-ui);letter-spacing:-.03em">
+                ◈ Genesis / JSONFlow IDE
+              </div>
+              <div style="color:var(--muted);font-size:12px;margin-bottom:24px;font-family:var(--font-code)">Sovereign OS · DDC Infrastructure · v1.0.0</div>
+              <p style="margin-bottom:16px">This is a <strong style="color:var(--txt)">3-stage deterministic compilation pipeline</strong> IDE, styled after Remix IDE. Describe an app in natural language and watch it compile all the way to runnable code in 9 languages.</p>
+              <div style="display:grid;gap:10px;margin-bottom:24px">
+                <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+                  <div style="color:var(--stage1);font-weight:700;font-size:12px;margin-bottom:4px">◈ Stage 1 — Genesis Module</div>
+                  <div style="font-size:12px">Natural language → deterministic JSON module. LLM enforces 11 canonical invariants. Uses Ollama locally.</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+                  <div style="color:var(--stage2);font-weight:700;font-size:12px;margin-bottom:4px">◈ Stage 2 — JSONFlow IR</div>
+                  <div style="font-size:12px">Module → JSONFlow Intermediate Representation. Pure deterministic compiler (no LLM). Produces <code style="color:var(--acc)">deriveState</code>, <code style="color:var(--acc)">scheduleNextAction</code>, signal functions.</div>
+                </div>
+                <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+                  <div style="color:var(--stage3);font-weight:700;font-size:12px;margin-bottom:4px">◈ Stage 3 — Code Output</div>
+                  <div style="font-size:12px">JSONFlow → Python, JS, TS, Rust, Go, Java, C#, Swift, Kotlin.</div>
+                </div>
+              </div>
+              <div style="font-size:12px;color:var(--muted)">→ Type a message in the chat panel to begin. Try: <span style="color:var(--acc);font-family:var(--font-code)">build a task management system</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Dynamic editor panes added by JS -->
+    </div>
+  </div>
+
+  <div class="resizer" id="res2"></div>
+
+  <!-- Right panel: Chat + Output -->
+  <div id="right">
+    <div id="right-tabs">
+      <div class="rt active" onclick="switchRightPanel('chat')" id="rt-chat">CHAT</div>
+      <div class="rt" onclick="switchRightPanel('output')" id="rt-output">OUTPUT</div>
+    </div>
+
+    <!-- Chat panel -->
+    <div id="chat-panel">
+      <div class="chat-cfg">
+        <div class="cfg-item">
+          <label style="font-size:10px;color:var(--muted)">URL</label>
+          <input class="cfg-input" id="urlInput" value="http://localhost:11434" placeholder="Ollama URL">
+        </div>
+        <div class="cfg-item">
+          <label style="font-size:10px;color:var(--muted)">Model</label>
+          <input class="cfg-input" id="modelInput" value="llama3.2" style="width:90px">
+        </div>
+      </div>
+      <div id="msgs">
+        <div class="msg system">◈ Genesis/JSONFlow IDE ready. Configure Ollama above, then describe what to build.</div>
+      </div>
+      <div class="chat-input-wrap">
+        <textarea id="userInput" placeholder="Describe what to build…" rows="2" onkeydown="handleKey(event)"></textarea>
+        <div class="chat-actions">
+          <button class="chat-setting" onclick="clearChat()" title="Clear">⌫</button>
+          <button class="chat-setting" onclick="loadSchema()" title="Load schema">⊞</button>
+          <button id="sendBtn" onclick="sendGenesis()">▶ Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output panel -->
+    <div id="out-panel">
+      <div class="out-tabs">
+        <div class="ot active" onclick="switchOutTab('genesis')" id="ot-genesis">Genesis</div>
+        <div class="ot" onclick="switchOutTab('jsonflow')" id="ot-jsonflow">JSONFlow</div>
+        <div class="ot" onclick="switchOutTab('code')" id="ot-code">Code</div>
+        <div class="ot" onclick="switchOutTab('tests')" id="ot-tests">Tests</div>
+        <div class="ot" onclick="switchOutTab('terminal')" id="ot-terminal">Terminal</div>
+      </div>
+
+      <!-- Genesis output -->
+      <div class="out-view active" id="genesis-view">
+        <div id="valPanel" style="display:none">
+          <div class="val-panel">
+            <div class="val-hdr">Canonical Validation</div>
+            <div class="val-grid" id="valItems"></div>
+          </div>
+        </div>
+        <div id="genesisDisplay"></div>
+      </div>
+
+      <!-- JSONFlow output -->
+      <div class="out-view" id="jsonflow-view">
+        <div class="jf-toolbar" id="jfFuncBar" style="display:none">
+          <div class="jf-func-btns" id="jf-func-btns"></div>
+        </div>
+        <div class="jf-toolbar" id="jfCompileBar" style="display:none">
+          <select class="et-select" id="langSelect">
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="rust">Rust</option>
+            <option value="go">Go</option>
+            <option value="java">Java</option>
+            <option value="csharp">C#</option>
+            <option value="swift">Swift</option>
+            <option value="kotlin">Kotlin</option>
+          </select>
+          <button class="et-btn primary" onclick="compileCurrentProgram()">▶ Compile</button>
+          <button class="et-btn" onclick="compileAllLanguages()">⊞ All 9 Languages</button>
+          <span class="et-label" id="compileInfo"></span>
+        </div>
+        <div id="jfDisplay"></div>
+      </div>
+
+      <!-- Code output -->
+      <div class="out-view" id="code-view">
+        <div id="codeDisplay"></div>
+      </div>
+
+      <!-- Tests output -->
+      <div class="out-view" id="tests-view">
+        <div class="test-toolbar">
+          <button class="run-tests-btn" onclick="runTests()">▶ Run Tests</button>
+          <div class="test-summary" id="test-summary"></div>
+        </div>
+        <div id="test-list" class="test-list"></div>
+      </div>
+
+      <!-- Terminal output -->
+      <div class="out-view" id="terminal-view">
+        <div class="terminal" id="terminal-body">
+          <div class="t-line"><span class="t-ps">genesis@ide:~$</span><span class="t-dim">Genesis/JSONFlow IDE Terminal</span></div>
+          <div class="t-line"><span class="t-dim">Type commands or run pipeline stages.</span></div>
+          <div class="t-line" id="t-input-line">
+            <span class="t-ps">genesis@ide:~$</span>
+            <input class="t-inp" id="term-input" placeholder="" autocomplete="off" onkeydown="termKey(event)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div id="statusbar">
+  <div class="sb-item">◈ Sovereign OS</div>
+  <span class="sb-sep">│</span>
+  <div class="sb-item" id="sb-stage">Stage 1: Genesis</div>
+  <span class="sb-sep">│</span>
+  <div class="sb-item" id="sb-file">welcome.md</div>
+  <span class="sb-sep">│</span>
+  <div class="sb-item" id="sb-lang">—</div>
+  <span class="sb-sep">│</span>
+  <div class="sb-item" id="sb-cursor">Ln 1, Col 1</div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settings-overlay">
+  <div class="modal">
+    <div class="modal-hdr">⚙ Settings</div>
+    <div class="modal-row">
+      <span class="modal-lbl">Ollama Base URL</span>
+      <input class="modal-inp" id="s-url" placeholder="http://localhost:11434">
+    </div>
+    <div class="modal-row">
+      <span class="modal-lbl">Model</span>
+      <input class="modal-inp" id="s-model" placeholder="llama3.2">
+    </div>
+    <div class="modal-row">
+      <span class="modal-lbl">Temperature (0 = deterministic)</span>
+      <input class="modal-inp" id="s-temp" type="number" step="0.1" min="0" max="2" placeholder="0">
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeSettings()">Cancel</button>
+      <button class="modal-ok" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let ollamaUrl             = 'http://localhost:11434';
+let ollamaModel           = 'llama3.2';
+let ollamaTemp            = 0;
+let isGenerating          = false;
+let conversationHistory   = [];
+let currentModule         = null;
+let jfPrograms            = [];
+let selectedJfIdx         = 0;
+let currentAppDescription = 'a user identity system';
+let currentSystemPrompt   = '';
+const MODULE_SCHEMAS      = {};
+
+const REQUIRED_INVARIANTS = [
+  "Replay(state) == Live(state)",
+  "No hidden or mutable state outside the log",
+  "All outputs traceable to explicit events",
+  "Signals are functions of history, not stored values",
+  "Same input sequence → identical execution path",
+  "Same event log → identical emitted event sequence",
+  "Every event has a deterministic total ordering key",
+  "Reducers are pure functions of (state, event)",
+  "Schedulers are pure functions of event history with deterministic tie-breaking",
+  "Signal functions are pure functions of event history",
+  "Given the same event log, emitted event sequence is identical"
+];
+
+// Virtual file system
+const VFS = {
+  'genesis.json': { content: '// Run Stage 1 to generate', lang: 'json' },
+  'jsonflow/deriveState.json': { content: '// Run Stage 2 to generate', lang: 'json' },
+  'jsonflow/scheduleNextAction.json': { content: '// Run Stage 2 to generate', lang: 'json' },
+  'code/output.py': { content: '# Run Stage 3 to generate', lang: 'python' },
+};
+let activeEditorTab = 'welcome';
+const openTabs = new Map([['welcome', { label: 'welcome.md', dirty: false }]]);
+
+// ═══════════════════════════════════════════════════════════
+// FILE TREE
+// ═══════════════════════════════════════════════════════════
+const SOURCE_FILES = [
+  { dir: 'genesis-jsonflow/', icon: '📁' },
+  { file: 'genesis.json', icon: '🔷', path: 'genesis.json' },
+  { dir: 'jsonflow/', icon: '📁', indent: true },
+  { file: 'deriveState.json', icon: '📄', path: 'jsonflow/deriveState.json', indent: true },
+  { file: 'scheduleNextAction.json', icon: '📄', path: 'jsonflow/scheduleNextAction.json', indent: true },
+  { dir: 'code/', icon: '📁', indent: true },
+  { file: 'output.py', icon: '🐍', path: 'code/output.py', indent: true },
+];
+
+function buildFileTree() {
+  const ft = document.getElementById('file-tree');
+  ft.innerHTML = SOURCE_FILES.map(f => {
+    if (f.dir) return `<div class="file-item dir ${f.indent?'file-indent':''}">${f.icon} ${f.dir}</div>`;
+    return `<div class="file-item ${f.indent?'file-indent':''}" data-path="${f.path}" onclick="openVFS('${f.path}')">${f.icon} ${f.file}</div>`;
+  }).join('');
+
+  const ot = document.getElementById('output-tree');
+  ot.innerHTML = `
+    <div class="file-item" onclick="switchRightPanel('output');switchOutTab('genesis')">🔷 genesis-module.json</div>
+    <div class="file-item" onclick="switchRightPanel('output');switchOutTab('jsonflow')">⚡ jsonflow-programs.json</div>
+    <div class="file-item" onclick="switchRightPanel('output');switchOutTab('code')">📦 compiled-code</div>
+    <div class="file-item" onclick="switchRightPanel('output');switchOutTab('tests')">🧪 test-results</div>
+    <div class="file-item" onclick="switchRightPanel('output');switchOutTab('terminal')">⬛ terminal</div>
+  `;
+}
+
+function openVFS(path) {
+  const file = VFS[path];
+  if (!file) return;
+  const label = path.split('/').pop();
+  if (!openTabs.has(path)) openTabs.set(path, { label, dirty: false });
+  renderTabBar();
+  switchEditorTab(path);
+  updateFile(path, file.content, file.lang);
+  document.querySelectorAll('#file-tree .file-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.path === path);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function renderTabBar() {
+  const bar = document.getElementById('tabs-bar');
+  bar.innerHTML = [...openTabs.entries()].map(([id, tab]) => `
+    <div class="tab ${id===activeEditorTab?'active':''}" data-tab="${id}" onclick="switchEditorTab('${id}')">
+      ${tab.dirty ? '<span class="tab-dot"></span>' : ''}
+      <span>${tab.label}</span>
+      ${id!=='welcome'?`<button class="tab-close" onclick="closeTab(event,'${id}')">×</button>`:''}
+    </div>
+  `).join('');
+}
+
+function switchEditorTab(id) {
+  activeEditorTab = id;
+  renderTabBar();
+  document.querySelectorAll('.editor-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById('pane-' + id);
+  if (pane) pane.classList.add('active');
+  const tab = openTabs.get(id);
+  document.getElementById('sb-file').textContent = tab ? tab.label : id;
+}
+
+function closeTab(e, id) {
+  e.stopPropagation();
+  openTabs.delete(id);
+  const pane = document.getElementById('pane-' + id);
+  if (pane) pane.remove();
+  if (activeEditorTab === id) {
+    const remaining = [...openTabs.keys()];
+    switchEditorTab(remaining[remaining.length - 1] || 'welcome');
+  }
+  renderTabBar();
+}
+
+function updateFile(path, content, lang) {
+  VFS[path] = { content, lang };
+  let pane = document.getElementById('pane-' + path);
+  if (!pane) {
+    pane = document.createElement('div');
+    pane.className = 'editor-pane';
+    pane.id = 'pane-' + path;
+    pane.innerHTML = `
+      <div class="editor-toolbar">
+        <button class="et-btn" onclick="copyEditorContent('${path}')">Copy</button>
+        <button class="et-btn" onclick="downloadFile('${path}')">↓ Download</button>
+        <div class="et-sep"></div>
+        <span class="et-label">${path}</span>
+      </div>
+      <div class="editor-wrap">
+        <div class="line-nums" id="lns-${path.replace(/\//g,'-')}"></div>
+        <textarea class="code-editor" id="ed-${path.replace(/\//g,'-')}" spellcheck="false"
+          onscroll="syncScroll('${path}')" oninput="editorInput('${path}')"
+          onkeyup="updateCursor(this)"
+        ></textarea>
+      </div>`;
+    document.getElementById('editor-area').appendChild(pane);
+  }
+  const safeId = path.replace(/\//g, '-');
+  const ed = document.getElementById('ed-' + safeId);
+  if (ed) {
+    ed.value = content;
+    renderLineNums(path, content);
+  }
+}
+
+function renderLineNums(path, content) {
+  const safeId = path.replace(/\//g, '-');
+  const lns = document.getElementById('lns-' + safeId);
+  if (!lns) return;
+  const lines = content.split('\n').length;
+  lns.textContent = Array.from({length: lines}, (_, i) => i + 1).join('\n');
+}
+
+function syncScroll(path) {
+  const safeId = path.replace(/\//g, '-');
+  const ed = document.getElementById('ed-' + safeId);
+  const lns = document.getElementById('lns-' + safeId);
+  if (ed && lns) lns.scrollTop = ed.scrollTop;
+}
+
+function editorInput(path) {
+  const safeId = path.replace(/\//g, '-');
+  const ed = document.getElementById('ed-' + safeId);
+  if (!ed) return;
+  VFS[path].content = ed.value;
+  renderLineNums(path, ed.value);
+  const tab = openTabs.get(path);
+  if (tab) tab.dirty = true;
+  renderTabBar();
+}
+
+function updateCursor(el) {
+  const pos = el.selectionStart;
+  const lines = el.value.substring(0, pos).split('\n');
+  document.getElementById('sb-cursor').textContent = `Ln ${lines.length}, Col ${lines[lines.length-1].length+1}`;
+}
+
+function copyEditorContent(path) {
+  const content = VFS[path]?.content || '';
+  navigator.clipboard.writeText(content);
+}
+
+function downloadFile(path) {
+  const content = VFS[path]?.content || '';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+  a.download = path.split('/').pop();
+  a.click();
+}
+
+function newFile() {
+  const name = prompt('File name:', 'new-file.json');
+  if (!name) return;
+  VFS[name] = { content: '{}', lang: 'json' };
+  openTabs.set(name, { label: name, dirty: true });
+  renderTabBar();
+  updateFile(name, '{}', 'json');
+  switchEditorTab(name);
+}
+
+// ═══════════════════════════════════════════════════════════
+// PANEL SWITCHING
+// ═══════════════════════════════════════════════════════════
+function switchRightPanel(panel) {
+  const chat = document.getElementById('chat-panel');
+  const out  = document.getElementById('out-panel');
+  document.getElementById('rt-chat').classList.toggle('active', panel==='chat');
+  document.getElementById('rt-output').classList.toggle('active', panel==='output');
+  if (panel === 'chat') { chat.classList.remove('hidden'); out.classList.remove('active'); }
+  else                  { chat.classList.add('hidden');    out.classList.add('active'); }
+}
+
+function switchOutTab(tab) {
+  switchRightPanel('output');
+  ['genesis','jsonflow','code','tests','terminal'].forEach(t => {
+    document.getElementById('ot-'+t)?.classList.toggle('active', t===tab);
+    document.getElementById(t+'-view')?.classList.toggle('active', t===tab);
+    const jfFB = document.getElementById('jfFuncBar');
+    const jfCB = document.getElementById('jfCompileBar');
+    if (jfFB) jfFB.style.display = (tab==='jsonflow' && jfPrograms.length) ? 'flex' : 'none';
+    if (jfCB) jfCB.style.display = (tab==='jsonflow' && jfPrograms.length) ? 'flex' : 'none';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════
+function openSettings() {
+  document.getElementById('s-url').value   = ollamaUrl;
+  document.getElementById('s-model').value = ollamaModel;
+  document.getElementById('s-temp').value  = ollamaTemp;
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+function saveSettings() {
+  ollamaUrl   = document.getElementById('s-url').value.trim() || ollamaUrl;
+  ollamaModel = document.getElementById('s-model').value.trim() || ollamaModel;
+  ollamaTemp  = parseFloat(document.getElementById('s-temp').value) || 0;
+  document.getElementById('urlInput').value   = ollamaUrl;
+  document.getElementById('modelInput').value = ollamaModel;
+  closeSettings();
+  checkConnection();
+}
+
+// ═══════════════════════════════════════════════════════════
+// OLLAMA CONNECTION
+// ═══════════════════════════════════════════════════════════
+async function checkConnection() {
+  ollamaUrl   = document.getElementById('urlInput').value.trim() || ollamaUrl;
+  ollamaModel = document.getElementById('modelInput').value.trim() || ollamaModel;
+  const dot = document.getElementById('conn-dot');
+  const lbl = document.getElementById('conn-label');
+  try {
+    const r = await fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      dot.className = 'conn-dot ok'; lbl.textContent = `Ollama · ${ollamaModel}`;
+      termLine('ok', `Connected to Ollama at ${ollamaUrl}`);
+    } else throw new Error('non-200');
+  } catch {
+    dot.className = 'conn-dot err'; lbl.textContent = 'Ollama offline';
+    termLine('err', 'Ollama not reachable. Using mock mode.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function slugify(text) {
+  return text.toLowerCase()
+    .replace(/^build\s+(an?\s+)?/i,'').replace(/\s+(app|module|system|platform|tool|service).*/i,'')
+    .trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').substring(0,40)||'custom';
+}
+function toPascal(s) { return (s||'').replace(/(^|_)([a-z])/g,(_,__,c)=>c.toUpperCase()); }
+function toCamel(s)  { const p = toPascal(s); return p.charAt(0).toLowerCase()+p.slice(1); }
+
+function addMsg(role, text, streaming=false) {
+  const c = document.getElementById('msgs');
+  const d = document.createElement('div');
+  d.className = `msg ${role}${streaming?' streaming':''}`;
+  d.textContent = text;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+  return d;
+}
+function clearChat() {
+  document.getElementById('msgs').innerHTML = '<div class="msg system">◈ Chat cleared.</div>';
+  conversationHistory = [];
+  currentModule = null;
+  jfPrograms    = [];
+}
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGenesis(); }
+}
+
+function setStage(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById(`pb${i}`);
+    if (!el) return;
+    el.className = 'pb' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+  const labels = ['Stage 1: Genesis','Stage 2: JSONFlow IR','Stage 3: Code Output'];
+  document.getElementById('sb-stage').textContent = labels[n-1] || '';
+}
+
+// ═══════════════════════════════════════════════════════════
+// GENESIS SYSTEM PROMPT
+// ═══════════════════════════════════════════════════════════
+function buildSystemPrompt(appDescription, moduleType) {
+  return `You are a deterministic module compiler for the Genesis event-sourced substrate.
+Output ONLY a single raw JSON object — no prose, no markdown fences, no code blocks, no comments.
+
+APP TO BUILD: ${appDescription}
+MODULE TYPE: ${moduleType}
+
+━━━ STRUCTURE RULES ━━━
+• "derived_state" and "emitted_events" are SEPARATE TOP-LEVEL KEYS. emitted_events is NEVER nested inside derived_state.
+• "invariants" must be an array of plain strings, not objects.
+• Every key in "events" must include: type, ordering_key, enforced, description, schema.
+• All schema property types use JSON Schema: "string", "number", "array", "object", "boolean".
+• Use "number" for all integer/u64 ID and timestamp fields. Do NOT use type aliases like "u64".
+
+OUTPUT SKELETON:
+{
+  "name": "Genesis/${moduleType}", "version": "1.0.0", "description": "...", "module_type": "${moduleType}",
+  "derived_state": { "description": "...", "structure": { "value": "::derived_state", "type": "array", "enforced": true, "items": { "type": "object", "required": ["<id>"], "properties": { "<id>": { "type": "number" } } } } },
+  "emitted_events": { "description": "...", "structure": { "value": "::emitted_events", "type": "array", "enforced": true, "items": { "type": "object", "required": ["event_type","args"], "properties": { "event_type": { "type": "string" }, "args": { "type": "object" } } } } },
+  "events": { "<EventName>": { "type": "event", "ordering_key": "<id_field>", "enforced": true, "description": "...", "schema": { "type": "object", "required": ["<id>","timestamp"], "properties": { "<id>": { "type": "number" }, "timestamp": { "type": "number" } } } } },
+  "reducers": { "deriveState": { "description": "...", "structure": { "value": "::reducers.deriveState", "type": "function", "parameters": [{"name":"eventLog","type":"array"}], "returns": {"type":"object"}, "enforced": true } } },
+  "signal_functions": {
+    "energy":   { "description": "...", "formula": "count(primary_event, window=100)/max(1,total)", "range": [0,1], "structure": { "value": "::signal_functions.energy",   "type": "function", "parameters": [{"name":"eventLog","type":"array"}], "returns": {"type":"number"}, "enforced": true } },
+    "decay":    { "description": "...", "formula": "1-(events_since_last/log_length)",              "range": [0,1], "structure": { "value": "::signal_functions.decay",    "type": "function", "parameters": [{"name":"eventLog","type":"array"}], "returns": {"type":"number"}, "enforced": true } },
+    "priority": { "description": "...", "formula": "(energy*0.6)+((1-decay)*0.4)",                  "range": [0,1], "structure": { "value": "::signal_functions.priority", "type": "function", "parameters": [{"name":"eventLog","type":"array"}], "returns": {"type":"number"}, "enforced": true } }
+  },
+  "schedulers": { "scheduleNextAction": { "description": "...", "structure": { "value": "::schedulers.scheduleNextAction", "type": "function", "parameters": [{"name":"state","type":"object"},{"name":"eventLog","type":"array"}], "returns": {"type":"string"}, "enforced": true } } },
+  "invariants": ${JSON.stringify(REQUIRED_INVARIANTS)},
+  "outputs": { "derived_state": {"type":"array","enforced":true}, "emitted_events": {"type":"array","enforced":true}, "ENFORCED_OUTPUTS": {"type":"object","enforced":true}, "canonical_module": {"type":"object","enforced":true} },
+  "dependencies": [{"name":"Genesis/Hashing","version":"1.0.0"},{"name":"Genesis/Addressing","version":"1.0.0"}]
+}
+
+Design domain-appropriate events for: ${appDescription}
+Output ONLY the JSON — no prose, no markdown.`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 1 — GENESIS
+// ═══════════════════════════════════════════════════════════
+async function sendGenesis() {
+  const input = document.getElementById('userInput');
+  const message = input.value.trim();
+  if (!message || isGenerating) return;
+  isGenerating = true;
+  document.getElementById('sendBtn').disabled = true;
+  input.value = '';
+  switchRightPanel('chat');
+  addMsg('user', message);
+  conversationHistory.push({ role: 'user', content: message });
+  if (/build|create|make|generate/i.test(message)) {
+    currentAppDescription = message;
+    currentSystemPrompt   = buildSystemPrompt(message, slugify(message));
+  }
+  ollamaUrl   = document.getElementById('urlInput').value.trim() || ollamaUrl;
+  ollamaModel = document.getElementById('modelInput').value.trim() || ollamaModel;
+  termLine('ok', `Stage 1: Sending to ${ollamaModel}…`);
+  try {
+    const resp = await fetch(`${ollamaUrl}/api/chat`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: ollamaModel,
+        messages: [{ role:'system', content: currentSystemPrompt || buildSystemPrompt(message, slugify(message)) }, ...conversationHistory],
+        stream: true, options: { temperature: ollamaTemp, seed: 42 }
+      })
+    });
+    const reader = resp.body.getReader();
+    const dec    = new TextDecoder('utf-8', { fatal: false });
+    let full = '', carry = '';
+    const msgEl = addMsg('ai', '', true);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = carry + dec.decode(value, { stream: true });
+      const lines = chunk.split('\n'); carry = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { const j = JSON.parse(line); if (j.message?.content) { full += j.message.content; msgEl.textContent = full; } } catch {}
+      }
+    }
+    if (carry.trim()) { try { const j = JSON.parse(carry); if (j.message?.content) full += j.message.content; } catch {} }
+    msgEl.classList.remove('streaming');
+    conversationHistory.push({ role:'assistant', content: full });
+    tryParseGenesis(full);
+  } catch (err) {
+    addMsg('system', `Error: ${err.message}`);
+    termLine('err', `Ollama error: ${err.message}`);
+  }
+  isGenerating = false;
+  document.getElementById('sendBtn').disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════
+// GENESIS PARSE & VALIDATE
+// ═══════════════════════════════════════════════════════════
+function cleanGenesisOutput(text) {
+  text = text.replace(/^```(?:json)?\s*/im,'').replace(/```\s*$/im,'');
+  text = text.replace(/(\"(?:[^\"\\]|\\.)*\")|\/\/[^\n]*/g,(m,str)=>str!==undefined?str:'');
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth=0,end=-1,inStr=false,escape=false;
+  for (let i=start;i<text.length;i++) {
+    const ch=text[i];
+    if (escape){escape=false;continue} if (ch==='\\'){escape=true;continue}
+    if (ch==='"'){inStr=!inStr;continue} if (inStr) continue;
+    if (ch==='{'||ch==='[') depth++;
+    else if (ch==='}'||ch===']'){depth--;if(depth===0){end=i;break}}
+  }
+  let raw = end!==-1?text.slice(start,end+1):text.slice(start);
+  raw = raw.replace(/,(\s*[}\]])/g,'$1');
+  return raw;
+}
+
+function normalizeModule(parsed) {
+  const m = Object.assign({ version:'1.0.0', module_type:'custom' }, parsed);
+  if (!Array.isArray(m.invariants) || m.invariants.length < 11) m.invariants = REQUIRED_INVARIANTS;
+  if (!m.outputs?.ENFORCED_OUTPUTS) m.outputs = { derived_state:{type:'array',enforced:true}, emitted_events:{type:'array',enforced:true}, ENFORCED_OUTPUTS:{type:'object',enforced:true}, canonical_module:{type:'object',enforced:true} };
+  if (!m.dependencies || m.dependencies.length < 2) m.dependencies = [{ name:'Genesis/Hashing',version:'1.0.0' },{ name:'Genesis/Addressing',version:'1.0.0' }];
+  return m;
+}
+
+function validateModule(m) {
+  if (!m.derived_state?.structure?.enforced) return false;
+  if (!m.emitted_events?.structure?.enforced) return false;
+  if (!m.reducers?.deriveState) return false;
+  if (!m.signal_functions?.energy) return false;
+  if (!m.schedulers?.scheduleNextAction) return false;
+  return true;
+}
+
+function tryParseGenesis(text) {
+  const cleaned = cleanGenesisOutput(text);
+  const m = cleaned ? [cleaned] : text.match(/\{[\s\S]*\}/);
+  if (!m) return;
+  let parsed;
+  try { parsed = JSON.parse(m[0]); }
+  catch { addMsg('system','Invalid JSON returned from model'); return; }
+  const normalized = normalizeModule(parsed);
+  if (!validateModule(normalized)) { addMsg('system','Module failed canonical validation'); return; }
+  currentModule = normalized;
+  renderGenesisModule(normalized);
+  setStage(2);
+  // Update VFS
+  const jsonStr = JSON.stringify(normalized, null, 2);
+  updateFile('genesis.json', jsonStr, 'json');
+  openVFS('genesis.json');
+  termLine('ok', `Stage 1 complete: ${normalized.name || normalized.module_type}`);
+  // Pipeline action button
+  const c = document.getElementById('msgs');
+  const btn = document.createElement('button');
+  btn.className = 'pipeline-action stage2';
+  btn.innerHTML = '◈ Stage 2: Convert to JSONFlow Programs';
+  btn.onclick = () => { btn.disabled=true; convertToJSONFlow(); };
+  c.appendChild(btn);
+  c.scrollTop = c.scrollHeight;
+  switchRightPanel('chat');
+}
+
+function renderGenesisModule(mod) {
+  const d = document.getElementById('genesisDisplay');
+  d.innerHTML = '';
+  const block = document.createElement('div');
+  block.className = 'code-block';
+  block.innerHTML = `
+    <div class="code-hdr">
+      <span class="code-file">${mod.name||'module'}.json</span>
+      <div class="code-actions">
+        <button class="code-btn" onclick="copyJSON()">Copy</button>
+        <button class="code-btn" onclick="downloadJSON()">↓</button>
+      </div>
+    </div>
+    <div class="code-body"><pre>${escHtml(JSON.stringify(mod,null,2))}</pre></div>`;
+  d.appendChild(block);
+  document.getElementById('badge-genesis').textContent = '✓';
+  renderValidation(mod);
+  switchOutTab('genesis');
+}
+
+function renderValidation(mod) {
+  const panel = document.getElementById('valPanel');
+  const items = document.getElementById('valItems');
+  panel.style.display = 'block';
+  const checks = [
+    ['derived_state enforced',       !!(mod.derived_state?.structure?.enforced)],
+    ['emitted_events enforced',      !!(mod.emitted_events?.structure?.enforced)],
+    ['reducers.deriveState present', !!(mod.reducers?.deriveState)],
+    ['signal_functions present',     !!(mod.signal_functions?.energy)],
+    ['schedulers present',           !!(mod.schedulers?.scheduleNextAction)],
+    ['All 11 invariants',            !!(mod.invariants?.length >= 11)],
+    ['Canonical outputs',            !!(mod.outputs?.ENFORCED_OUTPUTS)],
+    ['Genesis dependencies',         !!(mod.dependencies?.length >= 2)],
+  ];
+  items.innerHTML = checks.map(([lbl,ok]) =>
+    `<div class="val-item"><div class="val-icon ${ok?'pass':'fail'}">${ok?'✓':'✗'}</div><div>${lbl}</div></div>`
+  ).join('');
+}
+
+function copyJSON()     { if (currentModule) navigator.clipboard.writeText(JSON.stringify(currentModule,null,2)); }
+function downloadJSON() {
+  if (!currentModule) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(currentModule,null,2)],{type:'application/json'}));
+  a.download = (currentModule.name||'module').replace(/\//g,'-') + '.json';
+  a.click();
+}
+
+function loadSchema() {
+  const types = Object.keys(MODULE_SCHEMAS);
+  if (!types.length) { addMsg('system','No schemas loaded.'); return; }
+  const type = prompt('Load schema type:\n'+types.join(', '));
+  if (!type || !MODULE_SCHEMAS[type]) return;
+  currentModule = normalizeModule(MODULE_SCHEMAS[type]);
+  renderGenesisModule(currentModule);
+  setStage(2);
+  addMsg('system',`Loaded schema: ${type}`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// JSONFLOW IR — TYPE / DEFAULT MAPS
+// ═══════════════════════════════════════════════════════════
+const JF_TYPES = {
+  string:  {python:'str',javascript:'string',typescript:'string',rust:'String',go:'string',java:'String',csharp:'string',swift:'String',kotlin:'String'},
+  integer: {python:'int',javascript:'number',typescript:'number',rust:'i64',go:'int64',java:'long',csharp:'long',swift:'Int64',kotlin:'Long'},
+  number:  {python:'float',javascript:'number',typescript:'number',rust:'f64',go:'float64',java:'double',csharp:'double',swift:'Double',kotlin:'Double'},
+  boolean: {python:'bool',javascript:'boolean',typescript:'boolean',rust:'bool',go:'bool',java:'boolean',csharp:'bool',swift:'Bool',kotlin:'Boolean'},
+  array:   {python:'list',javascript:'Array<any>',typescript:'Array<unknown>',rust:'Vec<serde_json::Value>',go:'[]interface{}',java:'List<Object>',csharp:'List<object>',swift:'[Any]',kotlin:'List<Any>'},
+  object:  {python:'dict',javascript:'Record<string,any>',typescript:'Record<string,unknown>',rust:'HashMap<String,serde_json::Value>',go:'map[string]interface{}',java:'Map<String,Object>',csharp:'Dictionary<string,object>',swift:'[String:Any]',kotlin:'Map<String,Any>'},
+};
+const JF_DEFAULTS = {
+  string: {python:'""',javascript:'""',typescript:'""',rust:'String::new()',go:'""',java:'""',csharp:'""',swift:'""',kotlin:'""'},
+  integer:{python:'0',javascript:'0',typescript:'0',rust:'0i64',go:'0',java:'0L',csharp:'0L',swift:'Int64(0)',kotlin:'0L'},
+  number: {python:'0.0',javascript:'0.0',typescript:'0.0',rust:'0.0f64',go:'0.0',java:'0.0',csharp:'0.0',swift:'0.0',kotlin:'0.0'},
+  boolean:{python:'False',javascript:'false',typescript:'false',rust:'false',go:'false',java:'false',csharp:'false',swift:'false',kotlin:'false'},
+  array:  {python:'[]',javascript:'[]',typescript:'[]',rust:'Vec::new()',go:'nil',java:'new ArrayList<>()',csharp:'new List<object>()',swift:'[]',kotlin:'listOf()'},
+  object: {python:'{}',javascript:'{}',typescript:'{}',rust:'HashMap::new()',go:'make(map[string]interface{})',java:'new HashMap<>()',csharp:'new Dictionary<string,object>()',swift:'[:]',kotlin:'mapOf()'},
+};
+const LANG_EXT   = {python:'.py',javascript:'.js',typescript:'.ts',rust:'.rs',go:'.go',java:'.java',csharp:'.cs',swift:'.swift',kotlin:'.kt'};
+const LANG_LABEL = {python:'Python',javascript:'JavaScript',typescript:'TypeScript',rust:'Rust',go:'Go',java:'Java',csharp:'C#',swift:'Swift',kotlin:'Kotlin'};
+
+function jfT(s,l) {
+  const raw=(typeof s==='object'?s?.type:s)||'string';
+  const norm={int:'integer',float:'number',bool:'boolean',str:'string',dict:'object',list:'array'};
+  const t=norm[raw.toLowerCase()]||raw.toLowerCase();
+  const ANY={java:'Object',csharp:'object',rust:'serde_json::Value',go:'interface{}',swift:'Any',kotlin:'Any',typescript:'unknown',javascript:'any',python:'Any'};
+  return JF_TYPES[t]?.[l]||ANY[l]||'Any';
+}
+function jfDef(s,l) {
+  const raw=(typeof s==='object'?s?.type:s)||'string';
+  const norm={int:'integer',float:'number',bool:'boolean',str:'string',dict:'object',list:'array'};
+  const t=norm[raw.toLowerCase()]||raw.toLowerCase();
+  return JF_DEFAULTS[t]?.[l]||'null';
+}
+
+// ═══════════════════════════════════════════════════════════
+// JSONFLOW IR BUILDERS
+// ═══════════════════════════════════════════════════════════
+function _cmp(l,op,r){return{compare:{left:l,op,right:r}}}
+function _get(n){return{get:n}}
+function _getP(o,p){return{get:[o,p]}}
+function _val(v){return{value:v}}
+function _add(a,b){return{add:[a,b]}}
+function _sub(a,b){return{subtract:[a,b]}}
+function _mul(a,b){return{multiply:[a,b]}}
+function _div(a,b){return{divide:[a,b]}}
+function _set(t,v){return{type:'set',target:t,value:v}}
+function _ret(v){return{type:'return',value:v}}
+function _if(c,th,el){return{type:'if',condition:c,then:th,else:el||[]}}
+function _foreach(iv,it,body){return{type:'foreach',item_var:iv,iterable:it,body}}
+function _log(m){return{type:'log',level:'info',message:_val(m)}}
+
+function classifyEvents(events) {
+  const names=Object.keys(events);
+  const REQ=/request|creat|add|book|register|send|open|start|init|place/i;
+  const RES=/response|complet|cancel|delet|close|end|reject|confirm|approv/i;
+  const responses=names.filter(n=>/Response$/i.test(n)||(RES.test(n)&&!REQ.test(n)));
+  const resSet=new Set(responses);
+  const requests=names.filter(n=>REQ.test(n)&&!resSet.has(n));
+  const primary=requests[0]||names[0]||'Event';
+  return{names,requests,responses,primary};
+}
+function buildCounterCtx(names,extras={}) {
+  const ctx={total:{type:'integer',default:0}};
+  names.forEach(n=>{ctx[`cnt_${n}`]={type:'integer',default:0}});
+  return Object.assign(ctx,extras);
+}
+function countingForeach(names,extraBody=[]) {
+  const body=[
+    _set('total',_add(_get('total'),1)),
+    ...names.map(n=>_if(_cmp(_getP('event','event_type'),'==',n),[_set(`cnt_${n}`,_add(_get(`cnt_${n}`),1))],[])),
+    ...extraBody
+  ];
+  return _foreach('event',_get('eventLog'),body);
+}
+
+function makeDeriveState(mod) {
+  const events=mod.events||{};
+  const {names,requests,responses}=classifyEvents(events);
+  const entityKeys=[...new Set(names.map(n=>events[n]?.ordering_key).filter(Boolean))];
+  const primaryKey=entityKeys[0]||'id';
+  const ctxSchema=buildCounterCtx(names,{lastId:{type:'integer',default:0},activeCount:{type:'integer',default:0},closedCount:{type:'integer',default:0}});
+  const extraBody=[];
+  if (requests.length>0) {
+    const reqEvt=requests[0];
+    const orderKey=events[reqEvt]?.ordering_key||primaryKey;
+    extraBody.push(_if(_cmp(_getP('event','event_type'),'==',reqEvt),[_set('lastId',_getP('event',orderKey)),_set('activeCount',_add(_get('activeCount'),1))],[]));
+  }
+  if (responses.length>0) extraBody.push(_if(_cmp(_getP('event','event_type'),'==',responses[0]),[_set('closedCount',_add(_get('closedCount'),1))],[]));
+  const stateFields={};
+  Object.keys(ctxSchema).forEach(k=>{stateFields[k]=_get(k)});
+  return {
+    function:'deriveState',
+    metadata:{schema_version:'1.1.0',description:`Iterate eventLog to build state for ${mod.name||'module'} tracking: ${names.join(', ')}.`,deterministic:true},
+    schema:{inputs:{eventLog:{type:'array'}},context:ctxSchema,outputs:{state:{type:'object'}}},
+    context:{},
+    steps:[_log(`deriveState: processing ${mod.module_type||'module'} event log`),countingForeach(names,extraBody),_ret({object:stateFields})]
+  };
+}
+
+function makeScheduleNextAction(mod) {
+  const events=mod.events||{};
+  const {names,requests,responses}=classifyEvents(events);
+  const reqEvt=requests[0]||names[0]||'Event';
+  const resEvt=responses[0]||names[1]||reqEvt;
+  const actions=requests.map(r=>`Run${toPascal(r)}`);
+  if(!actions.length) actions.push(`RunEvent`);
+  const sf=mod.schedulers?.scheduleNextAction||{};
+  const desc=sf.description||`Schedule next action for ${mod.name||'module'}.`;
+  return {
+    function:'scheduleNextAction',
+    metadata:{schema_version:'1.1.0',description:desc,deterministic:true},
+    schema:{inputs:{state:{type:'object'},eventLog:{type:'array'}},context:{activeCount:{type:'integer',default:0},closedCount:{type:'integer',default:0},total:{type:'integer',default:0},action:{type:'string',default:'Idle'}},outputs:{action:{type:'string'}}},
+    context:{},
+    steps:[
+      _set('total',{length:_get('eventLog')}),
+      _foreach('event',_get('eventLog'),[
+        _set('total',_add(_get('total'),1)),
+        _if(_cmp(_getP('event','event_type'),'==',reqEvt),[_set('activeCount',_add(_get('activeCount'),1))],[]),
+        _if(_cmp(_getP('event','event_type'),'==',resEvt),[_set('closedCount',_add(_get('closedCount'),1))],[]),
+      ]),
+      _set('action',_val('Idle')),
+      _if(_cmp(_get('activeCount'),'>',0),[_set('action',_val(actions[0]))],[]),
+      _if(_cmp(_get('closedCount'),'==',_get('activeCount')),[_set('action',_val('Idle'))],[]),
+      _ret(_get('action'))
+    ]
+  };
+}
+
+function makeComputeEnergy(mod) {
+  const {primary}=classifyEvents(mod.events||{});
+  const sf=mod.signal_functions?.energy||{};
+  const desc=sf.description||`Energy: ${sf.formula||'rate of primary events in last 100'}.`;
+  return {
+    function:'computeEnergy',
+    metadata:{schema_version:'1.1.0',description:desc,deterministic:true},
+    schema:{inputs:{eventLog:{type:'array'}},context:{total:{type:'integer',default:0},primaryCnt:{type:'integer',default:0},denom:{type:'number',default:1.0},energy:{type:'number',default:0.0}},outputs:{energy:{type:'number'}}},
+    context:{},
+    steps:[
+      _set('total',{length:_get('eventLog')}),
+      _foreach('event',_get('eventLog'),[_if(_cmp(_getP('event','event_type'),'==',primary),[_set('primaryCnt',_add(_get('primaryCnt'),1))],[])]),
+      _if(_cmp(_get('total'),'>',0),[_set('denom',_get('total'))],[_set('denom',1.0)]),
+      _set('energy',_div(_get('primaryCnt'),_get('denom'))),
+      _if(_cmp(_get('energy'),'>',1.0),[_set('energy',1.0)],[]),
+      _if(_cmp(_get('energy'),'<',0.0),[_set('energy',0.0)],[]),
+      _ret(_get('energy'))
+    ]
+  };
+}
+
+function makeComputeDecay(mod) {
+  const {primary}=classifyEvents(mod.events||{});
+  const sf=mod.signal_functions?.decay||{};
+  const desc=sf.description||`Decay: ${sf.formula||'staleness since last primary event'}.`;
+  return {
+    function:'computeDecay',
+    metadata:{schema_version:'1.1.0',description:desc,deterministic:true},
+    schema:{inputs:{eventLog:{type:'array'}},context:{total:{type:'integer',default:0},i:{type:'integer',default:0},lastPos:{type:'integer',default:0},eventsSince:{type:'integer',default:0},denom:{type:'number',default:1.0},decay:{type:'number',default:1.0}},outputs:{decay:{type:'number'}}},
+    context:{},
+    steps:[
+      _set('total',{length:_get('eventLog')}),
+      _foreach('event',_get('eventLog'),[_set('i',_add(_get('i'),1)),_if(_cmp(_getP('event','event_type'),'==',primary),[_set('lastPos',_get('i'))],[])]),
+      _set('eventsSince',_sub(_get('total'),_get('lastPos'))),
+      _if(_cmp(_get('total'),'>',0),[_set('denom',_get('total'))],[_set('denom',1.0)]),
+      _set('decay',_sub(1.0,_div(_get('eventsSince'),_get('denom')))),
+      _if(_cmp(_get('decay'),'<',0.0),[_set('decay',0.0)],[]),
+      _if(_cmp(_get('decay'),'>',1.0),[_set('decay',1.0)],[]),
+      _ret(_get('decay'))
+    ]
+  };
+}
+
+function makeComputePriority(mod) {
+  const sf=mod.signal_functions?.priority||{};
+  const desc=sf.description||`Priority: ${sf.formula||'(energy*0.6)+((1-decay)*0.4)'}.`;
+  return {
+    function:'computePriority',
+    metadata:{schema_version:'1.1.0',description:desc,deterministic:true},
+    schema:{inputs:{energy:{type:'number'},decay:{type:'number'}},context:{priority:{type:'number',default:0.0}},outputs:{priority:{type:'number'}}},
+    context:{},
+    steps:[
+      _set('priority',_add(_mul(_get('energy'),0.6),_mul(_sub(1.0,_get('decay')),0.4))),
+      _if(_cmp(_get('priority'),'<',0.0),[_set('priority',0.0)],[]),
+      _if(_cmp(_get('priority'),'>',1.0),[_set('priority',1.0)],[]),
+      _ret(_get('priority'))
+    ]
+  };
+}
+
+function buildJSONFlowFromModule(mod) {
+  return [makeDeriveState(mod),makeScheduleNextAction(mod),makeComputeEnergy(mod),makeComputeDecay(mod),makeComputePriority(mod)];
+}
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 2 — JSONFLOW CONVERSION
+// ═══════════════════════════════════════════════════════════
+function convertToJSONFlow() {
+  addMsg('system','◈ Stage 2: Compiling JSONFlow programs…');
+  setStage(2);
+  let programs;
+  try { programs = buildJSONFlowFromModule(currentModule); }
+  catch(err) { addMsg('system',`JSONFlow compiler error: ${err.message}`); return; }
+  jfPrograms = programs; selectedJfIdx = 0;
+  renderJSONFlowPane();
+  // Update VFS
+  programs.forEach((p,i) => {
+    const path = `jsonflow/${p.function}.json`;
+    VFS[path] = { content: JSON.stringify(p,null,2), lang:'json' };
+    if (i===0 || i===1) {
+      const label = p.function + '.json';
+      openTabs.set(path, { label, dirty: false });
+      updateFile(path, JSON.stringify(p,null,2), 'json');
+    }
+  });
+  renderTabBar();
+  addMsg('system',`✓ Compiled ${programs.length} JSONFlow programs.`);
+  document.getElementById('badge-jsonflow').textContent = programs.length;
+  setStage(3);
+  termLine('ok',`Stage 2 complete: ${programs.length} JSONFlow programs compiled`);
+  const c = document.getElementById('msgs');
+  const btn = document.createElement('button');
+  btn.className = 'pipeline-action stage3';
+  btn.innerHTML = '◆ Stage 3: Compile to Code → (pick language in JSONFlow tab)';
+  btn.onclick = () => switchOutTab('jsonflow');
+  c.appendChild(btn); c.scrollTop = c.scrollHeight;
+  switchOutTab('jsonflow');
+}
+
+function renderJSONFlowPane() {
+  const bar = document.getElementById('jf-func-btns');
+  const fb  = document.getElementById('jfFuncBar');
+  const cb  = document.getElementById('jfCompileBar');
+  fb.style.display = cb.style.display = 'flex';
+  bar.innerHTML = jfPrograms.map((p,i) =>
+    `<button class="jf-func-btn ${i===selectedJfIdx?'active':''}" onclick="selectJfFunc(${i})">${p.function||'prog'+i}</button>`
+  ).join('');
+  renderSelectedJfFunc();
+}
+
+function selectJfFunc(idx) {
+  selectedJfIdx=idx;
+  document.querySelectorAll('.jf-func-btn').forEach((b,i)=>b.className='jf-func-btn'+(i===idx?' active':''));
+  renderSelectedJfFunc();
+}
+
+function renderSelectedJfFunc() {
+  const prog=jfPrograms[selectedJfIdx]; if(!prog) return;
+  const d=document.getElementById('jfDisplay'); d.innerHTML='';
+  const block=document.createElement('div'); block.className='code-block';
+  block.innerHTML=`
+    <div class="code-hdr"><span class="code-file">${prog.function}.json</span>
+    <div class="code-actions"><button class="code-btn" onclick="copyJF()">Copy</button></div></div>
+    <div class="code-body"><pre>${escHtml(JSON.stringify(prog,null,2))}</pre></div>`;
+  d.appendChild(block);
+  document.getElementById('compileInfo').textContent=`Function: ${prog.function} — select language and compile`;
+}
+
+function copyJF() { const p=jfPrograms[selectedJfIdx]; if(p) navigator.clipboard.writeText(JSON.stringify(p,null,2)); }
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 3 — CODE COMPILER
+// ═══════════════════════════════════════════════════════════
+
+// Language configs
+const LANG_CFGS = {
+  python: {
+    indent_str:'    ',stmt_end:'',assign_op:' = ',block_close:'',
+    if_open:c=>`if ${c}:`,else_open:'else:',
+    while_open:c=>`while ${c}:`,
+    foreach_open:(i,c)=>`for ${i} in ${c}:`,
+    return_stmt:v=>`return ${v}`,
+    comment:t=>`# ${t}`,
+    log_stmt:(lvl,msg)=>`print(f"[${lvl}] {${msg}}")`,
+    assert_stmt:(c,m)=>`assert ${c}, "${m}"`,
+    block_close_foreach:'',
+  },
+  javascript: {
+    indent_str:'  ',stmt_end:';',assign_op:' = ',block_close:'}',
+    if_open:c=>`if (${c}) {`,else_open:'} else {',
+    while_open:c=>`while (${c}) {`,
+    foreach_open:(i,c)=>`for (const ${i} of ${c}) {`,
+    return_stmt:v=>`return ${v};`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`console.${lvl.toLowerCase()==='error'?'error':'log'}(\`[${lvl}] \${${msg}}\`);`,
+    assert_stmt:(c,m)=>`console.assert(${c}, "${m}");`,
+  },
+  typescript: {
+    indent_str:'  ',stmt_end:';',assign_op:' = ',block_close:'}',
+    if_open:c=>`if (${c}) {`,else_open:'} else {',
+    while_open:c=>`while (${c}) {`,
+    foreach_open:(i,c)=>`for (const ${i} of ${c}) {`,
+    return_stmt:v=>`return ${v};`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`console.log(\`[${lvl}] \${${msg}}\`);`,
+    assert_stmt:(c,m)=>`console.assert(${c}, "${m}");`,
+  },
+  rust: {
+    indent_str:'    ',stmt_end:';',assign_op:' = ',block_close:'}',
+    if_open:c=>`if ${c} {`,else_open:'} else {',
+    while_open:c=>`while ${c} {`,
+    foreach_open:(i,c)=>`for ${i} in ${c}.iter() {`,
+    return_stmt:v=>`return ${v};`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`println!("[{}] {}", "${lvl}", ${msg});`,
+    assert_stmt:(c,m)=>`assert!(${c}, "${m}");`,
+  },
+  go: {
+    indent_str:'\t',stmt_end:'',assign_op:' = ',block_close:'}',
+    if_open:c=>`if ${c} {`,else_open:'} else {',
+    while_open:c=>`for ${c} {`,
+    foreach_open:(i,c)=>`for _, ${i} := range ${c} {`,
+    return_stmt:v=>`return ${v}`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`fmt.Printf("[%s] %v\\n", "${lvl}", ${msg})`,
+    assert_stmt:(c,m)=>`if !(${c}) { panic("${m}") }`,
+  },
+  java: {
+    indent_str:'    ',stmt_end:';',assign_op:' = ',block_close:'}',
+    if_open:c=>`if (${c}) {`,else_open:'} else {',
+    while_open:c=>`while (${c}) {`,
+    foreach_open:(i,c)=>`for (Object ${i} : ${c}) {`,
+    return_stmt:v=>`return ${v};`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`System.out.println("[" + "${lvl}" + "] " + ${msg});`,
+    assert_stmt:(c,m)=>`assert ${c} : "${m}";`,
+  },
+  csharp: {
+    indent_str:'    ',stmt_end:';',assign_op:' = ',block_close:'}',
+    if_open:c=>`if (${c}) {`,else_open:'} else {',
+    while_open:c=>`while (${c}) {`,
+    foreach_open:(i,c)=>`foreach (var ${i} in ${c}) {`,
+    return_stmt:v=>`return ${v};`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`Console.WriteLine($"[${lvl}] {${msg}}");`,
+    assert_stmt:(c,m)=>`Debug.Assert(${c}, "${m}");`,
+  },
+  swift: {
+    indent_str:'    ',stmt_end:'',assign_op:' = ',block_close:'}',
+    if_open:c=>`if ${c} {`,else_open:'} else {',
+    while_open:c=>`while ${c} {`,
+    foreach_open:(i,c)=>`for ${i} in ${c} {`,
+    return_stmt:v=>`return ${v}`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`print("[\\(\"${lvl}\")] \\(${msg})")`,
+    assert_stmt:(c,m)=>`assert(${c}, "${m}")`,
+  },
+  kotlin: {
+    indent_str:'    ',stmt_end:'',assign_op:' = ',block_close:'}',
+    if_open:c=>`if (${c}) {`,else_open:'} else {',
+    while_open:c=>`while (${c}) {`,
+    foreach_open:(i,c)=>`for (${i} in ${c}) {`,
+    return_stmt:v=>`return ${v}`,
+    comment:t=>`// ${t}`,
+    log_stmt:(lvl,msg)=>`println("[${lvl}] \${${msg}}")`,
+    assert_stmt:(c,m)=>`require(${c}) { "${m}" }`,
+  },
+};
+
+function jfExpr(expr, lang) {
+  if (expr===null) return ['null','null'];
+  if (typeof expr==='boolean') return [(['python'].includes(lang)?(expr?'True':'False'):(expr?'true':'false')),'boolean'];
+  if (typeof expr==='number')  return [String(expr),Number.isInteger(expr)?'integer':'number'];
+  if (typeof expr==='string')  return [`"${expr.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`, 'string'];
+  if (typeof expr!=='object')  return [String(expr),'string'];
+  if ('get' in expr) {
+    const ref=expr.get;
+    if (Array.isArray(ref)&&ref.length>=2) {
+      let base=typeof ref[0]==='string'?ref[0]:jfExpr(ref[0],lang)[0];
+      for (let i=1;i<ref.length;i++) {
+        const key=jfExpr(ref[i],lang)[0];
+        switch(lang) {
+          case 'java':   base=`((java.util.Map<?,?>)${base}).get(${key})`; break;
+          case 'kotlin': base=`(${base} as? Map<*,*>)?.get(${key})`; break;
+          case 'csharp': base=`((Dictionary<string,object>)${base})[${key}]`; break;
+          case 'go':     base=`${base}[${key}]`; break;
+          case 'rust':   base=`${base}.get(${key}).and_then(|v|v.as_str()).unwrap_or_default()`; break;
+          default:       base+=`[${key}]`;
+        }
+      }
+      return [base,'string'];
+    }
+    return [String(ref),'string'];
+  }
+  if ('value' in expr) {
+    const v=expr.value;
+    if (typeof v==='string')  return [`"${v.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`, 'string'];
+    if (typeof v==='boolean') return [(['python'].includes(lang)?(v?'True':'False'):(v?'true':'false')),'boolean'];
+    return [String(v),typeof v==='number'?(Number.isInteger(v)?'integer':'number'):'string'];
+  }
+  for (const [op,sym] of [['add','+'],['subtract','-'],['multiply','*'],['divide','/'],['mod','%']]) {
+    if (op in expr) {
+      const items=expr[op].map(i=>jfExpr(i,lang));
+      const code=items.map(([c])=>(c.includes(' ')&&!c.startsWith('"'))?`(${c})`:c).join(` ${sym} `);
+      return [code,items.some(([,t])=>t==='number')?'number':'integer'];
+    }
+  }
+  if ('compare' in expr) {
+    const c=expr.compare;
+    const [l]=jfExpr(c.left,lang);
+    const [r]=jfExpr(c.right,lang);
+    const strict=['javascript','typescript'].includes(lang);
+    const opMap={'===':strict?'===':'==','!==':strict?'!==':'!=','==':strict?'===':'==','>':'>','<':'<','>=':'>=','<=':'<='};
+    return [`${l} ${opMap[c.op]||c.op} ${r}`,'boolean'];
+  }
+  if ('length' in expr) {
+    const [v]=jfExpr(expr.length,lang);
+    const m={python:`len(${v})`,javascript:`${v}.length`,typescript:`${v}.length`,rust:`${v}.len()`,go:`len(${v})`,java:`${v}.size()`,csharp:`${v}.Count`,swift:`${v}.count`,kotlin:`${v}.size`};
+    return [m[lang]||`${v}.length`,'integer'];
+  }
+  if ('object' in expr) {
+    const entries=Object.entries(expr.object).map(([k,v])=>`"${k}": ${jfExpr(v,lang)[0]}`);
+    if (lang==='python') return [`{${entries.join(', ')}}`,'object'];
+    if (lang==='go')     return [`map[string]interface{}{${entries.join(', ')}}`,'object'];
+    return [`{ ${entries.join(', ')} }`,'object'];
+  }
+  return [`/* unsupported: ${JSON.stringify(expr).replace(/"/g,"'")} */`,'any'];
+}
+
+function jfSteps(steps, lang, cfg, indent, ctxP, ctxVars) {
+  indent=indent??1; ctxP=ctxP??''; ctxVars=ctxVars??new Set();
+  const pad=(cfg.indent_str||'    ').repeat(indent);
+  const sEnd=cfg.stmt_end??';';
+  const aOp=cfg.assign_op??'=';
+  const blk=cfg.block_close??'}';
+  const cmt=cfg.comment||(t=>`// ${t}`);
+  const lines=[];
+  function ex(node) { return jfExpr(node,lang)[0]; }
+  function sub(ss) { return jfSteps(ss,lang,cfg,indent+1,ctxP,ctxVars); }
+  for (const step of (steps||[])) {
+    if (typeof step!=='object') continue;
+    const st=step.type;
+    if (st==='set') {
+      let val; try{val=ex(step.value);}catch{val=JSON.stringify(step.value);}
+      const pfx=ctxVars.has(step.target)?ctxP:'';
+      lines.push(`${pad}${pfx}${step.target}${aOp}${val}${sEnd}`);
+    } else if (st==='return') {
+      let val; try{val=step.value!==undefined?ex(step.value):'';}catch{val=String(step.value);}
+      lines.push(pad+(cfg.return_stmt||`return ${val}${sEnd}`)(val));
+    } else if (st==='if') {
+      let cond; try{cond=ex(step.condition);}catch{cond='true';}
+      lines.push(pad+(cfg.if_open||`if (${cond}) {`)(cond));
+      lines.push(...sub(step.then||[]));
+      if (step.else?.length) { lines.push(pad+(cfg.else_open||'} else {')); lines.push(...sub(step.else)); }
+      if (blk) lines.push(pad+blk);
+    } else if (st==='foreach') {
+      let coll; try{coll=ex(step.iterable||step.collection);}catch{coll='[]';}
+      if (coll.startsWith('"')||coll.startsWith("'")) coll=coll.replace(/^['"]|['"]$/g,'');
+      const it=step.item_var||'_item';
+      lines.push(pad+(cfg.foreach_open||((i,c)=>`for (const ${i} of ${c}) {`))(it,coll));
+      lines.push(...sub(step.body||[]));
+      lines.push(pad+(cfg.block_close_foreach!==undefined?cfg.block_close_foreach:blk));
+    } else if (st==='log') {
+      const lvl=(step.level||'info').toUpperCase();
+      let msg; try{msg=ex(step.message||'""');}catch{msg='"log"';}
+      if (cfg.log_stmt) lines.push(pad+cfg.log_stmt(lvl,msg));
+      else lines.push(pad+cmt(`log(${lvl}): ${msg}`));
+    } else { lines.push(pad+cmt(`[${st}]`)); }
+  }
+  return lines;
+}
+
+function jfCompile(flow, lang) {
+  const cfg=LANG_CFGS[lang];
+  if (!cfg) return `// Language "${lang}" not supported.\n`;
+  const fn=flow.function||'flow';
+  const schema=flow.schema||{};
+  const inputs=schema.inputs||{};
+  const context=schema.context||{};
+  const outputs=schema.outputs||{};
+  const steps=flow.steps||[];
+  const ctxVars=new Set(Object.keys(context));
+  const bodyLines=jfSteps(steps,lang,cfg,1,lang==='python'?'ctx.':'',ctxVars);
+  const retSpec=outputs[Object.keys(outputs)[0]];
+  const retType=jfT(retSpec,lang);
+  const retDef=jfDef(retSpec,lang);
+
+  const gens = {
+    python: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${n}: ${jfT(s,lang)} = ${jfDef(s,lang)}`).join(', ');
+      const ctxClass=['class _Ctx:',  ...Object.entries(context).map(([n,s])=>`    ${n}: ${jfT(s,lang)} = ${jfDef(s,lang)}`)];
+      return [`# JSONFlow → Python 3.10+  |  function: ${fn}`,'',
+        ...ctxClass,'',
+        `def ${fn}(${params}) -> ${retType}:`,`    ctx = _Ctx()`,
+        ...bodyLines,`    return ${retDef}`,
+        '','if __name__ == "__main__":',
+        `    print(${fn}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')}))`,
+      ].join('\n')+'\n';
+    },
+    javascript: () => {
+      const params=Object.entries(inputs).map(([n])=>n).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`  let ${n} = ${jfDef(s,lang)};`);
+      return [`// JSONFlow → JavaScript  |  function: ${fn}`,
+        `function ${fn}(${params}) {`,...ctxInits,...bodyLines,
+        `  return ${retDef};`,'}','',
+        `console.log(${fn}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')}));`,
+      ].join('\n')+'\n';
+    },
+    typescript: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${n}: ${jfT(s,lang)}`).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`  let ${n}: ${jfT(s,lang)} = ${jfDef(s,lang)};`);
+      return [`// JSONFlow → TypeScript  |  function: ${fn}`,
+        `function ${fn}(${params}): ${retType} {`,...ctxInits,...bodyLines,
+        `  return ${retDef};`,'}','',
+        `console.log(${fn}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')}));`,
+      ].join('\n')+'\n';
+    },
+    rust: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${n}: ${jfT(s,lang)}`).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`    let mut ${n}: ${jfT(s,lang)} = ${jfDef(s,lang)};`);
+      return [`// JSONFlow → Rust  |  function: ${fn}`,
+        `fn ${fn}(${params}) -> ${retType} {`,...ctxInits,...bodyLines,
+        `    return ${retDef};`,'}','',
+        `fn main() { println!("{:?}", ${fn}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')})); }`,
+      ].join('\n')+'\n';
+    },
+    go: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${n} ${jfT(s,lang)}`).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`\tvar ${n} ${jfT(s,lang)} = ${jfDef(s,lang)}`);
+      return [`// JSONFlow → Go  |  function: ${fn}`,
+        `package main`,`import "fmt"`,``,
+        `func ${fn}(${params}) ${retType} {`,...ctxInits,...bodyLines,
+        `\treturn ${retDef}`,`}`,``,
+        `func main() { fmt.Println(${fn}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')})) }`,
+      ].join('\n')+'\n';
+    },
+    java: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${jfT(s,lang)} ${toCamel(n)}`).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`        ${jfT(s,lang)} ${n} = ${jfDef(s,lang)};`);
+      return [`// JSONFlow → Java  |  function: ${fn}`,
+        `public class ${toPascal(fn)}Module {`,
+        `    public static ${retType} ${toCamel(fn)}(${params}) {`,
+        ...ctxInits,...bodyLines,
+        `        return ${retDef};`,`    }`,
+        `    public static void main(String[] args) {`,
+        `        System.out.println(${toCamel(fn)}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')}));`,
+        `    }`,`}`,
+      ].join('\n')+'\n';
+    },
+    csharp: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${jfT(s,lang)} ${toCamel(n)}`).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`        ${jfT(s,lang)} ${n} = ${jfDef(s,lang)};`);
+      return [`// JSONFlow → C# (.NET 8)  |  function: ${fn}`,
+        `using System;`,`using System.Collections.Generic;`,``,
+        `public static class ${toPascal(fn)}Module {`,
+        `    public static ${retType} ${toPascal(fn)}(${params}) {`,
+        ...ctxInits,...bodyLines,
+        `        return ${retDef};`,`    }`,
+        `    public static void Main() {`,
+        `        Console.WriteLine(${toPascal(fn)}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')}));`,
+        `    }`,`}`,
+      ].join('\n')+'\n';
+    },
+    swift: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${n}: ${jfT(s,lang)}`).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`    var ${n}: ${jfT(s,lang)} = ${jfDef(s,lang)}`);
+      return [`// JSONFlow → Swift 5.9  |  function: ${fn}`,
+        `import Foundation`,``,
+        `func ${fn}(${params}) -> ${retType} {`,...ctxInits,...bodyLines,
+        `    return ${retDef}`,`}`,``,
+        `print(${fn}(${Object.entries(inputs).map(([n,s])=>`${n}: ${jfDef(s,lang)}`).join(', ')}))`,
+      ].join('\n')+'\n';
+    },
+    kotlin: () => {
+      const params=Object.entries(inputs).map(([n,s])=>`${n}: ${jfT(s,lang)}`).join(', ');
+      const ctxInits=Object.entries(context).map(([n,s])=>`    var ${n}: ${jfT(s,lang)} = ${jfDef(s,lang)}`);
+      return [`// JSONFlow → Kotlin  |  function: ${fn}`,``,
+        `fun ${fn}(${params}): ${retType} {`,...ctxInits,...bodyLines,
+        `    return ${retDef}`,`}`,``,
+        `fun main() {`,`    println(${fn}(${Object.values(inputs).map(s=>jfDef(s,lang)).join(', ')}))`,`}`,
+      ].join('\n')+'\n';
+    },
+  };
+  return gens[lang]?gens[lang]():`// Language not supported\n`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// STAGE 3 — COMPILE & RENDER
+// ═══════════════════════════════════════════════════════════
+function compileCurrentProgram() {
+  const lang=document.getElementById('langSelect').value;
+  const prog=jfPrograms[selectedJfIdx];
+  if (!prog) { addMsg('system','No JSONFlow program selected'); return; }
+  const code=jfCompile(prog,lang);
+  renderCode(lang,code,prog.function);
+  setStage(3);
+  document.getElementById('badge-code').textContent='✓';
+  // Update VFS
+  const ext=LANG_EXT[lang]||'.txt';
+  const path=`code/${prog.function}${ext}`;
+  VFS[path]={content:code,lang};
+  openTabs.set(path,{label:prog.function+ext,dirty:false});
+  updateFile(path,code,lang);
+  renderTabBar();
+  switchEditorTab(path);
+  switchOutTab('code');
+  termLine('ok',`Stage 3: Compiled ${prog.function} → ${LANG_LABEL[lang]}`);
+}
+
+function compileAllLanguages() {
+  const prog=jfPrograms[selectedJfIdx];
+  if (!prog) { addMsg('system','No JSONFlow program selected'); return; }
+  const langs=['python','javascript','typescript','rust','go','java','csharp','swift','kotlin'];
+  const d=document.getElementById('codeDisplay'); d.innerHTML='<div class="all-langs-grid" id="allLangsGrid"></div>';
+  const grid=document.getElementById('allLangsGrid');
+  langs.forEach(lang=>{
+    const code=jfCompile(prog,lang);
+    const fname=lang==='java'?toPascal(prog.function)+'.java':`${prog.function}${LANG_EXT[lang]||'.txt'}`;
+    const block=document.createElement('div'); block.className='code-block';
+    block.innerHTML=`<div class="code-hdr"><span class="code-file">${fname}</span>
+      <div class="code-actions"><span class="code-file" style="opacity:.5;margin-right:6px">${LANG_LABEL[lang]}</span>
+      <button class="code-btn" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('pre').textContent)">Copy</button>
+      <button class="code-btn" onclick="dlCode('${fname}',this.closest('.code-block').querySelector('pre').textContent)">↓</button>
+      </div></div><div class="code-body"><pre>${escHtml(code)}</pre></div>`;
+    grid.appendChild(block);
+  });
+  setStage(3); document.getElementById('badge-code').textContent='9';
+  switchOutTab('code');
+  termLine('ok',`Stage 3: Compiled ${prog.function} in all 9 languages`);
+}
+
+function renderCode(lang, code, funcName) {
+  const d=document.getElementById('codeDisplay'); d.innerHTML='';
+  const fname=lang==='java'?toPascal(funcName)+'.java':`${funcName}${LANG_EXT[lang]||'.txt'}`;
+  const block=document.createElement('div'); block.className='code-block';
+  block.innerHTML=`<div class="code-hdr"><span class="code-file">${fname}</span>
+    <div class="code-actions"><span class="code-file" style="opacity:.5;margin-right:6px">${LANG_LABEL[lang]||lang}</span>
+    <button class="code-btn" onclick="copyCode()">Copy</button>
+    <button class="code-btn" onclick="downloadCode()">↓</button>
+    </div></div><div class="code-body"><pre id="codeContent">${escHtml(code)}</pre></div>`;
+  d.appendChild(block); d._lang=lang; d._code=code; d._fname=fname;
+  document.getElementById('sb-lang').textContent=LANG_LABEL[lang]||lang;
+}
+function copyCode() { const d=document.getElementById('codeDisplay'); if(d._code) navigator.clipboard.writeText(d._code); }
+function downloadCode() { const d=document.getElementById('codeDisplay'); if(!d._code) return; dlCode(d._fname,d._code); }
+function dlCode(fname, code) {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([code],{type:'text/plain'}));
+  a.download=fname; a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// TEST RUNNER
+// ═══════════════════════════════════════════════════════════
+const TESTS = [
+  { id:'t1', label:'Genesis: derived_state enforced', fn: ()=>currentModule?.derived_state?.structure?.enforced===true },
+  { id:'t2', label:'Genesis: emitted_events enforced', fn: ()=>currentModule?.emitted_events?.structure?.enforced===true },
+  { id:'t3', label:'Genesis: reducers.deriveState present', fn: ()=>!!currentModule?.reducers?.deriveState },
+  { id:'t4', label:'Genesis: signal_functions present', fn: ()=>!!currentModule?.signal_functions?.energy },
+  { id:'t5', label:'Genesis: all 11 invariants', fn: ()=>(currentModule?.invariants?.length||0)>=11 },
+  { id:'t6', label:'JSONFlow: programs compiled', fn: ()=>jfPrograms.length>=4 },
+  { id:'t7', label:'JSONFlow: deriveState deterministic', fn: ()=>jfPrograms.find(p=>p.function==='deriveState')?.metadata?.deterministic===true },
+  { id:'t8', label:'JSONFlow: energy signal function', fn: ()=>jfPrograms.find(p=>p.function==='computeEnergy')!=null },
+  { id:'t9', label:'JSONFlow: priority signal function', fn: ()=>jfPrograms.find(p=>p.function==='computePriority')!=null },
+  { id:'t10', label:'Compile: JS output non-empty', fn: ()=>{ const p=jfPrograms[0]; return p?jfCompile(p,'javascript').length>10:false; } },
+  { id:'t11', label:'Compile: Python output non-empty', fn: ()=>{ const p=jfPrograms[0]; return p?jfCompile(p,'python').length>10:false; } },
+];
+
+let testResults = {};
+function runTests() {
+  testResults = {};
+  const list = document.getElementById('test-list');
+  list.innerHTML = '<div class="msg system" style="margin:8px">Running tests…</div>';
+  let pass=0, fail=0;
+  setTimeout(() => {
+    list.innerHTML = '';
+    TESTS.forEach(t => {
+      const start = Date.now();
+      let ok = false;
+      try { ok = t.fn(); } catch {}
+      const dur = Date.now() - start;
+      testResults[t.id] = ok;
+      if (ok) pass++; else fail++;
+      const el = document.createElement('div'); el.className = 'test-item';
+      el.innerHTML = `<div class="test-status ${ok?'ts-pass':'ts-fail'}">${ok?'✓':'✗'}</div>
+        <div class="test-label">${t.label}</div>
+        <div class="test-dur">${dur}ms</div>`;
+      list.appendChild(el);
+    });
+    document.getElementById('test-summary').innerHTML =
+      `<span class="ts-cnt">${pass}</span> passed · <span class="ts-cnt" style="color:var(--err)">${fail}</span> failed`;
+    termLine('ok', `Tests: ${pass}/${pass+fail} passed`);
+  }, 200);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TERMINAL
+// ═══════════════════════════════════════════════════════════
+const termHistory = []; let termHistIdx = -1;
+function termLine(type, text) {
+  const body = document.getElementById('terminal-body');
+  const il = document.getElementById('t-input-line');
+  const line = document.createElement('div'); line.className = 't-line';
+  const cls = {ok:'t-ok',err:'t-err',warn:'t-warn',dim:'t-dim'}[type]||'t-hi';
+  const prefix = {ok:'✓',err:'✗',warn:'⚠',dim:'·'}[type]||'›';
+  line.innerHTML = `<span class="${cls}">${prefix}</span><span>${escHtml(text)}</span>`;
+  body.insertBefore(line, il);
+  body.scrollTop = body.scrollHeight;
+}
+function termKey(e) {
+  if (e.key === 'Enter') {
+    const input = document.getElementById('term-input');
+    const cmd = input.value.trim();
+    if (!cmd) return;
+    termHistory.unshift(cmd); termHistIdx = -1;
+    termLine('dim', `$ ${cmd}`);
+    input.value = '';
+    execTermCmd(cmd);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const input = document.getElementById('term-input');
+    if (termHistIdx < termHistory.length - 1) termHistIdx++;
+    input.value = termHistory[termHistIdx] || '';
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const input = document.getElementById('term-input');
+    if (termHistIdx > 0) termHistIdx--;
+    else { termHistIdx = -1; input.value = ''; return; }
+    input.value = termHistory[termHistIdx] || '';
+  }
+}
+function execTermCmd(cmd) {
+  const parts = cmd.trim().split(/\s+/);
+  const c = parts[0].toLowerCase();
+  if (c === 'help') {
+    ['Available commands:','  help          — show this help','  clear         — clear terminal',
+      '  stage1        — run Genesis stage (requires chat)','  stage2        — compile JSONFlow from current module',
+      '  stage3 [lang] — compile code (default: javascript)','  test          — run all tests',
+      '  validate      — validate current module','  ls            — list VFS files',
+      '  cat [file]    — print VFS file content','  export        — export all outputs',
+    ].forEach(l=>termLine('dim',l));
+  } else if (c==='clear') {
+    const body=document.getElementById('terminal-body');
+    const il=document.getElementById('t-input-line');
+    [...body.children].forEach(el=>{if(el!==il)el.remove()});
+  } else if (c==='stage1') {
+    termLine('warn','Type your app description in the chat panel and click Send.');
+    switchRightPanel('chat');
+  } else if (c==='stage2') {
+    if (!currentModule) { termLine('err','No Genesis module loaded. Run Stage 1 first.'); return; }
+    convertToJSONFlow();
+  } else if (c==='stage3') {
+    const lang=parts[1]||'javascript';
+    if (!LANG_CFGS[lang]) { termLine('err',`Unknown language: ${lang}`); return; }
+    if (!jfPrograms.length) { termLine('err','No JSONFlow programs. Run Stage 2 first.'); return; }
+    document.getElementById('langSelect').value=lang;
+    compileCurrentProgram();
+  } else if (c==='test') {
+    switchOutTab('tests'); runTests();
+  } else if (c==='validate') {
+    if (!currentModule) { termLine('err','No module loaded.'); return; }
+    const ok=validateModule(currentModule);
+    if (ok) termLine('ok','Module passes canonical validation.');
+    else    termLine('err','Module FAILED canonical validation.');
+  } else if (c==='ls') {
+    Object.keys(VFS).forEach(f=>termLine('dim',`  ${f}`));
+  } else if (c==='cat') {
+    const file=parts.slice(1).join(' ');
+    if (!VFS[file]) { termLine('err',`File not found: ${file}`); return; }
+    VFS[file].content.split('\n').slice(0,30).forEach(l=>termLine('dim',l));
+    if (VFS[file].content.split('\n').length>30) termLine('dim','… (truncated)');
+  } else if (c==='export') {
+    exportAll();
+  } else {
+    termLine('err',`Unknown command: ${cmd}. Type "help" for available commands.`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════
+function exportAll() {
+  const exports = [];
+  if (currentModule)   exports.push({ name:'genesis-module.json',    content:JSON.stringify(currentModule,null,2),  type:'application/json' });
+  if (jfPrograms.length) exports.push({ name:'jsonflow-programs.json', content:JSON.stringify(jfPrograms,null,2), type:'application/json' });
+  Object.entries(VFS).forEach(([path,file]) => {
+    if (file.content && !file.content.startsWith('// Run')) exports.push({ name:path.replace(/\//g,'-'), content:file.content, type:'text/plain' });
+  });
+  if (!exports.length) { addMsg('system','Nothing to export yet.'); return; }
+  exports.forEach(({ name, content, type }) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([content],{type}));
+    a.download = name; a.click();
+  });
+  termLine('ok',`Exported ${exports.length} file(s)`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// RESIZERS
+// ═══════════════════════════════════════════════════════════
+function makeResizer(id, getEl, prop) {
+  const res = document.getElementById(id);
+  let dragging = false, startX = 0, startW = 0;
+  res.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startW = getEl().offsetWidth;
+    res.classList.add('dragging'); e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const newW = Math.max(150, Math.min(500, startW + (prop==='right'?-dx:dx)));
+    getEl().style[prop==='right'?'width':'width'] = newW + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging=false; res.classList.remove('dragging'); });
+}
+makeResizer('res1', ()=>document.getElementById('sidebar'), 'left');
+makeResizer('res2', ()=>document.getElementById('right'), 'right');
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  currentSystemPrompt = buildSystemPrompt('a user identity system','identity');
+  buildFileTree();
+  checkConnection();
+  termLine('ok', 'Genesis/JSONFlow IDE initialized');
+  termLine('dim', 'Type "help" for available commands');
+  document.getElementById('urlInput').addEventListener('change', checkConnection);
+  document.getElementById('modelInput').addEventListener('change', checkConnection);
+});
+</script>
+</body>
+</html>
