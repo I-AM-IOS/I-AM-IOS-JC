@@ -1,0 +1,381 @@
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.app{display:flex;flex-direction:column;height:620px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;background:var(--color-background-secondary);font-family:var(--font-mono,'Courier New',monospace);font-size:13px}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px;color:var(--color-text-primary)}
+.logo-dot{width:9px;height:9px;border-radius:50%;background:#1D9E75}
+.node-id{font-size:10px;color:var(--color-text-tertiary);letter-spacing:0.04em}
+.layout{display:flex;flex:1;overflow:hidden}
+.sidebar{width:152px;border-right:0.5px solid var(--color-border-tertiary);padding:10px 8px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;background:var(--color-background-primary)}
+.sl{font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;padding:0 4px;margin-bottom:2px}
+.rb,.pb{padding:5px 8px;border-radius:var(--border-radius-md);border:none;background:transparent;cursor:pointer;text-align:left;font-size:12px;font-family:inherit;color:var(--color-text-secondary);width:100%;transition:background 0.12s}
+.rb:hover,.pb:hover{background:var(--color-background-secondary)}
+.rb.active{background:var(--color-background-info);color:var(--color-text-info)}
+.pb.active{background:var(--color-background-secondary);color:var(--color-text-primary);border:0.5px solid var(--color-border-secondary)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.room-bar{padding:7px 14px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.room-title{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.room-meta{font-size:10px;color:var(--color-text-tertiary)}
+.sync-badge{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--color-background-success);color:var(--color-text-success)}
+.sync-badge.syncing{background:var(--color-background-warning);color:var(--color-text-warning)}
+.chat-area{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:5px}
+.msg{display:flex;flex-direction:column;gap:2px}
+.msg-text{font-size:13px;color:var(--color-text-primary);word-break:break-word}
+.msg-meta{font-size:10px;color:var(--color-text-tertiary);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cid-link{color:var(--color-text-info);cursor:pointer;text-decoration:underline;font-size:10px}
+.msg.system .msg-text{color:var(--color-text-secondary);font-style:italic;font-size:12px}
+.input-row{display:flex;gap:6px;padding:9px 14px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary)}
+.input-row input{flex:1;padding:6px 10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);font-family:inherit;font-size:12px;min-width:0}
+.input-row input::placeholder{color:var(--color-text-tertiary)}
+.input-row input:disabled{opacity:0.5}
+.input-row button{padding:6px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.input-row button:hover{background:var(--color-background-tertiary)}
+.panel-area{border-top:0.5px solid var(--color-border-tertiary);padding:10px 14px;background:var(--color-background-primary);max-height:200px;overflow-y:auto}
+.ph{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-text-tertiary);margin-bottom:8px}
+.mg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:8px}
+.mg2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mg3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:7px 9px}
+.mc .lbl{font-size:10px;color:var(--color-text-secondary);margin-bottom:2px}
+.mc .val{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.ar{display:flex;gap:5px;margin-top:7px}
+.ar button{flex:1;padding:5px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);font-family:inherit;font-size:11px;cursor:pointer}
+.ar button:hover{background:var(--color-background-tertiary)}
+.lr{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px}
+.badge{display:inline-block;padding:1px 5px;border-radius:4px;font-size:10px;margin-right:3px}
+.badge.transfer{background:var(--color-background-info);color:var(--color-text-info)}
+.badge.stake{background:#EEEDFE;color:#3C3489}
+.badge.reward{background:var(--color-background-success);color:var(--color-text-success)}
+.badge.burn{background:var(--color-background-danger);color:var(--color-text-danger)}
+.pr{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--color-text-secondary)}
+.pd{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px}
+.pd.on{background:#1D9E75} .pd.idle{background:#378ADD}
+.ev{font-size:11px;color:var(--color-text-secondary);padding:2px 0}
+.sbar{display:flex;align-items:center;gap:10px;padding:4px 14px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);font-size:10px;color:var(--color-text-tertiary)}
+.sdot{width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block}
+.loading-msg{color:var(--color-text-tertiary);font-size:12px;text-align:center;padding:24px}
+.empty-room{color:var(--color-text-tertiary);font-size:12px;text-align:center;padding:24px;font-style:italic}
+.poll-indicator{animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
+
+<h2 class="sr-only">SOVR-DI shared decentralized system — messages and ledger sync identically across all machines via shared storage</h2>
+
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      SOVR-DI
+    </div>
+    <span class="node-id" id="nodeId">initializing…</span>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <div>
+        <div class="sl">Rooms</div>
+        <button class="rb active" onclick="switchRoom('sovr',this)">sovr</button>
+        <button class="rb" onclick="switchRoom('ldgr',this)">ldgr</button>
+        <button class="rb" onclick="switchRoom('comp',this)">comp</button>
+        <button class="rb" onclick="switchRoom('cvas',this)">cvas</button>
+      </div>
+      <div>
+        <div class="sl">Panels</div>
+        <button class="pb active" onclick="switchPanel('monetary',this)">monetary</button>
+        <button class="pb" onclick="switchPanel('ledger',this)">ledger</button>
+        <button class="pb" onclick="switchPanel('mesh',this)">mesh</button>
+        <button class="pb" onclick="switchPanel('consensus',this)">consensus</button>
+        <button class="pb" onclick="switchPanel('monitor',this)">monitor</button>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="room-bar">
+        <div>
+          <div class="room-title" id="roomTitle">sovr</div>
+          <div class="room-meta" id="roomMeta">shared • loading…</div>
+        </div>
+        <span class="sync-badge syncing" id="syncBadge">syncing</span>
+      </div>
+      <div class="chat-area" id="chatArea">
+        <div class="loading-msg">Fetching shared room state…</div>
+      </div>
+      <div class="input-row">
+        <input type="text" id="msgInput" placeholder="Post to shared room… (Enter)" onkeydown="if(event.key==='Enter')postMsg()" disabled>
+        <button onclick="postMsg()" id="sendBtn" disabled>Post</button>
+      </div>
+      <div class="panel-area">
+        <div class="ph" id="panelHeader">monetary panel</div>
+        <div id="panelBody"></div>
+      </div>
+      <div class="sbar">
+        <span class="sdot" id="statusDot"></span>
+        <span id="peerTxt">peers: –</span>
+        <span id="roundTxt">round: –</span>
+        <span id="txTxt">txns: –</span>
+        <span id="storageTxt" class="poll-indicator">● syncing</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const NODE_ID = 'node_' + Math.random().toString(16).slice(2,8);
+document.getElementById('nodeId').textContent = NODE_ID;
+
+let currentRoom = 'sovr';
+let currentPanel = 'monetary';
+let roomMsgs = {};
+let ledgerEntries = [];
+let knownMsgCount = {};
+let sim = {peers:3,round:1,txns:0,rewards:0,apr:12.4,uptime:99.1};
+
+async function sha256cid(str) {
+  try {
+    const buf = new TextEncoder().encode(str);
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    const hex = Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    return 'bafk' + hex.slice(0,36);
+  } catch(e) {
+    return 'bafk' + Math.random().toString(16).slice(2,38);
+  }
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+async function storageGet(key) {
+  try { return await window.storage.get(key, true); } catch(e) { return null; }
+}
+async function storageSet(key, val) {
+  try { await window.storage.set(key, JSON.stringify(val), true); return true; } catch(e) { return false; }
+}
+
+async function loadRoom(room) {
+  const chatArea = document.getElementById('chatArea');
+  chatArea.innerHTML = '<div class="loading-msg">Fetching shared state…</div>';
+  setSyncBadge('syncing');
+  const res = await storageGet('sovr:room:' + room);
+  if (res && res.value) {
+    try { roomMsgs[room] = JSON.parse(res.value); } catch(e) { roomMsgs[room] = []; }
+  } else {
+    roomMsgs[room] = [];
+  }
+  knownMsgCount[room] = (roomMsgs[room]||[]).length;
+  setSyncBadge('live');
+  renderChat();
+  enableInput();
+}
+
+async function pollRoom(room) {
+  const res = await storageGet('sovr:room:' + room);
+  if (!res || !res.value) return;
+  let fresh;
+  try { fresh = JSON.parse(res.value); } catch(e) { return; }
+  const prev = (roomMsgs[room]||[]).length;
+  if (fresh.length !== prev || JSON.stringify(fresh) !== JSON.stringify(roomMsgs[room])) {
+    roomMsgs[room] = fresh;
+    if (room === currentRoom) {
+      renderChat();
+      setSyncBadge('live');
+    }
+  }
+}
+
+async function loadLedger() {
+  const res = await storageGet('sovr:ledger');
+  if (res && res.value) {
+    try { ledgerEntries = JSON.parse(res.value); } catch(e) {}
+  }
+  if (!ledgerEntries.length) {
+    ledgerEntries = [
+      {type:'stake',amount:500,hash:'a3f2b1e9',cid:'bafka3f2b1e9c7d2a8f1b3c4d5e6f7a8b',time:'11:23'},
+      {type:'reward',amount:12.5,hash:'2d4e7c1f',cid:'bafk2d4e7c1f0b3a9e8d1c2b3a4f5e6d7',time:'11:18'},
+      {type:'transfer',amount:250,hash:'9b8f3e2a',cid:'bafk9b8f3e2a1c4d7f0e2b3a4c5d6e7f8',time:'11:12'},
+    ];
+    await storageSet('sovr:ledger', ledgerEntries);
+  }
+}
+
+async function pollLedger() {
+  const res = await storageGet('sovr:ledger');
+  if (!res || !res.value) return;
+  try {
+    const fresh = JSON.parse(res.value);
+    if (JSON.stringify(fresh) !== JSON.stringify(ledgerEntries)) {
+      ledgerEntries = fresh;
+      if (currentPanel === 'ledger') renderPanel();
+    }
+  } catch(e) {}
+}
+
+function setSyncBadge(state) {
+  const b = document.getElementById('syncBadge');
+  b.textContent = state === 'syncing' ? 'syncing' : state === 'saved' ? 'saved ✓' : 'live ✓';
+  b.className = 'sync-badge' + (state === 'syncing' ? ' syncing' : '');
+  document.getElementById('storageTxt').textContent = state === 'syncing' ? '● syncing' : state === 'saved' ? '● saved' : '● live';
+}
+
+function enableInput() {
+  document.getElementById('msgInput').disabled = false;
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function renderChat() {
+  const msgs = roomMsgs[currentRoom] || [];
+  const chatArea = document.getElementById('chatArea');
+  const meta = document.getElementById('roomMeta');
+  const userMsgs = msgs.filter(m=>m.role!=='system');
+  meta.textContent = 'shared • ' + userMsgs.length + ' message' + (userMsgs.length!==1?'s':'');
+
+  if (!msgs.length) {
+    chatArea.innerHTML = '<div class="empty-room">No messages yet — be the first to post</div>';
+    return;
+  }
+
+  const scrolledToBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 40;
+
+  chatArea.innerHTML = msgs.map(m => {
+    if (m.role === 'system') return `<div class="msg system"><div class="msg-text">${escHtml(m.text)}</div></div>`;
+    const shortCid = m.cid ? m.cid.slice(0,16)+'…' : '';
+    return `<div class="msg">
+      <div class="msg-text">${escHtml(m.text)}</div>
+      <div class="msg-meta">
+        <span>${escHtml(m.node||'?')}</span>
+        <span>·</span>
+        <span>${escHtml(m.time)}</span>
+        ${m.cid?`<span>·</span><span class="cid-link" title="${escHtml(m.cid)}" onclick="copyCid('${escHtml(m.cid)}')">cid:${shortCid}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  if (scrolledToBottom) chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+async function postMsg() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.disabled = true;
+  document.getElementById('sendBtn').disabled = true;
+  setSyncBadge('syncing');
+
+  const time = new Date().toLocaleTimeString();
+  const cid = await sha256cid(text + time + NODE_ID + Math.random().toString(36));
+
+  if (!roomMsgs[currentRoom]) roomMsgs[currentRoom] = [];
+
+  const freshRes = await storageGet('sovr:room:' + currentRoom);
+  if (freshRes && freshRes.value) {
+    try {
+      const fresh = JSON.parse(freshRes.value);
+      if (fresh.length > roomMsgs[currentRoom].length) roomMsgs[currentRoom] = fresh;
+    } catch(e){}
+  }
+
+  roomMsgs[currentRoom].push({role:'user', text, time, node:NODE_ID, cid});
+  const ok = await storageSet('sovr:room:' + currentRoom, roomMsgs[currentRoom]);
+  setSyncBadge(ok ? 'saved' : 'syncing');
+  setTimeout(()=>setSyncBadge('live'), 1200);
+  sim.txns++;
+  updateStatus();
+  renderChat();
+  enableInput();
+  document.getElementById('msgInput').focus();
+}
+
+function copyCid(cid) {
+  navigator.clipboard?.writeText(cid).catch(()=>{});
+  document.getElementById('storageTxt').textContent = '● copied';
+  setTimeout(()=>document.getElementById('storageTxt').textContent='● live',2000);
+}
+
+function switchRoom(room, btn) {
+  currentRoom = room;
+  document.querySelectorAll('.rb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('roomTitle').textContent = room;
+  document.getElementById('msgInput').disabled = true;
+  document.getElementById('sendBtn').disabled = true;
+  loadRoom(room);
+}
+
+function switchPanel(panel, btn) {
+  currentPanel = panel;
+  document.querySelectorAll('.pb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPanel();
+}
+
+function renderPanel() {
+  document.getElementById('panelHeader').textContent = currentPanel + ' panel';
+  const body = document.getElementById('panelBody');
+  const p = currentPanel;
+
+  if (p==='monetary') {
+    body.innerHTML=`<div class="mg"><div class="mc"><div class="lbl">compute rev</div><div class="val">$2.4K</div></div><div class="mc"><div class="lbl">val APR</div><div class="val">${sim.apr.toFixed(1)}%</div></div><div class="mc"><div class="lbl">intel rwd</div><div class="val">$8.7K</div></div><div class="mc"><div class="lbl">staking</div><div class="val">$1.2K</div></div></div><div class="ar"><button onclick="claimRewards()">claim rewards</button><button>reinvest</button></div>`;
+  } else if (p==='ledger') {
+    const rows = ledgerEntries.slice(0,8).map(e=>`<div class="lr"><span><span class="badge ${e.type}">${e.type}</span><span style="color:var(--color-text-tertiary)">${e.hash}</span></span><span style="display:flex;gap:8px;align-items:center"><span style="color:var(--color-text-secondary)">${e.amount}</span>${e.cid?`<span class="cid-link" title="${e.cid}" onclick="copyCid('${e.cid}')">cid:${e.cid.slice(4,14)}…</span>`:''}<span style="color:var(--color-text-tertiary)">${e.time}</span></span></div>`).join('');
+    body.innerHTML=`<div class="ar" style="margin-bottom:8px"><button onclick="postTx('transfer')">transfer</button><button onclick="postTx('stake')">stake</button><button onclick="postTx('burn')">burn</button></div><div>${rows}</div>`;
+  } else if (p==='mesh') {
+    body.innerHTML=`<div class="mg mg2"><div class="mc"><div class="lbl">active peers</div><div class="val">${sim.peers}</div></div><div class="mc"><div class="lbl">round</div><div class="val">${sim.round}</div></div></div><div>${Array.from({length:sim.peers},(_,i)=>`<div class="pr"><span><span class="pd ${i%2?'idle':'on'}"></span>peer_${String(i).padStart(3,'0')}</span><span>${100+i*12}ms</span></div>`).join('')}</div>`;
+  } else if (p==='consensus') {
+    body.innerHTML=`<div class="mg mg3"><div class="mc"><div class="lbl">peers</div><div class="val">${sim.peers}</div></div><div class="mc"><div class="lbl">round</div><div class="val">${sim.round}</div></div><div class="mc"><div class="lbl">pending</div><div class="val">${sim.txns%20}</div></div></div>`;
+  } else if (p==='monitor') {
+    body.innerHTML=`<div class="mg"><div class="mc"><div class="lbl">uptime</div><div class="val">${sim.uptime.toFixed(1)}%</div></div><div class="mc"><div class="lbl">peers</div><div class="val">${sim.peers}</div></div><div class="mc"><div class="lbl">txns</div><div class="val">${sim.txns}</div></div><div class="mc"><div class="lbl">rewards</div><div class="val">${sim.rewards.toFixed(1)}</div></div></div><div>${['round '+sim.round+' active','peers: '+sim.peers,'queue: '+(sim.txns%20)+' txns','consensus running','rewards distributed','network healthy'].map(e=>`<div class="ev">✓ ${e}</div>`).join('')}</div>`;
+  }
+}
+
+async function postTx(type) {
+  const amount = Math.floor(Math.random()*500)+50;
+  const hash = Math.random().toString(16).slice(2,8);
+  const cid = await sha256cid(type+amount+hash+Date.now());
+  const entry = {type,amount,hash,cid,time:new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})};
+
+  const res = await storageGet('sovr:ledger');
+  if (res && res.value) { try{ ledgerEntries = JSON.parse(res.value); }catch(e){} }
+  ledgerEntries.unshift(entry);
+  if (ledgerEntries.length>20) ledgerEntries.pop();
+  await storageSet('sovr:ledger', ledgerEntries);
+  sim.txns++;
+  updateStatus();
+  renderPanel();
+}
+
+function claimRewards() { sim.rewards+=Math.random()*10+2; renderPanel(); }
+
+function updateStatus() {
+  document.getElementById('peerTxt').textContent = 'peers: '+sim.peers;
+  document.getElementById('roundTxt').textContent = 'round: '+sim.round;
+  document.getElementById('txTxt').textContent = 'txns: '+sim.txns;
+}
+
+setInterval(()=>{
+  sim.peers=2+Math.floor(Math.random()*4);
+  sim.round++;
+  sim.txns+=Math.floor(Math.random()*2);
+  sim.rewards+=Math.random()*2;
+  sim.apr=Math.max(8,Math.min(18,sim.apr+(Math.random()-0.5)*0.3));
+  sim.uptime=Math.max(95,Math.min(100,sim.uptime+(Math.random()-0.6)*0.15));
+  updateStatus();
+  if(['monetary','mesh','consensus','monitor'].includes(currentPanel)) renderPanel();
+},3000);
+
+setInterval(()=>{
+  pollRoom(currentRoom);
+  if(currentPanel==='ledger') pollLedger();
+},4000);
+
+async function init() {
+  await loadLedger();
+  await loadRoom('sovr');
+  renderPanel();
+  updateStatus();
+}
+init();
+</script>
+
+<!-- ── Sovereign Stack Integration ── -->
+<script src="../sovereign-log.js"></script>
+<script src="../sovereign-bus.js"></script>
+<script src="../ollama-local-ai.js"></script>
+<script>if (typeof attachBus === "function") attachBus();</script>

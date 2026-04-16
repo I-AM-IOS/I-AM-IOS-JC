@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supply Chain Resilience Monitor + Ollama AI</title>
+  <style>
+    :root {
+      --bg: #0a0e27;
+      --surface: #141829;
+      --surface2: #1a1f3a;
+      --text: #e0e9ff;
+      --muted: #8492b0;
+      --border: #2a3555;
+      --accent: #00ff88;
+      --accent2: #00d4ff;
+      --accent3: #7c3aed;
+      --accent4: #f59e0b;
+      --danger: #ff3366;
+      --warning: #ffaa00;
+      --success: #00ff88;
+      --glow: rgba(0, 255, 136, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow: hidden;
+    }
+
+    /* ── BOOT SCREEN ────────────────────────────────────────────── */
+    #boot {
+      position: fixed; inset: 0; z-index: 1000;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 24px;
+    }
+
+    #boot-logo {
+      font-size: 56px; font-weight: bold; letter-spacing: 2px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      animation: pulse-logo 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-logo { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
+
+    #boot-log {
+      font-size: 11px; color: var(--muted); text-align: center;
+      max-width: 500px; min-height: 100px; font-family: 'Space Mono', monospace;
+    }
+
+    #boot-bar { width: 300px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    #boot-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 12px var(--accent); }
+
+    /* ── MAIN LAYOUT ────────────────────────────────────────────── */
+    #app { display: none; width: 100%; height: 100%; flex-direction: column; }
+    #app.ready { display: flex; }
+
+    #topbar {
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 20px; height: 50px;
+      background: linear-gradient(180deg, var(--surface) 0%, rgba(20,24,41,0.7) 100%);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #topbar-logo {
+      font-size: 20px; font-weight: bold;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    #status-indicator {
+      display: flex; align-items: center; gap: 8px;
+      margin-left: auto; padding: 6px 12px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 4px;
+    }
+
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .status-dot.warning { background: var(--warning); }
+    .status-dot.danger { background: var(--danger); }
+
+    /* ── MAIN GRID ────────────────────────────────────────────── */
+    #main { display: flex; flex: 1; gap: 16px; padding: 16px; overflow: hidden; }
+
+    .column { display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+    .column1 { flex: 1; }
+    .column2 { flex: 1.2; }
+    .column3 { flex: 1; }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      display: flex; flex-direction: column;
+      gap: 12px; overflow: hidden;
+      position: relative;
+    }
+
+    .panel.flex { flex: 1; }
+    .panel.half { flex: 0.5; }
+
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-size: 13px; font-weight: bold;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .panel-subtitle { font-size: 10px; color: var(--muted); }
+
+    /* ── NETWORK CANVAS ────────────────────────────────────────── */
+    #network-canvas {
+      width: 100%; height: 100%;
+      background: radial-gradient(circle at 30% 60%, rgba(0,255,136,0.02), transparent);
+      border-radius: 4px;
+      cursor: grab;
+    }
+
+    #network-canvas:active { cursor: grabbing; }
+
+    /* ── NODE LIST ────────────────────────────────────────────── */
+    .supply-chain-node {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .supply-chain-node:hover {
+      border-color: var(--accent);
+      background: var(--surface2);
+      box-shadow: 0 0 8px rgba(0,255,136,0.2);
+    }
+
+    .supply-chain-node.critical {
+      border-color: var(--danger);
+      background: rgba(255,51,102,0.1);
+    }
+
+    .supply-chain-node.selected {
+      border-color: var(--accent2);
+      box-shadow: 0 0 12px rgba(0,212,255,0.3);
+    }
+
+    .node-name { font-weight: bold; color: var(--text); margin-bottom: 4px; }
+    .node-metric {
+      display: flex; justify-content: space-between;
+      color: var(--muted); font-size: 10px;
+      margin: 2px 0;
+    }
+
+    .metric-value {
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    .metric-value.warning { color: var(--warning); }
+    .metric-value.danger { color: var(--danger); }
+
+    /* ── SCROLLAREA ────────────────────────────────────────────── */
+    .scroll-content {
+      overflow-y: auto; overflow-x: hidden;
+      flex: 1;
+    }
+
+    .scroll-content::-webkit-scrollbar { width: 6px; }
+    .scroll-content::-webkit-scrollbar-track { background: var(--surface); border-radius: 2px; }
+    .scroll-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .scroll-content::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    /* ── CHAT INTERFACE ────────────────────────────────────────– */
+    #chat-messages {
+      display: flex; flex-direction: column; gap: 12px;
+      overflow-y: auto; flex: 1;
+    }
+
+    .chat-message {
+      padding: 12px;
+      border-radius: 4px;
+      background: var(--surface2);
+      border-left: 3px solid var(--accent);
+      font-size: 11px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+
+    .chat-message.user {
+      background: rgba(0,255,136,0.1);
+      border-left-color: var(--accent);
+      margin-left: 20px;
+    }
+
+    .chat-message.assistant {
+      background: rgba(0,212,255,0.1);
+      border-left-color: var(--accent2);
+      margin-right: 20px;
+    }
+
+    .chat-message.system {
+      background: rgba(255,170,0,0.1);
+      border-left-color: var(--warning);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .chat-sender { font-size: 9px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; }
+
+    /* ── CHAT INPUT ────────────────────────────────────────────– */
+    #chat-input-area {
+      display: flex; gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    #chat-input {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+    }
+
+    #chat-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 8px rgba(0,255,136,0.2);
+    }
+
+    #chat-send-btn {
+      padding: 8px 16px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    #chat-send-btn:hover {
+      background: var(--accent2);
+      box-shadow: 0 0 12px rgba(0,212,255,0.3);
+    }
+
+    #chat-send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ── BUTTONS ────────────────────────────────────────────────── */
+    .button-group {
+      display: flex; gap: 8px; margin-top: 8px;
+    }
+
+    button {
+      flex: 1; padding: 8px 12px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none; border-radius: 4px;
+      font-size: 11px; font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'Courier New', monospace;
+    }
+
+    button:hover {
+      background: var(--accent2);
+      box-shadow: 0 0 12px rgba(0,212,255,0.3);
+    }
+
+    button:active { transform: scale(0.98); }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    button.secondary:hover {
+      border-color: var(--accent);
+      background: rgba(0,255,136,0.1);
+    }
+
+    button.danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    button.danger:hover {
+      background: #ff6699;
+      box-shadow: 0 0 12px rgba(255,51,102,0.3);
+    }
+
+    /* ── STATS GRID ────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .stat-box {
+      background: var(--surface2);
+      padding: 12px; border-radius: 4px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .stat-label { font-size: 10px; color: var(--muted); }
+    .stat-value {
+      font-size: 18px; font-weight: bold;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    .stat-box.warning { border-left-color: var(--warning); }
+    .stat-box.warning .stat-value { color: var(--warning); }
+
+    .stat-box.danger { border-left-color: var(--danger); }
+    .stat-box.danger .stat-value { color: var(--danger); }
+
+    /* ── ALERTS ────────────────────────────────────────────────── */
+    .alert {
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      border-left: 4px solid;
+      background: rgba(255,51,102,0.1);
+      border-left-color: var(--danger);
+      color: var(--text);
+    }
+
+    .alert.warning {
+      background: rgba(255,170,0,0.1);
+      border-left-color: var(--warning);
+    }
+
+    .alert.info {
+      background: rgba(0,212,255,0.1);
+      border-left-color: var(--accent2);
+    }
+
+    /* ── OLLAMA STATUS ────────────────────────────────────────── */
+    #ollama-status {
+      font-size: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
+      border-radius: 4px;
+      background: rgba(255,170,0,0.1);
+      border: 1px solid var(--warning);
+      color: var(--warning);
+    }
+
+    #ollama-status.connected {
+      background: rgba(0,255,136,0.1);
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    #ollama-status.error {
+      background: rgba(255,51,102,0.1);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .thinking {
+      display: inline-block;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <!-- BOOT SCREEN -->
+  <div id="boot">
+    <div id="boot-logo">◆ RESILIENCE+AI</div>
+    <div id="boot-log">Initializing supply chain monitor...<br>Loading network topology...<br>Connecting to Ollama LLM...</div>
+    <div id="boot-bar"><div id="boot-fill"></div></div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app">
+    <!-- TOPBAR -->
+    <div id="topbar">
+      <div id="topbar-logo">◆ RESILIENCE+AI</div>
+      <div style="color: var(--muted); font-size: 11px;">Supply Chain Monitor with Local AI Analysis</div>
+      <div id="status-indicator">
+        <div class="status-dot"></div>
+        <span id="status-text">MONITORING</span>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div id="main">
+      <!-- COLUMN 1: NETWORK VISUALIZATION & STATS -->
+      <div class="column column1">
+        <div class="panel flex">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Supply Network</div>
+              <div class="panel-subtitle">Multi-tier supply chain topology</div>
+            </div>
+            <button class="secondary" onclick="resetNetwork()" style="flex: 0; padding: 4px 8px; font-size: 10px;">RESET</button>
+          </div>
+          <canvas id="network-canvas"></canvas>
+        </div>
+
+        <div class="panel half">
+          <div class="panel-header">
+            <div class="panel-title">Network Health</div>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-label">Nodes</div>
+              <div class="stat-value" id="stat-nodes">0</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Resilience</div>
+              <div class="stat-value" id="stat-resilience">0%</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Risk Level</div>
+              <div class="stat-value" id="stat-risk">LOW</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Critical Paths</div>
+              <div class="stat-value" id="stat-critical">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COLUMN 2: NODES & ALERTS -->
+      <div class="column column2">
+        <div class="panel flex">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Nodes</div>
+              <div class="panel-subtitle" id="node-count-subtitle">0 / 0</div>
+            </div>
+          </div>
+          <div class="scroll-content" id="nodes-list"></div>
+        </div>
+
+        <div class="panel half">
+          <div class="panel-header">
+            <div class="panel-title">Alerts</div>
+          </div>
+          <div class="scroll-content" id="alerts-list"></div>
+        </div>
+      </div>
+
+      <!-- COLUMN 3: AI CHAT & CONTROLS -->
+      <div class="column column3">
+        <!-- Ollama Status -->
+        <div id="ollama-status" style="display: none;">
+          ⚠ Connecting to Ollama at http://localhost:11434
+        </div>
+
+        <!-- Chat Panel -->
+        <div class="panel flex">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">AI Analysis</div>
+              <div class="panel-subtitle">Chat with supply chain AI</div>
+            </div>
+          </div>
+          <div id="chat-messages"></div>
+          <div id="chat-input-area">
+            <input 
+              type="text" 
+              id="chat-input" 
+              placeholder="Ask about network vulnerabilities..." 
+              onkeypress="handleChatKeypress(event)"
+            />
+            <button id="chat-send-btn" onclick="sendChatMessage()">SEND</button>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="panel half">
+          <div class="panel-header">
+            <div class="panel-title">Controls</div>
+          </div>
+          <div class="button-group">
+            <button onclick="simulateDisruption()">DISRUPT</button>
+            <button class="secondary" onclick="analyzeNetwork()">ANALYZE</button>
+          </div>
+          <div class="button-group">
+            <button class="secondary" onclick="togglePause()">PAUSE</button>
+            <button class="danger" onclick="resetNetwork()">RESET</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ════════════════════════════════════════════════════════════════
+       SUPPLY CHAIN RESILIENCE MONITOR + OLLAMA LOCAL LLM
+       Real algorithms + Local AI analysis
+       ════════════════════════════════════════════════════════════════ */
+
+    const CONFIG = {
+      nodeCount: 12,
+      canvasWidth: 0,
+      canvasHeight: 0,
+      ollamaUrl: 'http://localhost:11434',
+      ollamaModel: 'mistral' // or 'neural-chat', 'llama2', 'dolphin-mixtral'
+    };
+
+    let state = {
+      nodes: [],
+      edges: [],
+      selected: null,
+      paused: false,
+      time: 0,
+      disrupted: new Set(),
+      ollamaConnected: false,
+      chatHistory: []
+    };
+
+    // ── OLLAMA CONNECTION ──────────────────────────────────────────
+
+    async function checkOllamaConnection() {
+      try {
+        const response = await fetch(`${CONFIG.ollamaUrl}/api/tags`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          state.ollamaConnected = true;
+          updateOllamaStatus(true);
+          addChatMessage('system', `Connected! Available models: ${data.models?.map(m => m.name).join(', ') || 'checking...'}`);
+          return true;
+        }
+      } catch (e) {
+        state.ollamaConnected = false;
+        updateOllamaStatus(false);
+        addChatMessage('system', `Ollama unavailable at ${CONFIG.ollamaUrl}. Install from ollama.ai and run: ollama serve`);
+      }
+      return false;
+    }
+
+    function updateOllamaStatus(connected) {
+      const statusEl = document.getElementById('ollama-status');
+      if (connected) {
+        statusEl.className = 'connected';
+        statusEl.innerHTML = '✓ Ollama connected • Ready for analysis';
+      } else {
+        statusEl.className = 'error';
+        statusEl.innerHTML = '✗ Ollama offline • Run: ollama serve';
+      }
+      statusEl.style.display = 'block';
+    }
+
+    async function queryOllama(prompt) {
+      if (!state.ollamaConnected) {
+        return "Ollama is not connected. Please start it with: ollama serve";
+      }
+
+      try {
+        const response = await fetch(`${CONFIG.ollamaUrl}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: CONFIG.ollamaModel,
+            prompt: prompt,
+            stream: false,
+            temperature: 0.7
+          })
+        });
+
+        if (!response.ok) throw new Error('Ollama request failed');
+        const data = await response.json();
+        return data.response;
+      } catch (e) {
+        return `Error querying Ollama: ${e.message}`;
+      }
+    }
+
+    // ── CHAT FUNCTIONS ────────────────────────────────────────────
+
+    function addChatMessage(role, message) {
+      const msg = { role, message, timestamp: new Date() };
+      state.chatHistory.push(msg);
+
+      const messagesEl = document.getElementById('chat-messages');
+      const msgEl = document.createElement('div');
+      msgEl.className = `chat-message ${role}`;
+      msgEl.innerHTML = `
+        <div class="chat-sender">${role.toUpperCase()}</div>
+        <div>${message.replace(/\n/g, '<br>')}</div>
+      `;
+      messagesEl.appendChild(msgEl);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function handleChatKeypress(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    }
+
+    async function sendChatMessage() {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+
+      if (!message) return;
+      if (!state.ollamaConnected) {
+        addChatMessage('system', 'Ollama not connected. Cannot analyze.');
+        return;
+      }
+
+      input.value = '';
+      input.disabled = true;
+      document.getElementById('chat-send-btn').disabled = true;
+
+      addChatMessage('user', message);
+      addChatMessage('assistant', 'Analyzing<span class="thinking">...</span>');
+
+      const networkContext = buildNetworkContext();
+      const fullPrompt = `You are a supply chain resilience expert. Answer based on this network data:\n\n${networkContext}\n\nUser question: ${message}\n\nProvide concise, actionable analysis.`;
+
+      const response = await queryOllama(fullPrompt);
+
+      // Remove the "Analyzing..." message
+      const messagesEl = document.getElementById('chat-messages');
+      messagesEl.removeChild(messagesEl.lastChild);
+
+      addChatMessage('assistant', response);
+
+      input.disabled = false;
+      document.getElementById('chat-send-btn').disabled = false;
+      input.focus();
+    }
+
+    function buildNetworkContext() {
+      const resilience = calculateResilience();
+      const bottlenecks = findBottlenecks(state.nodes, state.edges);
+      const disrupted = Array.from(state.disrupted).map(id => state.nodes.find(n => n.id === id)?.name || id);
+
+      return `
+NETWORK STATUS:
+- Nodes: ${state.nodes.length}
+- Edges: ${state.edges.length}
+- Resilience Score: ${resilience}%
+- Disrupted Nodes: ${disrupted.length > 0 ? disrupted.join(', ') : 'None'}
+- Critical Bottlenecks: ${bottlenecks.map(b => b.node.name).join(', ')}
+
+NODE DETAILS:
+${state.nodes.map(n => `- ${n.name}: Health=${n.health.toFixed(0)}%, Inventory=${(n.inventory/n.capacity*100).toFixed(0)}%, Cost=$${(n.costToFail/1000).toFixed(0)}k`).join('\n')}
+
+VULNERABILITIES:
+${bottlenecks.slice(0, 3).map(b => `- ${b.node.name} has centrality ${b.centrality.toFixed(1)}`).join('\n')}
+      `.trim();
+    }
+
+    async function analyzeNetwork() {
+      if (!state.ollamaConnected) {
+        addChatMessage('system', 'Ollama not connected.');
+        return;
+      }
+
+      const networkContext = buildNetworkContext();
+      const prompt = `As a supply chain expert, analyze this network and identify the top 3 risks and 3 recommendations:\n\n${networkContext}`;
+
+      addChatMessage('user', 'Perform full network analysis');
+      addChatMessage('assistant', 'Analyzing<span class="thinking">...</span>');
+
+      const response = await queryOllama(prompt);
+
+      const messagesEl = document.getElementById('chat-messages');
+      messagesEl.removeChild(messagesEl.lastChild);
+
+      addChatMessage('assistant', response);
+    }
+
+    // ── GRAPH DATA STRUCTURES ──────────────────────────────────────
+
+    class Node {
+      constructor(id, tier, name) {
+        this.id = id;
+        this.tier = tier;
+        this.name = name;
+        this.x = Math.random() * CONFIG.canvasWidth;
+        this.y = Math.random() * CONFIG.canvasHeight;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = (Math.random() - 0.5) * 2;
+        this.capacity = 100;
+        this.inventory = 80 + Math.random() * 20;
+        this.throughput = 0;
+        this.health = 100;
+        this.isDisrupted = false;
+        this.dependencies = [];
+        this.costToFail = 10000 + Math.random() * 50000;
+      }
+
+      update(nodes, disrupted) {
+        if (this.isDisrupted) {
+          this.health = Math.max(0, this.health - 2);
+          this.inventory = Math.max(0, this.inventory - 3);
+        } else {
+          this.health = Math.min(100, this.health + 0.5);
+          this.inventory = Math.min(this.capacity, this.inventory + 0.3);
+        }
+
+        let fx = 0, fy = 0;
+        const repelRadius = 100;
+        const attractRadius = 150;
+
+        for (let other of nodes) {
+          if (other.id === this.id) continue;
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const d = Math.hypot(dx, dy) + 0.1;
+
+          if (d < repelRadius) {
+            const f = -50 / (d * d);
+            fx += (dx / d) * f;
+            fy += (dy / d) * f;
+          } else if (d < attractRadius && this.dependencies.includes(other.id)) {
+            const f = d / 200;
+            fx += (dx / d) * f;
+            fy += (dy / d) * f;
+          }
+        }
+
+        this.vx += fx * 0.02;
+        this.vy += fy * 0.02;
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+        this.x += this.vx;
+        this.y += this.vy;
+
+        const margin = 40;
+        if (this.x < margin) { this.x = margin; this.vx *= -0.5; }
+        if (this.x > CONFIG.canvasWidth - margin) { this.x = CONFIG.canvasWidth - margin; this.vx *= -0.5; }
+        if (this.y < margin) { this.y = margin; this.vy *= -0.5; }
+        if (this.y > CONFIG.canvasHeight - margin) { this.y = CONFIG.canvasHeight - margin; this.vy *= -0.5; }
+      }
+
+      getMetrics() {
+        return {
+          efficiency: (this.inventory / this.capacity * 100) | 0,
+          health: this.health | 0,
+          throughput: this.throughput | 0,
+          costToFail: (this.costToFail / 1000) | 0
+        };
+      }
+    }
+
+    // ── ALGORITHMS ──────────────────────────────────────────────────
+
+    function findAllPaths(nodes, edges, source, sink, maxDepth = 5) {
+      const paths = [];
+      const visited = new Set();
+
+      function dfs(current, target, path, depth) {
+        if (depth > maxDepth) return;
+        if (current === target) {
+          paths.push([...path]);
+          return;
+        }
+
+        visited.add(current);
+        const neighbors = edges
+          .filter(e => e.from === current)
+          .map(e => e.to)
+          .filter(n => !visited.has(n));
+
+        for (let next of neighbors) {
+          dfs(next, target, [...path, next], depth + 1);
+        }
+        visited.delete(current);
+      }
+
+      dfs(source, sink, [source], 0);
+      return paths;
+    }
+
+    function findBottlenecks(nodes, edges) {
+      const inDegree = new Map();
+      const outDegree = new Map();
+
+      nodes.forEach(n => {
+        inDegree.set(n.id, 0);
+        outDegree.set(n.id, 0);
+      });
+
+      edges.forEach(e => {
+        outDegree.set(e.from, (outDegree.get(e.from) || 0) + 1);
+        inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1);
+      });
+
+      const bottlenecks = nodes
+        .map(n => ({
+          node: n,
+          centrality: (inDegree.get(n.id) + outDegree.get(n.id)) * (101 - n.health) / 100
+        }))
+        .sort((a, b) => b.centrality - a.centrality)
+        .slice(0, 3);
+
+      return bottlenecks;
+    }
+
+    function calculateResilience() {
+      if (state.nodes.length === 0) return 0;
+
+      const avgHealth = state.nodes.reduce((s, n) => s + n.health, 0) / state.nodes.length;
+      const pathRedundancy = state.edges.filter(e => !state.disrupted.has(e.from)).length / Math.max(1, state.nodes.length * 0.7);
+      const bottlenecks = findBottlenecks(state.nodes, state.edges).length;
+
+      return Math.max(0, Math.min(100, 
+        avgHealth * 0.4 +
+        Math.min(100, pathRedundancy * 30) * 0.4 +
+        (3 - bottlenecks) * 10 * 0.2
+      )) | 0;
+    }
+
+    // ── INITIALIZATION ──────────────────────────────────────────────
+
+    function initializeNetwork() {
+      state.nodes = [];
+      state.edges = [];
+      state.disrupted = new Set();
+
+      const tiers = [
+        { tier: 0, count: 3, names: ['Supplier A', 'Supplier B', 'Supplier C'] },
+        { tier: 1, count: 5, names: ['Mfg Plant 1', 'Mfg Plant 2', 'Mfg Plant 3', 'Mfg Plant 4', 'Mfg Plant 5'] },
+        { tier: 2, count: 4, names: ['Dist Center 1', 'Dist Center 2', 'Dist Center 3', 'Dist Center 4'] }
+      ];
+
+      let nodeId = 0;
+      const tierNodes = {};
+
+      for (let tierInfo of tiers) {
+        tierNodes[tierInfo.tier] = [];
+        for (let i = 0; i < tierInfo.count; i++) {
+          const node = new Node(nodeId++, tierInfo.tier, tierInfo.names[i]);
+          state.nodes.push(node);
+          tierNodes[tierInfo.tier].push(node);
+        }
+      }
+
+      for (let prevTier = 0; prevTier < 2; prevTier++) {
+        const current = tierNodes[prevTier];
+        const next = tierNodes[prevTier + 1];
+
+        for (let from of current) {
+          const connCount = 2 + Math.floor(Math.random() * 2);
+          for (let i = 0; i < connCount; i++) {
+            const to = next[Math.floor(Math.random() * next.length)];
+            if (!state.edges.some(e => e.from === from.id && e.to === to.id)) {
+              state.edges.push({
+                from: from.id,
+                to: to.id,
+                flow: 50 + Math.random() * 30,
+                capacity: 100
+              });
+              from.dependencies.push(to.id);
+            }
+          }
+        }
+      }
+    }
+
+    // ── RENDERING ──────────────────────────────────────────────────
+
+    function drawNetwork() {
+      const canvas = document.getElementById('network-canvas');
+      const ctx = canvas.getContext('2d');
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let edge of state.edges) {
+        const from = state.nodes.find(n => n.id === edge.from);
+        const to = state.nodes.find(n => n.id === edge.to);
+        if (!from || !to) continue;
+
+        const disrupted = state.disrupted.has(from.id) || state.disrupted.has(to.id);
+        ctx.strokeStyle = disrupted ? '#ff3366' : '#00d4ff';
+        ctx.lineWidth = disrupted ? 2 : 1;
+        ctx.globalAlpha = disrupted ? 1 : 0.3;
+
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 1;
+
+      for (let node of state.nodes) {
+        const isDisrupted = state.disrupted.has(node.id);
+        const isSelected = state.selected === node.id;
+
+        const radius = isDisrupted ? 14 : 10;
+        const color = isDisrupted ? '#ff3366' : (node.health < 30 ? '#ffaa00' : '#00ff88');
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (isDisrupted || isSelected) {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = 0.5;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        ctx.fillStyle = '#0a0e27';
+        ctx.font = '9px Courier New';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(node.id, node.x, node.y);
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('stat-nodes').textContent = state.nodes.length;
+      const resilience = calculateResilience();
+      document.getElementById('stat-resilience').textContent = resilience + '%';
+      document.getElementById('stat-risk').textContent = resilience > 70 ? 'LOW' : resilience > 40 ? 'MED' : 'HIGH';
+      document.getElementById('stat-risk').parentElement.className = resilience > 70 ? 'stat-value' : resilience > 40 ? 'stat-value warning' : 'stat-value danger';
+
+      const bottlenecks = findBottlenecks(state.nodes, state.edges);
+      document.getElementById('stat-critical').textContent = bottlenecks.length;
+
+      const nodesList = document.getElementById('nodes-list');
+      nodesList.innerHTML = state.nodes
+        .sort((a, b) => a.health - b.health)
+        .map(node => {
+          const metrics = node.getMetrics();
+          const className = state.disrupted.has(node.id) ? 'critical' : node.health < 40 ? 'warning' : '';
+          return `
+            <div class="supply-chain-node ${className} ${state.selected === node.id ? 'selected' : ''}" onclick="selectNode(${node.id})">
+              <div class="node-name">Node ${node.id}: ${node.name}</div>
+              <div class="node-metric">
+                <span>Health</span>
+                <span class="metric-value ${node.health < 40 ? 'danger' : ''}${node.health < 70 ? 'warning' : ''}">${metrics.health}%</span>
+              </div>
+              <div class="node-metric">
+                <span>Inventory</span>
+                <span class="metric-value">${metrics.efficiency}%</span>
+              </div>
+              <div class="node-metric">
+                <span>Cost to Fail</span>
+                <span class="metric-value">$${metrics.costToFail}k</span>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+
+      const alerts = [];
+      state.nodes.forEach(n => {
+        if (state.disrupted.has(n.id)) {
+          alerts.push({ type: 'danger', msg: `${n.name} is DISRUPTED` });
+        } else if (n.health < 30) {
+          alerts.push({ type: 'danger', msg: `${n.name} critical health` });
+        } else if (n.health < 60) {
+          alerts.push({ type: 'warning', msg: `${n.name} degraded` });
+        }
+      });
+
+      const alertsList = document.getElementById('alerts-list');
+      alertsList.innerHTML = alerts.length === 0
+        ? '<div style="color: var(--muted); text-align: center; padding: 20px;">System nominal</div>'
+        : alerts.map(a => `<div class="alert ${a.type}">${a.msg}</div>`).join('');
+    }
+
+    // ── EVENT HANDLERS ──────────────────────────────────────────────
+
+    function selectNode(nodeId) {
+      state.selected = state.selected === nodeId ? null : nodeId;
+    }
+
+    function simulateDisruption() {
+      if (state.nodes.length === 0) return;
+      const node = state.nodes[Math.floor(Math.random() * state.nodes.length)];
+      state.disrupted.add(node.id);
+      node.isDisrupted = true;
+      addChatMessage('system', `⚠ Network disruption: ${node.name} (ID: ${node.id}) is offline`);
+    }
+
+    function resetNetwork() {
+      initializeNetwork();
+      state.selected = null;
+      state.disrupted = new Set();
+      state.paused = false;
+      updateUI();
+    }
+
+    function togglePause() {
+      state.paused = !state.paused;
+      document.querySelectorAll('button.secondary')[0].textContent = state.paused ? 'RESUME' : 'PAUSE';
+    }
+
+    // ── CANVAS INTERACTION ──────────────────────────────────────────
+
+    const canvas = document.getElementById('network-canvas');
+    let isDragging = false;
+    let dragNode = null;
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      for (let node of state.nodes) {
+        const d = Math.hypot(node.x - mx, node.y - my);
+        if (d < 15) {
+          isDragging = true;
+          dragNode = node;
+          break;
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDragging || !dragNode) return;
+      const rect = canvas.getBoundingClientRect();
+      dragNode.x = e.clientX - rect.left;
+      dragNode.y = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      isDragging = false;
+      dragNode = null;
+    });
+
+    // ── ANIMATION LOOP ──────────────────────────────────────────────
+
+    function animate() {
+      if (!state.paused) {
+        state.time++;
+
+        for (let node of state.nodes) {
+          node.update(state.nodes, state.disrupted);
+        }
+
+        if (state.time % 60 === 0) {
+          for (let nodeId of state.disrupted) {
+            if (Math.random() < 0.2) {
+              state.disrupted.delete(nodeId);
+              const node = state.nodes.find(n => n.id === nodeId);
+              if (node) node.isDisrupted = false;
+            }
+          }
+        }
+
+        updateUI();
+      }
+
+      drawNetwork();
+      requestAnimationFrame(animate);
+    }
+
+    // ── STARTUP ────────────────────────────────────────────────────
+
+    window.addEventListener('load', async () => {
+      CONFIG.canvasWidth = document.getElementById('network-canvas').clientWidth;
+      CONFIG.canvasHeight = document.getElementById('network-canvas').clientHeight;
+
+      let bootProgress = 0;
+      const bootInterval = setInterval(async () => {
+        bootProgress += Math.random() * 25;
+        document.getElementById('boot-fill').style.width = Math.min(bootProgress, 100) + '%';
+
+        if (bootProgress >= 100) {
+          clearInterval(bootInterval);
+          document.getElementById('boot').style.display = 'none';
+          document.getElementById('app').classList.add('ready');
+
+          initializeNetwork();
+          updateUI();
+          animate();
+
+          // Check Ollama connection
+          await checkOllamaConnection();
+        }
+      }, 200);
+    });
+  </script>
+
+<!-- ── Sovereign Stack Integration ── -->
+<script src="../sovereign-log.js"></script>
+<script src="../sovereign-bus.js"></script>
+<script src="../ollama-local-ai.js"></script>
+<script>if (typeof attachBus === "function") attachBus();</script>
+</body>
+</html>

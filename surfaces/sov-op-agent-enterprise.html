@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOA • Sovereign Operations Agent v0.2.0</title>
+    <style>
+        :root {
+            --bg: #0a0c0f;
+            --panel: #0d1117;
+            --border: #1e2a38;
+            --accent: #4a9eff;
+            --text: #c8d6e5;
+            --muted: #3a5a7a;
+            --success: #22c55e;
+            --warn: #f59e0b;
+            --error: #ef4444;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.4;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .soa-root {
+            height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            background: var(--bg);
+        }
+
+        .header {
+            background: #0d1117;
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .header-badge {
+            background: #112233;
+            border: 1px solid #1a3a5c;
+            color: var(--accent);
+            font-size: 10px;
+            letter-spacing: 2px;
+            padding: 4px 10px;
+            border-radius: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+            flex-shrink: 0;
+        }
+
+        .status-dot.offline {
+            background: var(--error);
+            box-shadow: 0 0 8px var(--error);
+        }
+
+        .ollama-status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--muted);
+            background: #111820;
+            padding: 4px 10px;
+            border-radius: 3px;
+            border: 1px solid var(--border);
+        }
+
+        .main {
+            display: grid;
+            grid-template-columns: 240px 1fr 240px;
+            overflow: hidden;
+        }
+
+        .sidebar, .sidebar-right {
+            background: #0d1117;
+            border-right: 1px solid var(--border);
+            padding: 16px 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-right {
+            border-right: none;
+            border-left: 1px solid var(--border);
+        }
+
+        .section-label {
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--muted);
+            padding: 8px 18px 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .nav-item {
+            padding: 9px 18px;
+            cursor: pointer;
+            color: #7a9bb5;
+            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-item:hover {
+            color: var(--text);
+            background: #111820;
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+            border-left-color: var(--accent);
+            background: #0d1a2a;
+        }
+
+        .center-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--panel);
+        }
+
+        .tab-bar {
+            display: flex;
+            background: #0d1117;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 12px 20px;
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: var(--bg);
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .metric-card {
+            background: #070a0d;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .metric-val {
+            font-size: 26px;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .metric-val.green { color: var(--success); }
+        .metric-val.amber { color: var(--warn); }
+
+        .constraint-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .constraint-name { color: #7a9bb5; }
+        .constraint-val { color: var(--accent); font-family: monospace; }
+
+        .log-container {
+            background: #070a0d;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 12px;
+            line-height: 1.6;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .log-line {
+            margin-bottom: 3px;
+        }
+
+        .log-ts {
+            color: #2a4a6a;
+            margin-right: 10px;
+            width: 70px;
+            display: inline-block;
+        }
+
+        .log-success { color: var(--success); }
+        .log-warn { color: var(--warn); }
+        .log-error { color: var(--error); }
+        .log-info { color: var(--accent); }
+
+        .decision-result {
+            border: 1px solid #1a4a2a;
+            border-radius: 6px;
+            padding: 18px;
+            background: #070d0a;
+            margin-bottom: 16px;
+        }
+
+        .decision-result.escalate {
+            border-color: #4a3a1a;
+            background: #0d0a07;
+        }
+
+        .verdict {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .thinking-block {
+            background: #070d0a;
+            border: 1px solid #1a3a2a;
+            border-radius: 4px;
+            padding: 14px;
+            margin: 16px 0;
+            font-size: 12.5px;
+            color: #5a9a7a;
+            line-height: 1.65;
+        }
+
+        .error-box {
+            background: #0d0707;
+            border: 1px solid #5a1a1a;
+            color: var(--error);
+            padding: 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin: 12px 0;
+        }
+
+        .input-area {
+            border-top: 1px solid var(--border);
+            background: #0d1117;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .decision-input {
+            flex: 1;
+            background: #070a0d;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 14px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            resize: vertical;
+            min-height: 92px;
+            outline: none;
+        }
+
+        .decision-input:focus {
+            border-color: var(--accent);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-family: monospace;
+            font-size: 13px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-success {
+            background: #0d2a1a;
+            border-color: #1a5a3a;
+            color: var(--success);
+        }
+
+        .btn-success:hover {
+            background: #1a3a2a;
+        }
+
+        .btn-primary {
+            background: #0d2a4a;
+            border-color: #1a5a9a;
+            color: var(--accent);
+        }
+
+        .btn-primary:hover {
+            background: #1a3a6a;
+        }
+
+        .tcc-step {
+            display: flex;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid #0d1520;
+            font-size: 11.5px;
+            align-items: flex-start;
+        }
+
+        .step-num { color: var(--success); width: 42px; flex-shrink: 0; }
+        .step-op { color: var(--accent); min-width: 160px; }
+        .step-detail { color: #7a9bb5; flex: 1; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+<div class="soa-root">
+    <!-- Header -->
+    <div class="header">
+        <div class="status-dot" id="main-dot"></div>
+        <span class="header-badge">SOA</span>
+        <span style="color:#4a9eff; font-weight:600;">SOVEREIGN OPERATIONS AGENT</span>
+        <span style="color:#3a5a7a; font-size:11px; margin-left:6px;">v0.2.0</span>
+        
+        <div class="ollama-status">
+            <div class="status-dot offline" id="ollama-dot"></div>
+            <span id="ollama-status-text">ollama: offline</span>
+        </div>
+    </div>
+
+    <div class="main">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="section-label">Domains</div>
+            <div class="nav-item active" data-domain="ops">▶ Operations</div>
+            <div class="nav-item" data-domain="finance">▶ Finance</div>
+            <div class="nav-item" data-domain="supply">▶ Supply Chain</div>
+            <div class="nav-item" data-domain="infra">▶ Infrastructure</div>
+
+            <div class="section-label" style="margin-top:24px;">Agents</div>
+            <div class="nav-item active" data-tab="decide">■ Kernel</div>
+            <div class="nav-item" data-tab="memory">■ Memory DAG</div>
+            <div class="nav-item" data-tab="tcc">■ TCC Log</div>
+            <div class="nav-item" data-tab="config">■ Config</div>
+
+            <div class="section-label" style="margin-top:24px;">Session</div>
+            <div style="padding:8px 18px;">
+                <div style="font-size:10px;color:var(--muted);">DECISIONS MADE</div>
+                <div style="font-size:24px;color:var(--accent);" id="decision-count">0</div>
+            </div>
+            <div style="padding:8px 18px;">
+                <div style="font-size:10px;color:var(--muted);">SUCCESS RATE</div>
+                <div style="font-size:24px;color:var(--success);" id="success-rate">—</div>
+            </div>
+            <div style="padding:8px 18px;">
+                <div style="font-size:10px;color:var(--muted);">MODEL</div>
+                <div style="font-size:13px;color:#a78bfa;" id="model-display">llama3.2</div>
+            </div>
+        </div>
+
+        <!-- Center Panel -->
+        <div class="center-panel">
+            <div class="tab-bar">
+                <div class="tab active" data-tab="decide">Decision</div>
+                <div class="tab" data-tab="memory">Memory</div>
+                <div class="tab" data-tab="tcc">TCC Audit</div>
+                <div class="tab" data-tab="config">Config</div>
+            </div>
+
+            <!-- Decision Panel -->
+            <div class="panel-body" id="panel-decide">
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Decision Context</div>
+                    <select id="decision-type" style="background:#111820;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;width:100%;font-family:monospace;">
+                        <option value="capacity_scale">capacity_scale</option>
+                        <option value="failover_decision">failover_decision</option>
+                        <option value="procurement_approval">procurement_approval</option>
+                        <option value="risk_assessment">risk_assessment</option>
+                        <option value="custom">custom</option>
+                    </select>
+                </div>
+
+                <div id="result-area"></div>
+                <div id="thinking-area"></div>
+                <div id="tcc-live"></div>
+            </div>
+
+            <!-- Memory Panel -->
+            <div class="panel-body" id="panel-memory" style="display:none;">
+                <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Memory DAG — Append-Only Ledger</div>
+                <div id="memory-list">
+                    <div style="color:var(--muted);font-size:12px;padding:20px;text-align:center;">No decisions recorded yet.<br>Run your first decision to populate the DAG.</div>
+                </div>
+            </div>
+
+            <!-- TCC Panel -->
+            <div class="panel-body" id="panel-tcc" style="display:none;">
+                <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">TCC Audit Log — Cryptographically Chained</div>
+                <div id="tcc-full-log" class="log-container" style="max-height:none;height:calc(100vh - 280px);">
+                    <div style="color:var(--muted);font-size:12px;padding:20px;text-align:center;">No TCC steps logged yet.</div>
+                </div>
+            </div>
+
+            <!-- Config Panel -->
+            <div class="panel-body" id="panel-config" style="display:none;">
+                <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Kernel Configuration</div>
+                
+                <div style="margin-bottom:16px;">
+                    <div style="margin-bottom:8px;font-size:11px;color:var(--muted);">Ollama URL</div>
+                    <input id="cfg-url" value="http://localhost:11434" class="config-input" style="width:100%;background:#111820;border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:4px;font-family:monospace;">
+                </div>
+
+                <div style="margin-bottom:16px;">
+                    <div style="margin-bottom:8px;font-size:11px;color:var(--muted);">Model</div>
+                    <input id="cfg-model" value="llama3.2" class="config-input" style="width:100%;background:#111820;border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:4px;font-family:monospace;">
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div>
+                        <div style="margin-bottom:8px;font-size:11px;color:var(--muted);">Temperature</div>
+                        <input id="cfg-temp" type="number" step="0.05" min="0" max="1" value="0.25" class="config-input" style="width:100%;">
+                    </div>
+                    <div>
+                        <div style="margin-bottom:8px;font-size:11px;color:var(--muted);">Max Tokens</div>
+                        <input id="cfg-tokens" type="number" value="1024" class="config-input" style="width:100%;">
+                    </div>
+                </div>
+
+                <div style="margin-top:28px;">
+                    <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Guardrails (Covenant)</div>
+                    
+                    <div class="constraint-row">
+                        <span class="constraint-name">cost_limit</span>
+                        <input id="c-cost" type="number" value="50000" style="width:110px;background:#111820;border:1px solid var(--border);color:var(--accent);padding:6px 10px;border-radius:4px;text-align:right;">
+                    </div>
+                    <div class="constraint-row">
+                        <span class="constraint-name">conf_threshold</span>
+                        <input id="c-conf" type="number" step="0.01" value="0.85" style="width:110px;background:#111820;border:1px solid var(--border);color:var(--accent);padding:6px 10px;border-radius:4px;text-align:right;">
+                    </div>
+                </div>
+
+                <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+                    <button class="btn btn-success" onclick="saveConfig()">Save Config</button>
+                    <button class="btn btn-primary" onclick="testOllama()">Test Ollama</button>
+                    <button class="btn btn-primary" onclick="clearAll()">Clear All</button>
+                </div>
+
+                <div id="config-log" class="log-container" style="margin-top:20px;max-height:180px;"></div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <textarea id="decision-input" class="decision-input" placeholder="Describe the operational situation...&#10;e.g. Database mysql-prod-3 showing CPU at 89%, memory at 7.8GB/8GB..."></textarea>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <button class="btn btn-success" onclick="runDecision()" id="run-btn" style="padding:14px 28px;font-size:14px;">▶ EXECUTE</button>
+                    <button class="btn btn-primary" onclick="loadExample()" style="padding:8px 16px;font-size:12px;">Load Example</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="sidebar-right">
+            <div style="padding:0 18px;">
+                <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Live Metrics</div>
+                
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Approved</div>
+                        <div class="metric-val green" id="m-approved">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Escalated</div>
+                        <div class="metric-val amber" id="m-escalated">0</div>
+                    </div>
+                </div>
+
+                <div class="metric-card" style="margin-bottom:12px;">
+                    <div class="metric-label">TCC Steps</div>
+                    <div class="metric-val" id="m-steps">0</div>
+                </div>
+                <div class="metric-card" style="margin-bottom:20px;">
+                    <div class="metric-label">Memory Entries</div>
+                    <div class="metric-val" id="m-memory">0</div>
+                </div>
+
+                <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Active Constraints</div>
+                <div class="constraint-row">
+                    <span class="constraint-name">cost_limit</span>
+                    <span class="constraint-val" id="cv-cost">$50k</span>
+                </div>
+                <div class="constraint-row">
+                    <span class="constraint-name">conf_thresh</span>
+                    <span class="constraint-val" id="cv-conf">85%</span>
+                </div>
+                <div class="constraint-row">
+                    <span class="constraint-name">domain</span>
+                    <span class="constraint-val" id="cv-domain">ops</span>
+                </div>
+                <div class="constraint-row">
+                    <span class="constraint-name">authority</span>
+                    <span class="constraint-val">EXECUTE</span>
+                </div>
+
+                <div style="margin-top:28px;">
+                    <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Event Log</div>
+                    <div class="log-container" id="event-log" style="max-height:calc(100vh - 520px);"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const state = {
+    ollamaUrl: 'http://localhost:11434',
+    model: 'llama3.2',
+    temp: 0.25,
+    maxTokens: 1024,
+    costLimit: 50000,
+    confThreshold: 0.85,
+    domain: 'ops',
+    memory: [],
+    tccLog: [],
+    stepCounter: 0,
+    decisionCount: 0,
+    approved: 0,
+    escalated: 0,
+    prevHash: '0000000000000000000000000000000000000000000000000000000000000000'
+};
+
+function simpleHash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) {
+        h = ((h << 5) + h) ^ str.charCodeAt(i);
+        h = h >>> 0;
+    }
+    return h.toString(16).padStart(16, '0');
+}
+
+function ts() {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+}
+
+function logEvent(msg, cls = 'log-info') {
+    const el = document.getElementById('event-log');
+    el.innerHTML += `<div class="log-line"><span class="log-ts">${ts()}</span><span class="${cls}">${msg}</span></div>`;
+    el.scrollTop = el.scrollHeight;
+}
+
+function tccLog(op, input, output, meta = '') {
+    const id = state.stepCounter++;
+    const inputHash = simpleHash(JSON.stringify(input));
+    const outputHash = simpleHash(JSON.stringify(output));
+    const sig = '0x' + simpleHash(id + op + inputHash + outputHash + state.prevHash).slice(0, 20) + '...';
+    
+    const entry = { id, op, inputHash, outputHash, sig, meta, ts: ts() };
+    state.tccLog.push(entry);
+    state.prevHash = sig;
+    
+    document.getElementById('m-steps').textContent = state.stepCounter;
+    return entry;
+}
+
+function renderTCCStep(entry) {
+    return `<div class="tcc-step">
+        <span class="step-num">#${String(entry.id).padStart(3,'0')}</span>
+        <span class="step-op">${entry.op}</span>
+        <span class="step-detail">in:${entry.inputHash.slice(0,8)}… → out:${entry.outputHash.slice(0,8)}…</span>
+        <span style="color:#2a5a3a;font-size:10px;">${entry.sig}</span>
+    </div>`;
+}
+
+function updateTCCPanel() {
+    const el = document.getElementById('tcc-full-log');
+    if (state.tccLog.length === 0) {
+        el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:30px;text-align:center;">No TCC steps logged yet.</div>`;
+        return;
+    }
+    el.innerHTML = state.tccLog.map(renderTCCStep).join('');
+}
+
+function appendToMemory(decision, reasoning, verdict, confidence) {
+    const entry = {
+        id: state.memory.length,
+        decision: decision.slice(0, 140),
+        verdict,
+        confidence,
+        reasoning: reasoning.slice(0, 180) + (reasoning.length > 180 ? '...' : ''),
+        hash: simpleHash(decision + verdict + Date.now()),
+        success: verdict === 'EXECUTE'
+    };
+    state.memory.push(entry);
+    document.getElementById('m-memory').textContent = state.memory.length;
+    renderMemory();
+}
+
+function renderMemory() {
+    const el = document.getElementById('memory-list');
+    if (state.memory.length === 0) {
+        el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:30px;text-align:center;">No decisions recorded yet.<br>Run your first decision to populate the DAG.</div>`;
+        return;
+    }
+    el.innerHTML = state.memory.slice().reverse().map(e => `
+        <div style="border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px;background:#070a0d;">
+            <div style="font-size:10px;color:#2a5a3a;margin-bottom:6px;">DAG[${e.id}] • ${e.hash.slice(0,12)}…</div>
+            <div style="font-size:12.5px;margin-bottom:8px;">${e.decision}</div>
+            <div style="font-size:11px;color:${e.success ? 'var(--success)' : 'var(--warn)'}">
+                ${e.verdict} • ${(e.confidence*100).toFixed(0)}% confidence
+            </div>
+        </div>
+    `).join('');
+}
+
+function getMemoryContext() {
+    if (state.memory.length === 0) return '';
+    const recent = state.memory.slice(-4);
+    return `Recent memory (${recent.length} entries, success rate: ${Math.round(recent.filter(m => m.success).length / recent.length * 100)}%):\n` +
+           recent.map(m => `• ${m.verdict} @ ${(m.confidence*100).toFixed(0)}% — ${m.decision.slice(0,70)}`).join('\n');
+}
+
+async function callOllama(systemPrompt, userPrompt) {
+    const url = document.getElementById('cfg-url').value || state.ollamaUrl;
+    const model = document.getElementById('cfg-model').value || state.model;
+    const temp = parseFloat(document.getElementById('cfg-temp').value) || 0.25;
+    const maxTokens = parseInt(document.getElementById('cfg-tokens').value) || 1024;
+
+    const response = await fetch(`${url}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model,
+            system: systemPrompt,
+            prompt: userPrompt,
+            stream: false,
+            options: { temperature: temp, num_predict: maxTokens }
+        })
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return data.response.trim();
+}
+
+function buildSystemPrompt() {
+    const costLimit = parseInt(document.getElementById('c-cost').value) || 50000;
+    const confThresh = parseFloat(document.getElementById('c-conf').value) || 0.85;
+    const memCtx = getMemoryContext();
+
+    return `You are the Sovereign Operations Agent (SOA) — a fully autonomous enterprise decision engine.
+
+DOMAIN: ${state.domain.toUpperCase()}
+GUARDRAILS:
+- Auto-approve ONLY if confidence ≥ ${Math.round(confThresh*100)}% AND estimated cost ≤ $${costLimit.toLocaleString()}
+- Safety, compliance, or high-risk actions MUST escalate
+- All decisions are cryptographically logged via TCC
+
+${memCtx ? `INSTITUTIONAL MEMORY:\n${memCtx}` : 'No prior decisions in memory.'}
+
+You MUST respond with exactly this JSON format and nothing else:
+
+{
+  "verdict": "EXECUTE" | "ESCALATE_TO_HUMAN" | "REJECT",
+  "confidence": 0.XX,
+  "action": "one-line action summary",
+  "reasoning": "2-3 concise sentences with clear logic",
+  "risk_factors": ["short risk1", "short risk2"],
+  "estimated_cost": integer_dollars,
+  "reversible": true or false
+}`;
+}
+
+async function runDecision() {
+    const input = document.getElementById('decision-input').value.trim();
+    if (!input) {
+        logEvent('Decision input is empty', 'log-warn');
+        return;
+    }
+
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.textContent = 'RUNNING...';
+
+    const resultArea = document.getElementById('result-area');
+    const thinkingArea = document.getElementById('thinking-area');
+    const tccLive = document.getElementById('tcc-live');
+
+    resultArea.innerHTML = '';
+    thinkingArea.innerHTML = '';
+    tccLive.innerHTML = '';
+
+    logEvent(`New decision: ${input.substring(0, 55)}${input.length > 55 ? '...' : ''}`, 'log-info');
+
+    try {
+        // TCC Step 1
+        tccLog('kernel.begin_transaction', {input: input.substring(0,100)}, {status:'started'});
+        tccLive.innerHTML += renderTCCStep(state.tccLog[state.tccLog.length-1]);
+
+        // TCC Step 2 - Memory
+        tccLog('memory_dag.retrieve', {query: input.substring(0,60)}, {entries: state.memory.length});
+        tccLive.innerHTML += renderTCCStep(state.tccLog[state.tccLog.length-1]);
+
+        thinkingArea.innerHTML = `<div class="thinking-block">Querying local Ollama • Building context from ${state.memory.length} memory entries...</div>`;
+
+        // TCC Step 3 - Inference
+        const systemPrompt = buildSystemPrompt();
+        const userPrompt = `OPERATIONAL SITUATION:\n${input}\n\nProvide your sovereign decision.`;
+        
+        const rawResponse = await callOllama(systemPrompt, userPrompt);
+        
+        tccLog('ollama.inference', {prompt_hash: simpleHash(userPrompt)}, {response_hash: simpleHash(rawResponse)});
+        tccLive.innerHTML += renderTCCStep(state.tccLog[state.tccLog.length-1]);
+
+        // Parse JSON
+        let parsed;
+        try {
+            const match = rawResponse.match(/\{[\s\S]*\}/);
+            parsed = JSON.parse(match ? match[0] : rawResponse);
+        } catch (e) {
+            throw new Error('Failed to parse LLM response as JSON');
+        }
+
+        tccLog('kernel.parse_result', {}, {verdict: parsed.verdict});
+
+        // Constraint Check
+        const costOk = !parsed.estimated_cost || parsed.estimated_cost <= (parseInt(document.getElementById('c-cost').value) || 50000);
+        const confOk = parsed.confidence >= (parseFloat(document.getElementById('c-conf').value) || 0.85);
+        
+        let finalVerdict = parsed.verdict;
+        if (finalVerdict === 'EXECUTE' && (!costOk || !confOk)) {
+            finalVerdict = 'ESCALATE_TO_HUMAN';
+        }
+
+        tccLog('covenant.guardrail_check', {cost: parsed.estimated_cost, confidence: parsed.confidence}, {finalVerdict});
+
+        // Commit
+        const decisionSig = '0x' + simpleHash(JSON.stringify(parsed) + finalVerdict).slice(0, 24) + '...';
+        tccLog('kernel.commit', {verdict: finalVerdict}, {signature: decisionSig});
+
+        // Update stats
+        state.decisionCount++;
+        if (finalVerdict === 'EXECUTE') state.approved++;
+        else state.escalated++;
+
+        document.getElementById('decision-count').textContent = state.decisionCount;
+        document.getElementById('m-approved').textContent = state.approved;
+        document.getElementById('m-escalated').textContent = state.escalated;
+        document.getElementById('success-rate').textContent = state.decisionCount ? 
+            Math.round(state.approved / state.decisionCount * 100) + '%' : '—';
+
+        appendToMemory(input, parsed.reasoning || '', finalVerdict, parsed.confidence);
+
+        // Display result
+        const isEscalate = finalVerdict !== 'EXECUTE';
+        resultArea.innerHTML = `
+            <div class="decision-result ${isEscalate ? 'escalate' : ''}">
+                <div class="verdict" style="color:${isEscalate ? 'var(--warn)' : 'var(--success)'}">
+                    ${finalVerdict === 'EXECUTE' ? '✓ EXECUTE' : finalVerdict === 'ESCALATE_TO_HUMAN' ? '⚠ ESCALATE TO HUMAN' : '✕ REJECTED'}
+                </div>
+                <div style="font-size:12px;color:#5a9a7a;margin:8px 0;">
+                    Confidence: ${(parsed.confidence*100).toFixed(1)}% • 
+                    Cost: $${(parsed.estimated_cost || 0).toLocaleString()} • 
+                    Reversible: ${parsed.reversible ? 'YES' : 'NO'}
+                </div>
+                <div style="font-size:11px;color:#2a5a3a;margin-bottom:10px;">sig: ${decisionSig}</div>
+                <div style="font-size:12.5px;"><strong>Action:</strong> ${parsed.action}</div>
+                <div style="font-size:12.5px;margin-top:8px;"><strong>Reasoning:</strong> ${parsed.reasoning}</div>
+                ${parsed.risk_factors && parsed.risk_factors.length ? 
+                    `<div style="margin-top:12px;font-size:11px;color:#8a6a1a;">Risk: ${parsed.risk_factors.join(' • ')}</div>` : ''}
+            </div>`;
+
+        logEvent(`Decision completed → ${finalVerdict}`, finalVerdict === 'EXECUTE' ? 'log-success' : 'log-warn');
+        updateTCCPanel();
+
+    } catch (err) {
+        resultArea.innerHTML = `
+            <div class="error-box">
+                <strong>Kernel Error:</strong> ${err.message}<br><br>
+                <span style="font-size:12px;">
+                    Make sure Ollama is running:<br>
+                    <code style="background:#1a1a1a;padding:2px 6px;border-radius:2px;">ollama serve</code><br><br>
+                    And the model is available:<br>
+                    <code style="background:#1a1a1a;padding:2px 6px;border-radius:2px;">ollama pull llama3.2</code>
+                </span>
+            </div>`;
+        logEvent(`Error: ${err.message}`, 'log-error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '▶ EXECUTE';
+    }
+}
+
+async function testOllama() {
+    const logEl = document.getElementById('config-log');
+    const url = document.getElementById('cfg-url').value;
+    
+    logEl.innerHTML = `<div class="log-line"><span class="log-ts">${ts()}</span><span class="log-info">Testing connection to ${url}...</span></div>`;
+    
+    try {
+        const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(3000) });
+        const data = await res.json();
+        const models = data.models ? data.models.map(m => m.name).join(', ') : 'none';
+        
+        logEl.innerHTML += `<div class="log-line"><span class="log-ts">${ts()}</span><span class="log-success">✓ Ollama reachable • Models: ${models}</span></div>`;
+        
+        const currentModel = document.getElementById('cfg-model').value;
+        if (!data.models?.some(m => m.name.includes(currentModel))) {
+            logEl.innerHTML += `<div class="log-line"><span class="log-ts">${ts()}</span><span class="log-warn">⚠ Model "${currentModel}" not found. Run: ollama pull ${currentModel}</span></div>`;
+        }
+        
+        setOllamaStatus(true);
+    } catch (e) {
+        logEl.innerHTML += `<div class="log-line"><span class="log-ts">${ts()}</span><span class="log-error">✗ Connection failed: ${e.message}</span></div>`;
+        setOllamaStatus(false);
+    }
+}
+
+function setOllamaStatus(online) {
+    const dot = document.getElementById('ollama-dot');
+    const txt = document.getElementById('ollama-status-text');
+    const mainDot = document.getElementById('main-dot');
+    
+    if (online) {
+        dot.className = 'status-dot';
+        txt.textContent = 'ollama: online';
+        txt.style.color = '#22c55e';
+        mainDot.className = 'status-dot';
+    } else {
+        dot.className = 'status-dot offline';
+        txt.textContent = 'ollama: offline';
+        txt.style.color = '#ef4444';
+        mainDot.className = 'status-dot offline';
+    }
+}
+
+function saveConfig() {
+    state.ollamaUrl = document.getElementById('cfg-url').value;
+    state.model = document.getElementById('cfg-model').value;
+    state.temp = parseFloat(document.getElementById('cfg-temp').value);
+    state.maxTokens = parseInt(document.getElementById('cfg-tokens').value);
+    state.costLimit = parseInt(document.getElementById('c-cost').value);
+    state.confThreshold = parseFloat(document.getElementById('c-conf').value);
+
+    document.getElementById('cv-cost').textContent = '$' + (state.costLimit / 1000) + 'k';
+    document.getElementById('cv-conf').textContent = Math.round(state.confThreshold * 100) + '%';
+    document.getElementById('model-display').textContent = state.model;
+
+    const log = document.getElementById('config-log');
+    log.innerHTML += `<div class="log-line"><span class="log-ts">${ts()}</span><span class="log-success">Configuration saved successfully.</span></div>`;
+    logEvent('Configuration updated', 'log-info');
+}
+
+function clearAll() {
+    if (!confirm('Clear all memory, TCC logs, and counters?')) return;
+    
+    state.memory = [];
+    state.tccLog = [];
+    state.stepCounter = 0;
+    state.decisionCount = 0;
+    state.approved = 0;
+    state.escalated = 0;
+    state.prevHash = '0000000000000000000000000000000000000000000000000000000000000000';
+
+    document.getElementById('decision-count').textContent = '0';
+    document.getElementById('m-approved').textContent = '0';
+    document.getElementById('m-escalated').textContent = '0';
+    document.getElementById('m-steps').textContent = '0';
+    document.getElementById('m-memory').textContent = '0';
+    document.getElementById('success-rate').textContent = '—';
+
+    document.getElementById('memory-list').innerHTML = `<div style="color:var(--muted);font-size:12px;padding:30px;text-align:center;">Memory cleared.</div>`;
+    document.getElementById('tcc-full-log').innerHTML = `<div style="color:var(--muted);font-size:12px;padding:30px;text-align:center;">No TCC steps logged yet.</div>`;
+    document.getElementById('result-area').innerHTML = '';
+    document.getElementById('thinking-area').innerHTML = '';
+    document.getElementById('tcc-live').innerHTML = '';
+    
+    logEvent('All memory and logs cleared', 'log-warn');
+}
+
+function loadExample() {
+    const examples = [
+        "Database mysql-prod-3 showing CPU at 89%, memory at 7.8GB/8GB. Response time degraded from 12ms to 340ms. 14 similar incidents resolved by scaling in 11 cases.",
+        "Supplier A offers 22% discount on XR-44 but requires net-15 terms instead of net-30. Current inventory: 9 days. Finance cash position solid.",
+        "API gateway p99 latency spiked to 2.1s. Root cause suspected in upstream service. Rolling deployment 45% complete. Options: rollback or continue with circuit breaker.",
+        "Fraud signal on account #9182: 17 transactions in 11 minutes from Eastern Europe IP while account registered in US. Model score 94%."
+    ];
+    document.getElementById('decision-input').value = examples[Math.floor(Math.random() * examples.length)];
+}
+
+// Tab & Domain Switching
+document.querySelectorAll('[data-tab]').forEach(el => {
+    el.addEventListener('click', () => {
+        const tab = el.getAttribute('data-tab');
+        document.querySelectorAll('.panel-body').forEach(p => p.style.display = 'none');
+        document.getElementById('panel-' + tab).style.display = 'block';
+        
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll(`.tab[data-tab="${tab}"]`).forEach(t => t.classList.add('active'));
+        
+        document.querySelectorAll('.nav-item').forEach(item => {
+            if (item.getAttribute('data-tab') === tab) item.classList.add('active');
+            else if (item.getAttribute('data-tab')) item.classList.remove('active');
+        });
+
+        if (tab === 'tcc') updateTCCPanel();
+    });
+});
+
+document.querySelectorAll('[data-domain]').forEach(el => {
+    el.addEventListener('click', () => {
+        state.domain = el.getAttribute('data-domain');
+        document.getElementById('cv-domain').textContent = state.domain;
+        
+        document.querySelectorAll('[data-domain]').forEach(d => d.classList.remove('active'));
+        el.classList.add('active');
+        
+        logEvent(`Domain switched to ${state.domain.toUpperCase()}`, 'log-muted');
+    });
+});
+
+// Initial setup
+setTimeout(() => {
+    logEvent('SOA Kernel v0.2.0 initialized', 'log-success');
+    logEvent('Waiting for Ollama connection...', 'log-muted');
+    
+    // Auto test Ollama on load
+    testOllama().catch(() => {});
+}, 600);
+</script>
+
+
+<!-- ── Sovereign Stack Integration ── -->
+<script src="../sovereign-log.js"></script>
+<script src="../sovereign-bus.js"></script>
+<script src="../ollama-local-ai.js"></script>
+<script>if (typeof attachBus === "function") attachBus();</script>
+</body>
+</html>

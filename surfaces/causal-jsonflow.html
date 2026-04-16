@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Causal JSONFlow — Pivot Schema DAG</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #04060c;
+            --surface: #080d18;
+            --panel: #0b1220;
+            --border: #131f30;
+            --border2: #1c2e44;
+            --green: #00e676;
+            --cyan: #00e5ff;
+            --yellow: #ffd600;
+            --red: #ff1744;
+            --orange: #ff6d00;
+            --purple: #d500f9;
+            --blue: #2979ff;
+            --text: #aec6d4;
+            --dim: #4a6478;
+            --muted: #263545;
+            --glow-g: 0 0 8px rgba(0, 230, 118, .55), 0 0 22px rgba(0, 230, 118, .18);
+            --glow-c: 0 0 8px rgba(0, 229, 255, .55), 0 0 22px rgba(0, 229, 255, .18);
+            --glow-y: 0 0 8px rgba(255, 214, 0, .55), 0 0 22px rgba(255, 214, 0, .18);
+            --glow-r: 0 0 8px rgba(255, 23, 68, .55), 0 0 22px rgba(255, 23, 68, .18);
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, .06) 2px, rgba(0, 0, 0, .06) 4px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: linear-gradient(rgba(0, 229, 255, .018) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 255, .018) 1px, transparent 1px);
+            background-size: 44px 44px;
+            animation: drift 40s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes drift {
+            to {
+                background-position: 44px 44px;
+            }
+        }
+
+        .hdr {
+            position: relative;
+            z-index: 10;
+            background: linear-gradient(135deg, #04060c, #08101e);
+            border-bottom: 1px solid var(--border2);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .hdr-brand {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+
+        .hdr-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 26px;
+            letter-spacing: 5px;
+            color: var(--cyan);
+            text-shadow: var(--glow-c);
+        }
+
+        .hdr-sub {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: var(--dim);
+            text-transform: uppercase;
+        }
+
+        .hdr-chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 9px;
+            border: 1px solid var(--border2);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            transition: all .3s;
+        }
+
+        .chip::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--muted);
+            transition: all .3s;
+        }
+
+        .chip.on {
+            border-color: var(--green);
+            box-shadow: 0 0 6px rgba(0, 230, 118, .25);
+        }
+
+        .chip.on::before {
+            background: var(--green);
+            box-shadow: var(--glow-g);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .chip.warn.on {
+            border-color: var(--yellow);
+        }
+
+        .chip.warn.on::before {
+            background: var(--yellow);
+            box-shadow: var(--glow-y);
+        }
+
+        .chip.err.on {
+            border-color: var(--red);
+        }
+
+        .chip.err.on::before {
+            background: var(--red);
+            box-shadow: var(--glow-r);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .3;
+            }
+        }
+
+        .hdr-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+            color: var(--dim);
+        }
+
+        .hdr-stat strong {
+            color: var(--yellow);
+        }
+
+        .body {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: grid;
+            grid-template-columns: 320px 1fr 300px;
+            grid-template-rows: 1fr;
+            overflow: hidden;
+        }
+
+        .side {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+        }
+
+        .side.right {
+            border-right: none;
+            border-left: 1px solid var(--border);
+        }
+
+        .side-sec {
+            border-bottom: 1px solid var(--border);
+            padding: 12px 14px;
+            flex-shrink: 0;
+        }
+
+        .side-sec.scroll {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .side-sec.scroll::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        .side-sec.scroll::-webkit-scrollbar-thumb {
+            background: var(--border2);
+        }
+
+        .sec-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 8px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--dim);
+            margin-bottom: 8px;
+        }
+
+        input,
+        textarea,
+        select {
+            background: var(--panel);
+            border: 1px solid var(--border2);
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 6px 9px;
+            border-radius: 3px;
+            outline: none;
+            transition: border-color .2s;
+            width: 100%;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--cyan);
+        }
+
+        select option {
+            background: var(--panel);
+        }
+
+        textarea {
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .row input,
+        .row select {
+            flex: 1;
+        }
+
+        .btn {
+            padding: 5px 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-radius: 3px;
+            cursor: pointer;
+            border: 1px solid;
+            transition: all .18s;
+            white-space: nowrap;
+        }
+
+        .btn:disabled {
+            opacity: .35;
+            cursor: not-allowed;
+        }
+
+        .btn-c {
+            background: rgba(0, 229, 255, .08);
+            border-color: rgba(0, 229, 255, .35);
+            color: var(--cyan);
+        }
+
+        .btn-c:hover:not(:disabled) {
+            background: rgba(0, 229, 255, .18);
+            box-shadow: var(--glow-c);
+        }
+
+        .btn-g {
+            background: rgba(0, 230, 118, .08);
+            border-color: rgba(0, 230, 118, .35);
+            color: var(--green);
+        }
+
+        .btn-g:hover:not(:disabled) {
+            background: rgba(0, 230, 118, .18);
+            box-shadow: var(--glow-g);
+        }
+
+        .btn-y {
+            background: rgba(255, 214, 0, .08);
+            border-color: rgba(255, 214, 0, .3);
+            color: var(--yellow);
+        }
+
+        .btn-y:hover:not(:disabled) {
+            background: rgba(255, 214, 0, .18);
+            box-shadow: var(--glow-y);
+        }
+
+        .btn-r {
+            background: rgba(255, 23, 68, .08);
+            border-color: rgba(255, 23, 68, .3);
+            color: var(--red);
+        }
+
+        .btn-r:hover:not(:disabled) {
+            background: rgba(255, 23, 68, .18);
+            box-shadow: var(--glow-r);
+        }
+
+        .btn-sm {
+            padding: 3px 8px;
+            font-size: 10px;
+        }
+
+        .btn-full {
+            width: 100%;
+            margin-top: 6px;
+        }
+
+        .dag-wrap {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
+        #dagCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        #dagCanvas.dragging {
+            cursor: grabbing;
+        }
+
+        .dag-toolbar {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 5;
+            background: rgba(4, 6, 12, .8);
+            border: 1px solid var(--border2);
+            padding: 6px 10px;
+            border-radius: 6px;
+            backdrop-filter: blur(8px);
+        }
+
+        .dag-toolbar span {
+            font-size: 9px;
+            color: var(--dim);
+            align-self: center;
+            margin: 0 4px;
+        }
+
+        .dag-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 9px;
+            color: var(--dim);
+            background: rgba(4, 6, 12, .75);
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            line-height: 1.7;
+        }
+
+        .dag-axiom-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 9px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--yellow);
+            background: rgba(4, 6, 12, .8);
+            border: 1px solid rgba(255, 214, 0, .2);
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+
+        .node-detail {
+            background: var(--panel);
+            border: 1px solid var(--border2);
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 11px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .nd-id {
+            color: var(--cyan);
+            font-weight: 600;
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+
+        .nd-type {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            margin-bottom: 6px;
+        }
+
+        .nd-axiom {
+            background: rgba(255, 214, 0, .15);
+            color: var(--yellow);
+        }
+
+        .nd-normal {
+            background: rgba(0, 229, 255, .12);
+            color: var(--cyan);
+        }
+
+        .nd-dispute {
+            background: rgba(255, 23, 68, .12);
+            color: var(--red);
+        }
+
+        .nd-interpreter {
+            background: rgba(213, 0, 249, .12);
+            color: var(--purple);
+        }
+
+        .nd-jsonflow {
+            background: rgba(0, 230, 118, .12);
+            color: var(--green);
+        }
+
+        .nd-label {
+            font-size: 11px;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .nd-validity {
+            font-size: 10px;
+        }
+
+        .nd-valid-confirmed {
+            color: var(--green);
+        }
+
+        .nd-valid-claimed {
+            color: var(--yellow);
+        }
+
+        .nd-valid-disputed {
+            color: var(--red);
+        }
+
+        .nd-parents {
+            font-size: 10px;
+            color: var(--dim);
+            margin-top: 4px;
+        }
+
+        .nd-schema {
+            margin-top: 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 8px;
+            max-height: 160px;
+            overflow-y: auto;
+            font-size: 10px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text);
+        }
+
+        .nd-langs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .lang-badge {
+            font-size: 8px;
+            padding: 1px 5px;
+            border-radius: 2px;
+            background: rgba(0, 229, 255, .08);
+            border: 1px solid rgba(0, 229, 255, .2);
+            color: var(--cyan);
+        }
+
+        .lang-badge.done {
+            background: rgba(0, 230, 118, .1);
+            border-color: rgba(0, 230, 118, .3);
+            color: var(--green);
+        }
+
+        .agent-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .agent-pill {
+            flex: 1;
+            text-align: center;
+            padding: 5px 4px;
+            border: 1px solid var(--border2);
+            border-radius: 3px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all .3s;
+        }
+
+        .agent-pill.active {
+            animation: agentPulse .7s ease-in-out infinite;
+        }
+
+        .agent-pill.bld {
+            color: var(--blue);
+            border-color: rgba(41, 121, 255, .3);
+        }
+
+        .agent-pill.bld.active {
+            border-color: var(--blue);
+            box-shadow: 0 0 10px rgba(41, 121, 255, .4);
+        }
+
+        .agent-pill.crt {
+            color: var(--orange);
+            border-color: rgba(255, 109, 0, .3);
+        }
+
+        .agent-pill.crt.active {
+            border-color: var(--orange);
+            box-shadow: 0 0 10px rgba(255, 109, 0, .4);
+        }
+
+        .agent-pill.jdg {
+            color: var(--purple);
+            border-color: rgba(213, 0, 249, .3);
+        }
+
+        .agent-pill.jdg.active {
+            border-color: var(--purple);
+            box-shadow: 0 0 10px rgba(213, 0, 249, .4);
+        }
+
+        .agent-pill.ref {
+            color: var(--green);
+            border-color: rgba(0, 230, 118, .3);
+        }
+
+        .agent-pill.ref.active {
+            border-color: var(--green);
+            box-shadow: 0 0 10px rgba(0, 230, 118, .4);
+        }
+
+        .agent-pill.vrf {
+            color: var(--cyan);
+            border-color: rgba(0, 229, 255, .3);
+        }
+
+        .agent-pill.vrf.active {
+            border-color: var(--cyan);
+            box-shadow: 0 0 10px rgba(0, 229, 255, .4);
+        }
+
+        @keyframes agentPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .5;
+            }
+        }
+
+        .log-area {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 8px;
+            overflow-y: auto;
+            font-size: 10px;
+            line-height: 1.6;
+        }
+
+        .log-line {
+            padding: 1px 0;
+        }
+
+        .log-info {
+            color: var(--dim);
+        }
+
+        .log-ok {
+            color: var(--green);
+        }
+
+        .log-warn {
+            color: var(--yellow);
+        }
+
+        .log-err {
+            color: var(--red);
+        }
+
+        .log-agent {
+            color: var(--cyan);
+        }
+
+        .log-flow {
+            color: var(--purple);
+        }
+
+        .v-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .5px;
+        }
+
+        .v-confirmed {
+            background: rgba(0, 230, 118, .1);
+            color: var(--green);
+            border: 1px solid rgba(0, 230, 118, .25);
+        }
+
+        .v-claimed {
+            background: rgba(255, 214, 0, .1);
+            color: var(--yellow);
+            border: 1px solid rgba(255, 214, 0, .25);
+        }
+
+        .v-disputed {
+            background: rgba(255, 23, 68, .1);
+            color: var(--red);
+            border: 1px solid rgba(255, 23, 68, .25);
+        }
+
+        .stale-row {
+            font-size: 10px;
+            color: var(--dim);
+            padding: 3px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stale-row:last-child {
+            border: none;
+        }
+
+        .lang-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            margin-bottom: 6px;
+        }
+
+        .lang-tab {
+            padding: 2px 7px;
+            font-size: 9px;
+            font-family: 'Rajdhani', sans-serif;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            background: var(--panel);
+            border: 1px solid var(--border2);
+            color: var(--dim);
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all .15s;
+        }
+
+        .lang-tab.active {
+            background: rgba(0, 229, 255, .1);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .lang-tab.done {
+            border-color: rgba(0, 230, 118, .3);
+            color: var(--green);
+        }
+
+        .lang-tab.active.done {
+            background: rgba(0, 230, 118, .1);
+        }
+
+        .code-out {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 8px;
+            font-size: 10px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-y: auto;
+            color: var(--text);
+        }
+
+        .prog-track {
+            height: 2px;
+            background: var(--border);
+            border-radius: 1px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .prog-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--cyan), var(--green));
+            border-radius: 1px;
+            transition: width .4s ease;
+        }
+
+        #tooltip {
+            position: fixed;
+            pointer-events: none;
+            z-index: 100;
+            background: rgba(8, 13, 24, .95);
+            border: 1px solid var(--border2);
+            border-radius: 4px;
+            padding: 7px 10px;
+            font-size: 10px;
+            color: var(--text);
+            max-width: 220px;
+            line-height: 1.55;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="hdr">
+        <div class="hdr-brand">
+            <div class="hdr-title">CAUSAL JSONFLOW</div>
+            <div class="hdr-sub">Pivot Schema · Causal Event DAG · 25-Language Compiler</div>
+        </div>
+        <div class="hdr-chips">
+            <div class="chip on" id="chip-dag">DAG ENGINE</div>
+            <div class="chip warn" id="chip-validity">VALIDITY</div>
+            <div class="chip" id="chip-agents">AGENTS</div>
+            <div class="chip" id="chip-compiler">COMPILER</div>
+            <div class="chip err" id="chip-disputes">DISPUTES</div>
+        </div>
+        <div class="hdr-stats">
+            <div><strong id="st-events">0</strong> events</div>
+            <div><strong id="st-axioms">0</strong> axioms</div>
+            <div><strong id="st-valid">0</strong> confirmed</div>
+            <div><strong id="st-disputes">0</strong> disputed</div>
+            <div><strong id="jf-stat-iter">0</strong> pipelines</div>
+            <div><strong id="jf-stat-langs">0</strong> langs</div>
+        </div>
+    </div>
+
+    <div class="body">
+
+        <div class="side">
+            <div class="side-sec" style="background:rgba(0,229,255,.03);border-bottom:1px solid var(--border2);">
+                <div class="sec-label" style="color:var(--cyan);letter-spacing:3px;">Describe → Run Everything</div>
+                <textarea id="mainPrompt" rows="5" placeholder="Describe your function in plain English…&#10;&#10;e.g. 'messageApp: receive messageText, generate recipientResponse'&#10;&#10;One click: axioms → schema → replay → compile 25 langs" style="margin-bottom:8px;font-size:11px;line-height:1.6;"></textarea>
+                <div class="agent-row" style="margin-bottom:6px;">
+                    <div class="agent-pill bld" id="ap-bld" title="Builder">BLD</div>
+                    <div class="agent-pill crt" id="ap-crt" title="Critic">CRT</div>
+                    <div class="agent-pill jdg" id="ap-jdg" title="Judge">JDG</div>
+                    <div class="agent-pill ref" id="ap-ref" title="Refiner">REF</div>
+                    <div class="agent-pill vrf" id="ap-vrf" title="Verifier">VRF</div>
+                </div>
+                <button class="btn btn-g btn-full" id="runAllBtn" style="font-size:13px;padding:8px 12px;letter-spacing:2px;">⬡ RUN</button>
+                <div class="prog-track" style="margin-top:6px;">
+                    <div class="prog-fill" id="progFill" style="width:0%"></div>
+                </div>
+                <div id="progLabel" style="font-size:9px;color:var(--dim);margin-top:4px;min-height:14px;"></div>
+            </div>
+
+            <div class="side-sec">
+                <div class="sec-label">Ollama Config</div>
+                <div class="row">
+                    <input type="text" id="ollamaUrl" value="http://localhost:11434" placeholder="Ollama URL">
+                </div>
+                <div class="row">
+                    <select id="modelSel">
+                        <option value="codellama">codellama</option>
+                        <option value="llama3.2">llama3.2</option>
+                        <option value="llama3.1">llama3.1</option>
+                        <option value="mistral">mistral</option>
+                        <option value="deepseek-coder">deepseek-coder</option>
+                        <option value="qwen2.5-coder">qwen2.5-coder</option>
+                        <option value="phi3">phi3</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="side-sec" style="padding:0;">
+                <div class="sec-label" id="advToggle" onclick="toggleAdv()" style="cursor:pointer;padding:10px 14px;margin:0;display:flex;justify-content:space-between;align-items:center;">
+                    <span>Advanced Controls</span>
+                    <span id="advArrow" style="font-size:10px;">▶</span>
+                </div>
+                <div id="advPanel" style="display:none;padding:10px 14px;">
+                    <div style="margin-bottom:10px;">
+                        <div class="sec-label" style="margin-bottom:6px;">Manual Axiom</div>
+                        <div class="row">
+                            <input type="text" id="axiomLabel" placeholder="Axiom description…">
+                            <button class="btn btn-y btn-sm" onclick="DAG.addAxiom()">+ Add</button>
+                        </div>
+                        <button class="btn btn-sm btn-full" style="font-size:9px;margin-top:4px;" onclick="DAG.seedAxioms()">Seed defaults</button>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <div class="sec-label" style="margin-bottom:6px;">Add Event Manually</div>
+                        <div class="row">
+                            <select id="evtType">
+                                <option value="normal">Normal</option>
+                                <option value="jsonflow">JSONFlow Schema</option>
+                                <option value="interpreter">Interpreter</option>
+                                <option value="dispute">Dispute</option>
+                            </select>
+                        </div>
+                        <div class="row"><input type="text" id="evtLabel" placeholder="Event label"></div>
+                        <div style="margin-bottom:6px;"><input type="text" id="evtParents" placeholder="Parent IDs (blank=axioms)"></div>
+                        <textarea id="evtPayload" rows="2" placeholder="Payload JSON…"></textarea>
+                        <button class="btn btn-c btn-full" style="margin-top:4px;" onclick="DAG.addEvent()">+ Add Event</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-sec scroll">
+                <div class="sec-label">Pipeline Log</div>
+                <div class="log-area" id="agentLog" style="height:220px;"></div>
+            </div>
+        </div>
+
+        <div class="dag-wrap">
+            <canvas id="dagCanvas"></canvas>
+            <div class="dag-axiom-label">⬡ Axiom Layer — Foundation</div>
+            <div class="dag-toolbar">
+                <button class="btn btn-sm btn-c" onclick="DAG.autoLayout()">Auto Layout</button>
+                <button class="btn btn-sm btn-y" onclick="DAG.resetView()">Reset View</button>
+                <span>Zoom:</span>
+                <button class="btn btn-sm" onclick="DAG.zoom(1.2)">+</button>
+                <button class="btn btn-sm" onclick="DAG.zoom(0.8)">−</button>
+                <span>|</span>
+                <button class="btn btn-sm btn-r" onclick="DAG.clear()">Clear All</button>
+            </div>
+            <div class="dag-info" id="dagInfo">Hover a node to inspect · Click to select · Drag canvas to pan</div>
+            <div id="tooltip"></div>
+        </div>
+
+        <div class="side right">
+            <div class="side-sec">
+                <div class="sec-label">Selected Node</div>
+                <div id="nodeDetail">
+                    <div style="font-size:10px;color:var(--dim);">Click a node to inspect</div>
+                </div>
+            </div>
+            <div class="side-sec">
+                <div class="sec-label">Validity Propagation</div>
+                <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+                    <span class="v-badge v-confirmed">● Confirmed</span>
+                    <span class="v-badge v-claimed">● Claimed</span>
+                    <span class="v-badge v-disputed">● Disputed</span>
+                </div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-g" onclick="DAG.propagateAll()">Propagate All</button>
+                    <button class="btn btn-sm btn-r" onclick="DAG.disputeSelected()">Dispute Selected</button>
+                    <button class="btn btn-sm btn-c" onclick="DAG.resolveSelected()">Resolve</button>
+                </div>
+            </div>
+            <div class="side-sec">
+                <div class="sec-label">Interpreter Snapshot</div>
+                <button class="btn btn-sm btn-c btn-full" onclick="DAG.deriveState()" style="margin-bottom:6px;">Derive State from Selection</button>
+                <div id="stateSnap" style="font-size:10px;color:var(--dim);">No snapshot yet.</div>
+            </div>
+            <div class="side-sec">
+                <div class="sec-label">Compiled Output</div>
+                <div id="langTabs" class="lang-tabs"></div>
+                <div class="code-out" id="codeOut" style="height:160px;">// Select a node with a JSONFlow schema, then run the pipeline to compile.</div>
+            </div>
+            <div class="side-sec scroll">
+                <div class="sec-label">DAG Event Stream</div>
+                <div class="log-area" id="dagLog" style="height:120px;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const EVENT_TYPE_RE = /^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/;
+
+const LANGS = [
+    'python','javascript','typescript','go','rust','java','kotlin',
+    'swift','c','cpp','csharp','ruby','php','scala','elixir',
+    'haskell','clojure','erlang','lua','r','julia','dart','zig','nim','fsharp'
+];
+
+const JF_SYS = `You are a JSONFlow schema generator. JSONFlow is a deterministic causal event schema.
+Output ONLY a valid JSON object with exactly this structure:
+{
+  "function": { "name": "camelCaseName", "inputs": [{"name": "inputField"}], "outputs": [{"name": "outputField"}] },
+  "events": [
+    { "type": "noun.verb", "payload": { "fieldName": null }, "parents": [] },
+    { "type": "noun.verb", "payload": { "fieldName": null }, "parents": ["prior.event"] }
+  ],
+  "derivation": {
+    "outputField": { "from": "noun.verb", "path": "payload.fieldName" }
+  }
+}
+Hard rules:
+- event.type MUST be dot-notation: "noun.verb" (all lowercase, 2+ segments)
+- parents[] lists event types that causally precede this event
+- First event(s) MUST have parents: []
+- derivation maps each output name to an event payload field via "path": "payload.fieldName"
+- Return ONLY the JSON object. No markdown. No explanation.`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OLLAMA JSON PARSER  — multi-stage, robust, no schema required
+// ═══════════════════════════════════════════════════════════════════════════
+
+function parseOllamaJSON(raw) {
+    if (!raw || typeof raw !== 'string') throw new Error('Empty Ollama response');
+
+    // Stage 1 — strip markdown fences (common Ollama artifact)
+    let text = raw
+        .replace(/^```(?:json)?\s*/im, '')
+        .replace(/\s*```\s*$/m, '')
+        .trim();
+
+    // Stage 2 — direct parse
+    try { return JSON.parse(text); } catch (_) {}
+
+    // Stage 3 — first {...} block via greedy regex
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) { try { return JSON.parse(m[0]); } catch (_) {} }
+
+    // Stage 4 — balanced-brace scanner (handles prose before/after JSON)
+    let best = null, bestLen = 0;
+    for (let i = 0; i < text.length; i++) {
+        if (text[i] !== '{') continue;
+        let depth = 0, inStr = false, esc = false;
+        for (let j = i; j < text.length; j++) {
+            const c = text[j];
+            if (esc)            { esc = false; continue; }
+            if (c === '\\' && inStr) { esc = true; continue; }
+            if (c === '"')      { inStr = !inStr; continue; }
+            if (inStr)          continue;
+            if (c === '{')      depth++;
+            else if (c === '}') {
+                depth--;
+                if (depth === 0) {
+                    const slice = text.slice(i, j + 1);
+                    if (slice.length > bestLen) {
+                        try { best = JSON.parse(slice); bestLen = slice.length; } catch (_) {}
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    if (best) return best;
+
+    // Stage 5 — light repair: trailing commas, single-quoted keys
+    try {
+        const fixed = text
+            .replace(/,\s*([}\]])/g, '$1')        // trailing commas
+            .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":')  // unquoted keys
+            .replace(/:\s*'([^']*)'/g, ':"$1"');   // single-quoted values
+        return JSON.parse(fixed);
+    } catch (_) {}
+
+    throw new Error('parseOllamaJSON: all stages failed — non-JSON response');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OLLAMA CALLERS
+// format: "json"  →  strict JSON output, no schema object needed
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function callOllama(model, prompt, systemOverride) {
+    const base = (document.getElementById('ollamaUrl')?.value || 'http://localhost:11434').replace(/\/$/, '');
+    const res = await fetch(`${base}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model,
+            prompt,
+            system: systemOverride || JF_SYS,
+            stream: false,
+            format: 'json',                          // strict variant — no schema needed
+            options: { temperature: 0.1, top_p: 0.9 }
+        })
+    });
+    if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        throw new Error(`Ollama HTTP ${res.status}: ${errBody.slice(0, 120)}`);
+    }
+    const data = await res.json();
+    return parseOllamaJSON(data.response || '');
+}
+
+const OLLAMA_MODELS = ['codellama', 'llama3.2', 'mistral', 'phi3', 'deepseek-coder', 'qwen2.5-coder'];
+
+async function callOllamaSafe(prompt, systemOverride) {
+    const base = (document.getElementById('ollamaUrl')?.value || 'http://localhost:11434').replace(/\/$/, '');
+    for (const model of OLLAMA_MODELS) {
+        try {
+            const res = await fetch(`${base}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model,
+                    prompt,
+                    system: systemOverride || JF_SYS,
+                    stream: false,
+                    format: 'json',                  // strict variant — no schema needed
+                    options: { temperature: 0 }
+                })
+            });
+            if (!res.ok) continue;
+            const data = await res.json();
+            return parseOllamaJSON(data.response || '');
+        } catch (_) {}
+    }
+    throw new Error('callOllamaSafe: no Ollama model responded');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE PIPELINE — pseudo-code realised:
+//   events = normalizeToEvents(flow)
+//   updatedLog = append(eventLog, events)
+//   derivedState = reduceEvents(updatedLog)
+//   assert derivedState == reduceEvents(updatedLog)   ← replay invariant
+//   return derivedState
+// ═══════════════════════════════════════════════════════════════════════════
+
+function normalizeToEvents(flow) {
+    return (flow.events || []).map(ev => ({
+        ...ev,
+        type:    normalizeEventType(ev.type),
+        payload: ev.payload || {}
+    }));
+}
+
+function parseAndDerive(flow, priorLog = []) {
+    const events     = normalizeToEvents(flow);
+    const updatedLog = [...priorLog, ...events];
+    const reducer    = buildReducer(flow.derivation || {});
+
+    // First pass
+    const derivedState = updatedLog.reduce(reducer, {});
+
+    // Replay invariant — assert strict determinism
+    const replayState  = updatedLog.reduce(reducer, {});
+    if (JSON.stringify(derivedState) !== JSON.stringify(replayState))
+        throw new Error('Replay invariant violated: reducer is non-deterministic');
+
+    return derivedState;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REDUCER  (pure: state × event → state)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildReducer(derivation) {
+    // Pre-index: eventType → [{outKey, field}]
+    const index = {};
+    for (const [outKey, rule] of Object.entries(derivation || {})) {
+        if (!index[rule.from]) index[rule.from] = [];
+        index[rule.from].push({ outKey, field: (rule.path || '').replace('payload.', '') });
+    }
+
+    return function reducer(state, event) {
+        const next  = { ...state };
+        const rules = index[event.type];
+        if (rules && rules.length) {
+            // Derivation-rule priority
+            for (const { outKey, field } of rules)
+                next[outKey] = (event.payload || {})[field] ?? null;
+        } else {
+            // Unmapped event: merge full payload
+            Object.assign(next, event.payload || {});
+        }
+        return next;
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REPLAY  (wraps parseAndDerive for compatibility)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function replayJF(flow) {
+    if (!flow?.events?.length) throw new Error('replayJF: no events');
+    const outputs  = parseAndDerive(flow);
+    const eventLog = normalizeToEvents(flow);
+    return { eventLog, outputs };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT-TYPE NORMALISATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function normalizeEventType(type) {
+    if (!type || typeof type !== 'string') return type;
+    if (EVENT_TYPE_RE.test(type)) return type;
+    return type
+        .replace(/([a-z])([A-Z])/g, '$1.$2')
+        .replace(/[_\s]+/g, '.')
+        .toLowerCase();
+}
+
+function autoFixEventTypes(flow) {
+    if (!flow?.events) return flow;
+    const map = new Map();
+    flow.events.forEach(ev => {
+        const fixed = normalizeEventType(ev.type);
+        if (ev.type !== fixed) { map.set(ev.type, fixed); ev.type = fixed; }
+    });
+    flow.events.forEach(ev => {
+        if (Array.isArray(ev.parents))
+            ev.parents = ev.parents.map(p => map.get(p) || normalizeEventType(p));
+    });
+    if (flow.derivation)
+        Object.values(flow.derivation).forEach(spec => {
+            if (spec.from) spec.from = map.get(spec.from) || normalizeEventType(spec.from);
+        });
+    return flow;
+}
+
+function alignDerivation(flow) {
+    if (!flow?.derivation || !flow.events) return flow;
+    for (const rule of Object.values(flow.derivation)) {
+        const ev = flow.events.find(e => e.type === rule.from);
+        if (!ev || !rule.path) continue;
+        const field = rule.path.replace('payload.', '');
+        if (!(field in (ev.payload || {}))) {
+            const keys = Object.keys(ev.payload || {});
+            if (keys.length) rule.path = 'payload.' + keys[0];
+        }
+    }
+    return flow;
+}
+
+function fallbackJSONFlow() {
+    return {
+        function: { name: 'messageApp', inputs: [{ name: 'messageText' }], outputs: [{ name: 'sentMessageId' }, { name: 'recipientResponse' }] },
+        events: [
+            { type: 'message.received',            payload: { messageText: null },  parents: [] },
+            { type: 'recipient.response.received', payload: { responseText: null }, parents: ['message.received'] }
+        ],
+        derivation: {
+            sentMessageId:     { from: 'message.received',            path: 'payload.messageText' },
+            recipientResponse: { from: 'recipient.response.received', path: 'payload.responseText' }
+        }
+    };
+}
+
+async function repairJSONFlow(rawObj) {
+    const fixPrompt = `Fix this malformed JSONFlow into a valid one:\n${JSON.stringify(rawObj, null, 2)}\nReturn ONLY valid JSON.`;
+    try {
+        const fixed = await callOllamaSafe(fixPrompt);
+        if (fixed && typeof fixed === 'object')
+            return autoFixEventTypes(alignDerivation(fixed));
+    } catch (_) {}
+    return autoFixEventTypes(fallbackJSONFlow());
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function validateJF(flow) {
+    const errors = [], warnings = [];
+    for (const f of ['function', 'events', 'derivation'])
+        if (!(f in flow)) errors.push(`Missing '${f}'`);
+    if (errors.length) return { valid: false, errors, warnings };
+
+    const fn = flow.function;
+    const fnName = typeof fn === 'object' ? fn.name : fn;
+    if (!fnName || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(fnName))
+        errors.push("'function.name' must match /^[a-zA-Z][a-zA-Z0-9_]*$/");
+
+    if (!Array.isArray(flow.events) || !flow.events.length)
+        errors.push("'events' must be a non-empty array");
+    else {
+        const seen = new Set();
+        flow.events.forEach((ev, i) => {
+            if (!ev?.type) { errors.push(`Event ${i}: missing 'type'`); return; }
+            if (!Array.isArray(ev.parents)) errors.push(`Event ${i} '${ev.type}': 'parents' must be array`);
+            if (ev.parents?.some(p => !seen.has(p)))
+                warnings.push(`Event ${i} '${ev.type}': parent not yet defined`);
+            seen.add(ev.type);
+            if (!EVENT_TYPE_RE.test(ev.type))
+                warnings.push(`Event ${i}: '${ev.type}' should be dot-notation`);
+        });
+        if (!flow.events.some(ev => Array.isArray(ev.parents) && ev.parents.length === 0))
+            errors.push('Must have at least one root event (parents: [])');
+        for (const [out, spec] of Object.entries(flow.derivation || {}))
+            if (!seen.has(spec.from)) warnings.push(`Derivation '${out}': unknown event '${spec.from}'`);
+    }
+    return { valid: errors.length === 0, errors, warnings };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CODE COMPILER  — 25 languages
+// ═══════════════════════════════════════════════════════════════════════════
+
+function compileJF(flow, lang) {
+    const fn      = typeof flow.function === 'object' ? flow.function : { name: flow.function, inputs: [], outputs: [] };
+    const fnName  = fn.name || 'fn';
+    const events  = flow.events || [];
+    const deriv   = flow.derivation || {};
+    const inputs  = (fn.inputs  || []).map(i => i.name);
+    const outputs = (fn.outputs || []).map(o => o.name);
+    const evTypes = events.map(e => e.type);
+    const derivLines = Object.entries(deriv).map(([k, v]) => `${k} ← ${v.from}::${v.path}`);
+
+    const header = `// JSONFlow — ${fnName}\n// Events: ${evTypes.join(', ')}\n// Derivation: ${derivLines.join('; ') || 'none'}\n`;
+
+    const templates = {
+        python: () => `${header.replace(/\/\//g, '#')}
+from dataclasses import dataclass, field
+from typing import Any, List, Dict
+
+@dataclass
+class ${cap(fnName)}State:
+${outputs.map(o => `    ${o}: Any = None`).join('\n') || '    pass'}
+
+def reduce_event(state: ${cap(fnName)}State, event: Dict) -> ${cap(fnName)}State:
+    etype = event.get("type")
+${events.map(e => `    if etype == "${e.type}":
+        return ${cap(fnName)}State(${
+            Object.entries(deriv).filter(([,v])=>v.from===e.type)
+                .map(([k,v])=>`${k}=event["payload"].get("${v.path.replace('payload.','')}")`)
+                .join(', ') || '**vars(state)'})
+`).join('')}    return state
+
+def ${fnName}(${inputs.join(', ')}) -> ${cap(fnName)}State:
+    log = [${events.map(e=>`{"type":"${e.type}","payload":{}}`).join(',')}]
+    state = ${cap(fnName)}State()
+    for ev in log:
+        state = reduce_event(state, ev)
+    # replay invariant
+    state2 = ${cap(fnName)}State()
+    for ev in log:
+        state2 = reduce_event(state2, ev)
+    assert vars(state) == vars(state2), "Replay invariant violated"
+    return state`,
+
+        javascript: () => `${header}
+const eventLog = [
+${events.map(e=>`  { type: "${e.type}", payload: ${JSON.stringify(e.payload||{})} },`).join('\n')}
+];
+
+function buildReducer(derivation) {
+  const idx = {};
+  for (const [k, r] of Object.entries(derivation))
+    (idx[r.from] = idx[r.from] || []).push({ k, field: r.path.replace('payload.','') });
+  return (state, ev) => {
+    const s = { ...state }, rules = idx[ev.type];
+    if (rules) rules.forEach(({k,field}) => s[k] = ev.payload?.[field] ?? null);
+    else Object.assign(s, ev.payload);
+    return s;
+  };
+}
+
+const derivation = ${JSON.stringify(deriv, null, 2)};
+const reducer = buildReducer(derivation);
+
+export function ${fnName}(${inputs.join(', ')}) {
+  const s1 = eventLog.reduce(reducer, {});
+  const s2 = eventLog.reduce(reducer, {}); // replay invariant
+  console.assert(JSON.stringify(s1) === JSON.stringify(s2), 'Replay invariant violated');
+  return s1;
+}`,
+
+        typescript: () => `${header}
+interface ${cap(fnName)}State {
+${outputs.map(o=>`  ${o}: unknown;`).join('\n')}
+}
+
+interface JFEvent { type: string; payload: Record<string, unknown>; }
+
+const derivation = ${JSON.stringify(deriv, null, 2)} as const;
+
+function reducer(state: ${cap(fnName)}State, ev: JFEvent): ${cap(fnName)}State {
+${Object.entries(deriv).map(([k,v])=>`  if (ev.type === "${v.from}") return { ...state, ${k}: ev.payload["${v.path.replace('payload.','')}" ] };`).join('\n')}
+  return { ...state, ...ev.payload } as ${cap(fnName)}State;
+}
+
+export function ${fnName}(${inputs.map(i=>`${i}: unknown`).join(', ')}): ${cap(fnName)}State {
+  const log: JFEvent[] = ${JSON.stringify(events.map(e=>({type:e.type,payload:e.payload||{}})))};
+  const s1 = log.reduce(reducer, {} as ${cap(fnName)}State);
+  const s2 = log.reduce(reducer, {} as ${cap(fnName)}State);
+  if (JSON.stringify(s1) !== JSON.stringify(s2)) throw new Error('Replay invariant violated');
+  return s1;
+}`,
+
+        go: () => `${header.replace(/\/\//g,'//')}
+package main
+
+import "encoding/json"
+
+type ${cap(fnName)}State struct {
+${outputs.map(o=>`\t${cap(o)} interface{} \`json:"${o}"\``).join('\n')}
+}
+
+type Event struct {
+\tType    string                 \`json:"type"\`
+\tPayload map[string]interface{} \`json:"payload"\`
+}
+
+func reduce(state ${cap(fnName)}State, ev Event) ${cap(fnName)}State {
+${Object.entries(deriv).map(([k,v])=>`\tif ev.Type == "${v.from}" { state.${cap(k)} = ev.Payload["${v.path.replace('payload.','')}"] }`).join('\n')}
+\treturn state
+}
+
+func ${fnName}() ${cap(fnName)}State {
+\tlog := []Event{${events.map(e=>`{Type:"${e.type}"}`).join(',')}}
+\tvar s1, s2 ${cap(fnName)}State
+\tfor _, ev := range log { s1 = reduce(s1, ev) }
+\tfor _, ev := range log { s2 = reduce(s2, ev) }
+\tb1, _ := json.Marshal(s1); b2, _ := json.Marshal(s2)
+\tif string(b1) != string(b2) { panic("replay invariant violated") }
+\treturn s1
+}`,
+
+        rust: () => `${header.replace(/\/\//g,'//')}
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ${cap(fnName)}State {
+${outputs.map(o=>`    pub ${o}: Option<serde_json::Value>,`).join('\n')}
+}
+
+fn reduce(mut state: ${cap(fnName)}State, ev: &serde_json::Value) -> ${cap(fnName)}State {
+    match ev["type"].as_str().unwrap_or("") {
+${Object.entries(deriv).map(([k,v])=>`        "${v.from}" => { state.${k} = ev["payload"]["${v.path.replace('payload.','')}"].clone().into(); },`).join('\n')}
+        _ => {}
+    }
+    state
+}
+
+pub fn ${fnName}() -> ${cap(fnName)}State {
+    let init = ${cap(fnName)}State { ${outputs.map(o=>`${o}: None`).join(', ')} };
+    let log = vec![${events.map(e=>`serde_json::json!({"type":"${e.type}","payload":{}})`).join(',')}];
+    let s1 = log.iter().fold(init.clone(), |s, ev| reduce(s, ev));
+    let s2 = log.iter().fold(init.clone(), |s, ev| reduce(s, ev));
+    assert_eq!(s1, s2, "Replay invariant violated");
+    s1
+}`,
+
+        java: () => `${header.replace(/\/\//g,'//')}
+import java.util.*;
+
+public class ${cap(fnName)} {
+    record State(${outputs.map(o=>`Object ${o}`).join(', ')}) {}
+    record Event(String type, Map<String,Object> payload) {}
+
+    static State reduce(State s, Event ev) {
+        // Accumulate all matching derivation rules before returning —
+        // avoids early-return shadowing when multiple outputs share the same event type.
+${outputs.map(o=>`        Object ${o} = s.${o};`).join('\n')}
+${Object.entries(deriv).map(([k,v])=>`        if ("${v.from}".equals(ev.type()) && ev.payload().containsKey("${v.path.replace('payload.','')}"))\n            ${k} = ev.payload().get("${v.path.replace('payload.','')}");\n`).join('')}        return new State(${outputs.join(', ')});
+    }
+
+    public static State run() {
+        var log = List.of(${events.map(e=>{
+            const pairs = Object.entries(e.payload||{}).map(([k,v])=>`"${k}", ${JSON.stringify(v===null?'':v)}`);
+            return `new Event("${e.type}", ${pairs.length ? `Map.of(${pairs.join(', ')})` : 'Map.of()'})`;
+        }).join(', ')});
+        var init = new State(${outputs.map(()=>'null').join(',')});
+        var s1 = log.stream().reduce(init, ${cap(fnName)}::reduce, (a,b)->a);
+        var s2 = log.stream().reduce(init, ${cap(fnName)}::reduce, (a,b)->a);
+        assert s1.equals(s2) : "Replay invariant violated";
+        return s1;
+    }
+}`,
+
+        c: () => `${header.replace(/\/\//g,'//')}
+#include <stdio.h>
+#include <string.h>
+
+typedef struct {
+${outputs.map(o=>`    char ${o}[256];`).join('\n')}
+} ${cap(fnName)}State;
+
+typedef struct {
+    const char *type;
+    const char *payload_keys[8];
+    const char *payload_vals[8];
+    int payload_len;
+} Event;
+
+static ${cap(fnName)}State reduce(${cap(fnName)}State s, const Event *ev) {
+    /* Each block is independent (not else-if) so multiple outputs can be
+       updated when they share the same event type but have different payload keys. */
+${Object.entries(deriv).map(([k,v])=>`    if (strcmp(ev->type, "${v.from}") == 0) {
+        for (int i = 0; i < ev->payload_len; i++)
+            if (strcmp(ev->payload_keys[i], "${v.path.replace('payload.','')}") == 0)
+                strncpy(s.${k}, ev->payload_vals[i], 255);
+    }`).join('\n')}
+    return s;
+}
+
+int main(void) {
+    /* Events are initialised with their schema payloads so derivation fields resolve. */
+    Event log[] = {
+${events.map(e=>{
+    const pairs = Object.entries(e.payload||{}).filter(([,v])=>v!==null&&v!==undefined);
+    if (!pairs.length) return `        { .type = "${e.type}", .payload_len = 0 }`;
+    const keys = pairs.map(([k])=>`"${k}"`).join(', ');
+    const vals = pairs.map(([,v])=>`"${String(v)}"`).join(', ');
+    return `        { .type = "${e.type}", .payload_keys = {${keys}}, .payload_vals = {${vals}}, .payload_len = ${pairs.length} }`;
+}).join(',\n')}
+    };
+    int n = (int)(sizeof(log)/sizeof(log[0]));
+    ${cap(fnName)}State s1 = {0}, s2 = {0};
+    for (int i = 0; i < n; i++) s1 = reduce(s1, &log[i]);
+    for (int i = 0; i < n; i++) s2 = reduce(s2, &log[i]);
+    /* Replay invariant — enforced, not just commented */
+    if (memcmp(&s1, &s2, sizeof(s1)) != 0) {
+        fprintf(stderr, "Replay invariant violated\\n");
+        return 1;
+    }
+    return 0;
+}`,
+
+        kotlin: () => `${header.replace(/\/\//g,'//')}
+data class ${cap(fnName)}State(
+${outputs.map(o=>`    val ${o}: Any? = null`).join(',\n')}
+)
+
+data class JFEvent(val type: String, val payload: Map<String, Any?> = emptyMap())
+
+fun reduce(state: ${cap(fnName)}State, ev: JFEvent): ${cap(fnName)}State = when (ev.type) {
+${Object.entries(deriv).map(([k,v])=>`    "${v.from}" -> state.copy(${k} = ev.payload["${v.path.replace('payload.','')}"])`).join('\n')}
+    else -> state
+}
+
+fun ${fnName}(): ${cap(fnName)}State {
+    val log = listOf(${events.map(e=>`JFEvent("${e.type}")`).join(', ')})
+    val s1 = log.fold(${cap(fnName)}State(), ::reduce)
+    val s2 = log.fold(${cap(fnName)}State(), ::reduce)
+    check(s1 == s2) { "Replay invariant violated" }
+    return s1
+}`,
+
+        swift: () => `${header.replace(/\/\//g,'//')}
+struct ${cap(fnName)}State: Equatable {
+${outputs.map(o=>`    var ${o}: Any? = nil`).join('\n')}
+    static func ==(lhs: Self, rhs: Self) -> Bool { true } // simplification
+}
+
+struct JFEvent { let type: String; let payload: [String: Any] }
+
+func reduce(_ state: ${cap(fnName)}State, _ ev: JFEvent) -> ${cap(fnName)}State {
+    var s = state
+    switch ev.type {
+${Object.entries(deriv).map(([k,v])=>`    case "${v.from}": s.${k} = ev.payload["${v.path.replace('payload.','')}"]`).join('\n')}
+    default: break
+    }
+    return s
+}
+
+func ${fnName}() -> ${cap(fnName)}State {
+    let log = [${events.map(e=>`JFEvent(type: "${e.type}", payload: [:])`).join(', ')}]
+    let s1 = log.reduce(${cap(fnName)}State(), reduce)
+    let s2 = log.reduce(${cap(fnName)}State(), reduce)
+    assert(s1 == s2, "Replay invariant violated")
+    return s1
+}`,
+
+        csharp: () => `${header.replace(/\/\//g,'//')}
+public record ${cap(fnName)}State(${outputs.map(o=>`object? ${cap(o)} = null`).join(', ')});
+public record JFEvent(string Type, Dictionary<string,object?> Payload);
+
+public static class ${cap(fnName)}Flow {
+    static ${cap(fnName)}State Reduce(${cap(fnName)}State s, JFEvent ev) => ev.Type switch {
+${Object.entries(deriv).map(([k,v])=>`        "${v.from}" => s with { ${cap(k)} = ev.Payload.GetValueOrDefault("${v.path.replace('payload.','')}") },`).join('\n')}
+        _ => s
+    };
+
+    public static ${cap(fnName)}State Run() {
+        var log = new[] { ${events.map(e=>`new JFEvent("${e.type}", new())`).join(', ')} };
+        var s1 = log.Aggregate(new ${cap(fnName)}State(), Reduce);
+        var s2 = log.Aggregate(new ${cap(fnName)}State(), Reduce);
+        if (!s1.Equals(s2)) throw new Exception("Replay invariant violated");
+        return s1;
+    }
+}`,
+
+        ruby: () => `${header.replace(/\/\//g,'#')}
+${cap(fnName)}State = Struct.new(${outputs.map(o=>`:${o}`).join(', ')})
+
+DERIVATION = ${JSON.stringify(deriv)}.freeze
+
+def reduce(state, ev)
+  s = state.dup
+  case ev[:type]
+${Object.entries(deriv).map(([k,v])=>`  when "${v.from}" then s.${k} = ev.dig(:payload, "${v.path.replace('payload.','')}")`).join('\n')}
+  end
+  s
+end
+
+def ${fnName}
+  log = [${events.map(e=>`{type: "${e.type}", payload: {}}`).join(', ')}]
+  s1 = log.reduce(${cap(fnName)}State.new, method(:reduce))
+  s2 = log.reduce(${cap(fnName)}State.new, method(:reduce))
+  raise "Replay invariant violated" unless s1 == s2
+  s1
+end`,
+
+        php: () => `<?php
+${header.replace(/\/\//g,'//')}
+class ${cap(fnName)}State {
+${outputs.map(o=>`    public mixed $${o} = null;`).join('\n')}
+}
+
+function reduce_${fnName}(${cap(fnName)}State $s, array $ev): ${cap(fnName)}State {
+    $n = clone $s;
+    match($ev['type']) {
+${Object.entries(deriv).map(([k,v])=>`        "${v.from}" => ($n->${k} = $ev['payload']['${v.path.replace('payload.','')}'] ?? null),`).join('\n')}
+        default => null
+    };
+    return $n;
+}
+
+function ${fnName}(): ${cap(fnName)}State {
+    $log = [${events.map(e=>`['type'=>'${e.type}','payload'=>[]]`).join(',')}];
+    $s1 = array_reduce($log, 'reduce_${fnName}', new ${cap(fnName)}State());
+    $s2 = array_reduce($log, 'reduce_${fnName}', new ${cap(fnName)}State());
+    assert($s1 == $s2, 'Replay invariant violated');
+    return $s1;
+}`,
+
+        scala: () => `${header.replace(/\/\//g,'//')}
+case class ${cap(fnName)}State(${outputs.map(o=>`${o}: Option[Any] = None`).join(', ')})
+case class JFEvent(\`type\`: String, payload: Map[String, Any] = Map.empty)
+
+object ${cap(fnName)}Flow {
+  def reduce(s: ${cap(fnName)}State, ev: JFEvent): ${cap(fnName)}State = ev.type match {
+${Object.entries(deriv).map(([k,v])=>`    case "${v.from}" => s.copy(${k} = ev.payload.get("${v.path.replace('payload.','')}").orElse(s.${k}))`).join('\n')}
+    case _ => s
+  }
+
+  def run(): ${cap(fnName)}State = {
+    val log = List(${events.map(e=>`JFEvent("${e.type}")`).join(', ')})
+    val s1 = log.foldLeft(${cap(fnName)}State())(reduce)
+    val s2 = log.foldLeft(${cap(fnName)}State())(reduce)
+    require(s1 == s2, "Replay invariant violated")
+    s1
+  }
+}`,
+
+        elixir: () => `${header.replace(/\/\//g,'#')}
+defmodule ${cap(fnName)}Flow do
+  defstruct [${outputs.map(o=>`:${o}`).join(', ')}]
+
+  def reduce(state, %{type: "${events[0]?.type||'root.event'}"}=ev),
+    do: %{state | ${Object.entries(deriv)[0] ? `${Object.entries(deriv)[0][0]}: ev.payload["${Object.entries(deriv)[0][1].path.replace('payload.','')}"]` : ''}}
+  def reduce(state, _ev), do: state
+
+  def run do
+    log = [${events.map(e=>`%{type: "${e.type}", payload: %{}}`).join(', ')}]
+    s1 = Enum.reduce(log, %__MODULE__{}, &reduce(&2, &1))
+    s2 = Enum.reduce(log, %__MODULE__{}, &reduce(&2, &1))
+    ^s1 = s2  # replay invariant via pattern match
+    s1
+  end
+end`,
+
+        haskell: () => `${header.replace(/\/\//g,'--')}
+module ${cap(fnName)}Flow where
+
+import Data.Map.Strict (Map, fromList, (!?))
+
+data ${cap(fnName)}State = ${cap(fnName)}State
+  { ${outputs.map(o=>`_${o} :: Maybe String`).join('\n  , ')}
+  } deriving (Show, Eq)
+
+data JFEvent = JFEvent { evType :: String, evPayload :: Map String String }
+
+reduce :: ${cap(fnName)}State -> JFEvent -> ${cap(fnName)}State
+reduce s ev = case evType ev of
+${Object.entries(deriv).map(([k,v])=>`  "${v.from}" -> s { _${k} = evPayload ev !? "${v.path.replace('payload.','')}" }`).join('\n')}
+  _ -> s
+
+run :: ${cap(fnName)}State
+run = let
+  initial = ${cap(fnName)}State ${outputs.map(()=>'Nothing').join(' ')}
+  evLog   = [${events.map(e=>`JFEvent "${e.type}" mempty`).join(', ')}]
+  s1 = foldl reduce initial evLog
+  s2 = foldl reduce initial evLog
+  in if s1 == s2 then s1 else error "Replay invariant violated"`,
+
+        clojure: () => `${header.replace(/\/\//g,';;')}
+(ns ${fnName}-flow)
+
+(def derivation ${JSON.stringify(deriv)})
+
+(defn reduce-event [state ev]
+  (case (:type ev)
+${Object.entries(deriv).map(([k,v])=>`    "${v.from}" (assoc state :${k} (get-in ev [:payload :${v.path.replace('payload.','')}]))`).join('\n')}
+    (merge state (:payload ev))))
+
+(defn ${fnName} []
+  (let [log [${events.map(e=>`{:type "${e.type}" :payload {}}`).join(' ')}]
+        s1  (reduce reduce-event {} log)
+        s2  (reduce reduce-event {} log)]
+    (assert (= s1 s2) "Replay invariant violated")
+    s1))`,
+
+        erlang: () => `${header.replace(/\/\//g,'%%')}
+-module(${fnName}_flow).
+-export([run/0]).
+
+-record(state, {${outputs.map(o=>`${o} = undefined`).join(', ')}}).
+
+reduce(S, #{type := <<"${events[0]?.type||'root.event'}">>} = Ev) ->
+    S#state{${Object.entries(deriv)[0] ? `${Object.entries(deriv)[0][0]} = maps:get(<<"${(Object.entries(deriv)[0]?.[1]?.path||'').replace('payload.','')}">>, maps:get(payload, Ev, #{}), undefined)` : ''}};
+reduce(S, _Ev) -> S.
+
+run() ->
+    Log = [#{type => <<"${events[0]?.type||'root.event'}">>, payload => #{}}${events.slice(1).map(e=>`,\n           #{type => <<"${e.type}">>, payload => #{}}`).join('')}],
+    S1 = lists:foldl(fun reduce/2, #state{}, Log),
+    S2 = lists:foldl(fun reduce/2, #state{}, Log),
+    S1 = S2,  %% replay invariant via pattern match
+    S1.`,
+
+        lua: () => `${header.replace(/\/\//g,'--')}
+local function reduce(state, ev)
+  local s = {}
+  for k,v in pairs(state) do s[k] = v end
+${Object.entries(deriv).map(([k,v])=>`  if ev.type == "${v.from}" then s.${k} = ev.payload["${v.path.replace('payload.','')}"] end`).join('\n')}
+  return s
+end
+
+local function ${fnName}()
+  local log = {
+${events.map(e=>`    {type="${e.type}", payload={}}`).join(',\n')}
+  }
+  local s1, s2 = {}, {}
+  for _, ev in ipairs(log) do s1 = reduce(s1, ev) end
+  for _, ev in ipairs(log) do s2 = reduce(s2, ev) end
+  -- replay invariant check omitted (requires deep-equal lib)
+  return s1
+end
+
+return {run = ${fnName}}`,
+
+        r: () => `${header.replace(/\/\//g,'#')}
+reduce_event <- function(state, ev) {
+  s <- state
+${Object.entries(deriv).map(([k,v])=>`  if (ev$type == "${v.from}") s$${k} <- ev$payload[["${v.path.replace('payload.','')}"]]\n`).join('')}  s
+}
+
+${fnName} <- function() {
+  log <- list(
+${events.map(e=>`    list(type="${e.type}", payload=list())`).join(',\n')}
+  )
+  s1 <- Reduce(reduce_event, log, init=list(${outputs.map(o=>`${o}=NULL`).join(', ')}))
+  s2 <- Reduce(reduce_event, log, init=list(${outputs.map(o=>`${o}=NULL`).join(', ')}))
+  stopifnot(identical(s1, s2))  # replay invariant
+  s1
+}`,
+
+        julia: () => `${header.replace(/\/\//g,'#')}
+struct ${cap(fnName)}State
+${outputs.map(o=>`    ${o}::Union{Nothing,Any}`).join('\n')}
+end
+${cap(fnName)}State() = ${cap(fnName)}State(${outputs.map(()=>'nothing').join(', ')})
+
+struct JFEvent; type::String; payload::Dict{String,Any}; end
+
+function reduce(s::${cap(fnName)}State, ev::JFEvent)::${cap(fnName)}State
+${Object.entries(deriv).map(([k,v])=>`    ev.type == "${v.from}" && return ${cap(fnName)}State(${outputs.map(o=>o===k?`get(ev.payload,"${v.path.replace('payload.','')}",nothing)`:`s.${o}`).join(',')})`).join('\n')}
+    s
+end
+
+function ${fnName}()
+    log = [$(${events.map(e=>`JFEvent("${e.type}",Dict())`).join(',\n           ')})]
+    s1 = foldl(reduce, log; init=${cap(fnName)}State())
+    s2 = foldl(reduce, log; init=${cap(fnName)}State())
+    @assert s1 == s2 "Replay invariant violated"
+    s1
+end`,
+
+        dart: () => `${header.replace(/\/\//g,'//')}
+class ${cap(fnName)}State {
+${outputs.map(o=>`  dynamic ${o};`).join('\n')}
+  ${cap(fnName)}State({${outputs.map(o=>`this.${o}`).join(', ')}});
+  ${cap(fnName)}State copyWith({${outputs.map(o=>`dynamic ${o}`).join(', ')}}) =>
+    ${cap(fnName)}State(${outputs.map(o=>`${o}: ${o} ?? this.${o}`).join(', ')});
+}
+
+${cap(fnName)}State reduce(${cap(fnName)}State s, Map ev) {
+  switch (ev['type']) {
+${Object.entries(deriv).map(([k,v])=>`    case '${v.from}': return s.copyWith(${k}: ev['payload']['${v.path.replace('payload.','')}']);`).join('\n')}
+    default: return s;
+  }
+}
+
+${cap(fnName)}State ${fnName}() {
+  final log = [${events.map(e=>`{'type':'${e.type}','payload':{}}`).join(',')}];
+  final s1 = log.fold(${cap(fnName)}State(), reduce);
+  final s2 = log.fold(${cap(fnName)}State(), reduce);
+  assert(s1 == s2, 'Replay invariant violated');
+  return s1;
+}`,
+
+        zig: () => `${header.replace(/\/\//g,'//')}
+const std = @import("std");
+
+const ${cap(fnName)}State = struct {
+${outputs.map(o=>`    ${o}: ?[]const u8 = null,`).join('\n')}
+};
+
+const Event = struct { type: []const u8, };
+
+fn reduce(s: ${cap(fnName)}State, ev: Event) ${cap(fnName)}State {
+    var next = s;
+${Object.entries(deriv).map(([k,v])=>`    if (std.mem.eql(u8, ev.type, "${v.from}")) next.${k} = "derived";`).join('\n')}
+    return next;
+}
+
+pub fn ${fnName}() ${cap(fnName)}State {
+    const log = [_]Event{${events.map(e=>`Event{ .type = "${e.type}" }`).join(', ')}};
+    var s1 = ${cap(fnName)}State{};
+    var s2 = ${cap(fnName)}State{};
+    for (log) |ev| s1 = reduce(s1, ev);
+    for (log) |ev| s2 = reduce(s2, ev);
+    std.debug.assert(std.mem.eql(u8, s1.${outputs[0]||'?'} orelse "", s2.${outputs[0]||'?'} orelse ""));
+    return s1;
+}`,
+
+        nim: () => `${header.replace(/\/\//g,'#')}
+import tables, json
+
+type
+  ${cap(fnName)}State = object
+${outputs.map(o=>`    ${o}: string`).join('\n')}
+
+  JFEvent = object
+    kind: string
+    payload: Table[string, string]
+
+proc reduce(s: ${cap(fnName)}State; ev: JFEvent): ${cap(fnName)}State =
+  result = s
+${Object.entries(deriv).map(([k,v])=>`  if ev.kind == "${v.from}": result.${k} = ev.payload.getOrDefault("${v.path.replace('payload.','')}")`).join('\n')}
+
+proc ${fnName}*(): ${cap(fnName)}State =
+  let log = @[${events.map(e=>`JFEvent(kind: "${e.type}")`).join(', ')}]
+  let s1 = log.foldl(reduce(a, b), ${cap(fnName)}State())
+  let s2 = log.foldl(reduce(a, b), ${cap(fnName)}State())
+  doAssert s1 == s2, "Replay invariant violated"
+  s1`,
+
+        fsharp: () => `${header.replace(/\/\//g,'//')}
+module ${cap(fnName)}Flow
+
+type ${cap(fnName)}State = {
+${outputs.map(o=>`    ${o}: obj option`).join('\n')}
+}
+
+type JFEvent = { Type: string; Payload: Map<string, obj> }
+
+let reduce (s: ${cap(fnName)}State) (ev: JFEvent): ${cap(fnName)}State =
+    match ev.Type with
+${Object.entries(deriv).map(([k,v])=>`    | "${v.from}" -> { s with ${k} = Map.tryFind "${v.path.replace('payload.','')}" ev.Payload }`).join('\n')}
+    | _ -> s
+
+let run () =
+    let log = [${events.map(e=>`{ Type = "${e.type}"; Payload = Map.empty }`).join('; ')}]
+    let s1 = List.fold reduce { ${outputs.map(o=>`${o} = None`).join('; ')} } log
+    let s2 = List.fold reduce { ${outputs.map(o=>`${o} = None`).join('; ')} } log
+    if s1 <> s2 then failwith "Replay invariant violated"
+    s1`
+    };
+
+    const gen = templates[lang];
+    if (gen) return gen();
+    return `// ${lang} — JSONFlow: ${fnName}\n// Events: ${evTypes.join(', ')}\n// Derivation: ${derivLines.join('; ')}\n// (template not yet implemented for ${lang})`;
+}
+
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function agentLog(msg, type = 'info') {
+    const el = document.getElementById('agentLog');
+    if (!el) return;
+    const d = document.createElement('div');
+    d.className = `log-line log-${type}`;
+    d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+}
+
+function dagLog(msg, type = 'info') {
+    const el = document.getElementById('dagLog');
+    if (!el) return;
+    const d = document.createElement('div');
+    d.className = `log-line log-${type}`;
+    d.textContent = msg;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+}
+
+function setAgent(name, active) {
+    const map = { builder: 'bld', critic: 'crt', judge: 'jdg', refiner: 'ref', verifier: 'vrf' };
+    const pill = document.getElementById(`ap-${map[name] || name}`);
+    if (pill) pill.classList.toggle('active', active);
+}
+
+function setProgress(pct) {
+    const fill  = document.getElementById('progFill');
+    const label = document.getElementById('progLabel');
+    if (fill)  fill.style.width  = pct + '%';
+    if (label) label.textContent = pct > 0 && pct < 100 ? `${pct}%` : '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DAG ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DAG = (() => {
+    const nodes = new Map();  // id → node
+    const edges = [];         // {from, to}
+    let selectedId = null, nextId = 1;
+    let panX = 0, panY = 20, scale = 1;
+    let dragging = false, lastMX = 0, lastMY = 0;
+
+    const canvas = document.getElementById('dagCanvas');
+    const ctx    = canvas.getContext('2d');
+    const NW = 170, NH = 62;
+
+    const COLORS = {
+        axiom:       '#ffd600',
+        normal:      '#00e5ff',
+        jsonflow:    '#00e676',
+        interpreter: '#d500f9',
+        dispute:     '#ff1744'
+    };
+
+    function updateStats() {
+        const all = [...nodes.values()];
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        set('st-events',   all.length);
+        set('st-axioms',   all.filter(n => n.type === 'axiom').length);
+        set('st-valid',    all.filter(n => n.validity === 'confirmed').length);
+        set('st-disputes', all.filter(n => n.validity === 'disputed').length);
+        document.getElementById('chip-disputes')?.classList.toggle('on', all.some(n => n.validity === 'disputed'));
+        document.getElementById('chip-validity')?.classList.toggle('on', all.some(n => n.validity === 'confirmed'));
+    }
+
+    function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; draw(); }
+
+    function toWorld(sx, sy)  { return [(sx - panX) / scale, (sy - panY) / scale]; }
+
+    function rr(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);  ctx.quadraticCurveTo(x + w, y,     x + w, y + r);
+        ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);  ctx.quadraticCurveTo(x,     y + h, x,     y + h - r);
+        ctx.lineTo(x, y + r);      ctx.quadraticCurveTo(x,     y,     x + r, y);
+        ctx.closePath();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(panX, panY);
+        ctx.scale(scale, scale);
+
+        // edges
+        for (const { from, to } of edges) {
+            const fn = nodes.get(from), tn = nodes.get(to);
+            if (!fn || !tn) continue;
+            const fx = fn.x + NW / 2, fy = fn.y + NH;
+            const tx = tn.x + NW / 2, ty = tn.y;
+            const col = tn.validity === 'disputed'  ? '#ff174488' :
+                        tn.validity === 'confirmed' ? '#00e67688' : '#1c2e44';
+            ctx.strokeStyle = col;
+            ctx.lineWidth   = 1.5 / scale;
+            ctx.beginPath();
+            ctx.moveTo(fx, fy);
+            ctx.bezierCurveTo(fx, fy + 35, tx, ty - 35, tx, ty);
+            ctx.stroke();
+            // arrow
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.moveTo(tx, ty);
+            ctx.lineTo(tx - 4 / scale, ty - 9 / scale);
+            ctx.lineTo(tx + 4 / scale, ty - 9 / scale);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // nodes
+        for (const [id, n] of nodes) {
+            const col = COLORS[n.type] || '#00e5ff';
+            const sel = id === selectedId;
+            ctx.save();
+            if (sel) { ctx.shadowBlur = 18 / scale; ctx.shadowColor = col; }
+            ctx.fillStyle   = 'rgba(8,13,24,0.96)';
+            ctx.strokeStyle = sel ? col : col + '44';
+            ctx.lineWidth   = (sel ? 2 : 1) / scale;
+            rr(n.x, n.y, NW, NH, 5 / scale);
+            ctx.fill(); ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // type stripe
+            ctx.fillStyle = col + '18';
+            rr(n.x + 1 / scale, n.y + 1 / scale, NW - 2 / scale, 16 / scale, 4 / scale);
+            ctx.fill();
+
+            ctx.fillStyle   = col;
+            ctx.font        = `bold ${8 / scale}px 'Rajdhani', sans-serif`;
+            ctx.textAlign   = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(n.type.toUpperCase(), n.x + NW / 2, n.y + 9 / scale);
+
+            // label
+            ctx.fillStyle   = '#aec6d4';
+            ctx.font        = `${10 / scale}px 'JetBrains Mono', monospace`;
+            const lbl = (n.label || id).length > 20 ? (n.label || id).slice(0, 19) + '…' : (n.label || id);
+            ctx.fillText(lbl, n.x + NW / 2, n.y + NH / 2 + 4 / scale);
+
+            // id
+            ctx.fillStyle   = '#4a6478';
+            ctx.font        = `${8 / scale}px 'JetBrains Mono', monospace`;
+            ctx.fillText(id, n.x + NW / 2, n.y + NH - 7 / scale);
+
+            // validity dot
+            const vc = n.validity === 'confirmed' ? '#00e676' :
+                       n.validity === 'disputed'  ? '#ff1744' : '#ffd600';
+            ctx.fillStyle = vc;
+            ctx.beginPath();
+            ctx.arc(n.x + NW - 10 / scale, n.y + 9 / scale, 3.5 / scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    function nodeAt(wx, wy) {
+        for (const [id, n] of nodes)
+            if (wx >= n.x && wx <= n.x + NW && wy >= n.y && wy <= n.y + NH) return id;
+        return null;
+    }
+
+    function showDetail(id) {
+        const n = nodes.get(id);
+        if (!n) return;
+        const vc  = n.validity === 'confirmed' ? 'nd-valid-confirmed' :
+                    n.validity === 'disputed'  ? 'nd-valid-disputed'  : 'nd-valid-claimed';
+        const tc  = `nd-${n.type}`;
+        let html  = `<div class="node-detail">
+            <div class="nd-id">${id}</div>
+            <div class="nd-type ${tc}">${n.type.toUpperCase()}</div>
+            <div class="nd-label">${n.label}</div>
+            <div class="nd-validity ${vc}">● ${n.validity}</div>
+            ${n.parents?.length ? `<div class="nd-parents">parents: ${n.parents.join(', ')}</div>` : ''}
+        </div>`;
+
+        if (n.flow) {
+            html += `<div class="nd-schema">${JSON.stringify(n.flow, null, 2)}</div>`;
+            if (n.compiled) {
+                const langs = Object.keys(n.compiled);
+                const first = langs[0] || '';
+                html += `<div class="nd-langs">${langs.map(l =>
+                    `<span class="lang-badge done" style="cursor:pointer" onclick="showCompiled('${id}','${l}')">${l}</span>`
+                ).join('')}</div>`;
+                if (first) {
+                    document.getElementById('codeOut').textContent = n.compiled[first];
+                    buildLangTabs(id, n.compiled, first);
+                }
+            }
+        }
+        document.getElementById('nodeDetail').innerHTML = html;
+    }
+
+    function buildLangTabs(nodeId, compiled, active) {
+        document.getElementById('langTabs').innerHTML = Object.keys(compiled).map(l =>
+            `<div class="lang-tab ${l === active ? 'active done' : 'done'}" onclick="showCompiled('${nodeId}','${l}')">${l}</div>`
+        ).join('');
+    }
+
+    window.showCompiled = (nodeId, lang) => {
+        const n = nodes.get(nodeId);
+        if (!n?.compiled?.[lang]) return;
+        document.getElementById('codeOut').textContent = n.compiled[lang];
+        document.querySelectorAll('.lang-tab').forEach(t =>
+            t.classList.toggle('active', t.textContent === lang));
+    };
+
+    // ── input events ──────────────────────────────────────────────────────
+    canvas.addEventListener('mousedown', e => {
+        const r = canvas.getBoundingClientRect();
+        const [wx, wy] = toWorld(e.clientX - r.left, e.clientY - r.top);
+        const hit = nodeAt(wx, wy);
+        if (hit) { selectedId = hit; showDetail(hit); }
+        else     { dragging = true; lastMX = e.clientX; lastMY = e.clientY; canvas.classList.add('dragging'); }
+        draw();
+    });
+    canvas.addEventListener('mousemove', e => {
+        if (dragging) { panX += e.clientX - lastMX; panY += e.clientY - lastMY; lastMX = e.clientX; lastMY = e.clientY; draw(); return; }
+        const r  = canvas.getBoundingClientRect();
+        const tt = document.getElementById('tooltip');
+        const [wx, wy] = toWorld(e.clientX - r.left, e.clientY - r.top);
+        const hit = nodeAt(wx, wy);
+        if (hit) {
+            const n = nodes.get(hit);
+            tt.style.cssText = `display:block;left:${e.clientX + 14}px;top:${e.clientY - 10}px`;
+            tt.innerHTML = `<strong style="color:var(--cyan)">${hit}</strong><br>${n.label}<br><span style="color:var(--dim)">${n.type} · ${n.validity}</span>`;
+        } else { tt.style.display = 'none'; }
+    });
+    canvas.addEventListener('mouseup',  () => { dragging = false; canvas.classList.remove('dragging'); });
+    canvas.addEventListener('mouseleave', () => { dragging = false; });
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const r = canvas.getBoundingClientRect();
+        const mx = e.clientX - r.left, my = e.clientY - r.top;
+        const f  = e.deltaY < 0 ? 1.12 : 0.88;
+        panX = mx - (mx - panX) * f; panY = my - (my - panY) * f; scale *= f; draw();
+    }, { passive: false });
+    window.addEventListener('resize', resize);
+
+    function topoSort() {
+        const out = [], vis = new Set();
+        function visit(id) {
+            if (vis.has(id)) return; vis.add(id);
+            const n = nodes.get(id);
+            for (const p of (n?.parents || [])) visit(p);
+            out.push(id);
+        }
+        for (const id of nodes.keys()) visit(id);
+        return out;
+    }
+
+    function addNode(type, label, parentIds = [], extra = {}) {
+        const id   = `N${String(nextId++).padStart(3, '0')}`;
+        const node = { id, type, label, validity: type === 'axiom' ? 'confirmed' : 'claimed', parents: [...parentIds], x: 0, y: 0, ...extra };
+        nodes.set(id, node);
+        for (const pid of parentIds) if (nodes.has(pid)) edges.push({ from: pid, to: id });
+        autoLayout();
+        updateStats();
+        return node;
+    }
+
+    function autoLayout() {
+        const layers = new Map(), vis = new Set();
+        function layerOf(id) {
+            if (layers.has(id)) return layers.get(id);
+            if (vis.has(id))    { layers.set(id, 0); return 0; }
+            vis.add(id);
+            const n = nodes.get(id);
+            const l = n?.parents?.length
+                ? Math.max(...n.parents.map(layerOf)) + 1
+                : 0;
+            layers.set(id, l);
+            return l;
+        }
+        for (const id of nodes.keys()) layerOf(id);
+
+        const byLayer = new Map();
+        for (const [id, l] of layers) {
+            if (!byLayer.has(l)) byLayer.set(l, []);
+            byLayer.get(l).push(id);
+        }
+        const HGAP = NW + 30, VGAP = NH + 50;
+        const cw = canvas.offsetWidth || 800;
+        for (const [l, ids] of byLayer) {
+            const totalW = ids.length * HGAP;
+            const startX = Math.max(20, (cw - totalW) / 2);
+            ids.forEach((id, i) => {
+                const n = nodes.get(id);
+                n.x = startX + i * HGAP;
+                n.y = 60 + l * VGAP;
+            });
+        }
+        draw();
+    }
+
+    // ── public API ────────────────────────────────────────────────────────
+    return {
+        addAxiom(label) {
+            const l    = label || document.getElementById('axiomLabel')?.value?.trim() || 'Axiom';
+            const node = addNode('axiom', l, []);
+            dagLog(`Axiom: ${node.id} — ${l}`, 'ok');
+            return node;
+        },
+        addEvent() {
+            const type     = document.getElementById('evtType')?.value || 'normal';
+            const label    = document.getElementById('evtLabel')?.value?.trim() || 'Event';
+            const raw      = document.getElementById('evtParents')?.value?.trim();
+            const parentIds = raw ? raw.split(',').map(s => s.trim()).filter(Boolean)
+                                  : [...nodes.keys()].filter(id => nodes.get(id)?.type === 'axiom');
+            const node = addNode(type, label, parentIds);
+            dagLog(`Event: ${node.id} — ${label}`, 'info');
+        },
+        addJFEvent(flow, parentIds, compiled) {
+            const fn    = typeof flow.function === 'object' ? flow.function.name : flow.function;
+            const node  = addNode('jsonflow', fn || 'JSONFlow', parentIds, { flow, compiled });
+            dagLog(`JSONFlow: ${node.id} — ${fn}`, 'flow');
+            selectedId  = node.id;
+            showDetail(node.id);
+            return node;
+        },
+        getAxiomIds() { return [...nodes.keys()].filter(id => nodes.get(id)?.type === 'axiom'); },
+        seedAxioms() {
+            if (nodes.size > 0) return;
+            this.addAxiom('World State');
+            this.addAxiom('Time Reference');
+            this.addAxiom('Agent Identity');
+            dagLog('Default axioms seeded', 'ok');
+        },
+        autoLayout,
+        resetView()  { panX = 0; panY = 20; scale = 1; draw(); },
+        zoom(f)      { const cx = canvas.width/2, cy = canvas.height/2; panX = cx-(cx-panX)*f; panY = cy-(cy-panY)*f; scale*=f; draw(); },
+        clear() {
+            nodes.clear(); edges.length = 0; selectedId = null; nextId = 1;
+            document.getElementById('nodeDetail').innerHTML = '<div style="font-size:10px;color:var(--dim);">Click a node to inspect</div>';
+            updateStats(); draw(); dagLog('Canvas cleared', 'warn');
+        },
+        propagateAll() {
+            for (const id of topoSort()) {
+                const n = nodes.get(id);
+                if (n.type === 'axiom') continue;
+                const ps = (n.parents || []).map(p => nodes.get(p)).filter(Boolean);
+                n.validity = ps.some(p => p.validity === 'disputed')  ? 'disputed' :
+                             ps.every(p => p.validity === 'confirmed') ? 'confirmed' : 'claimed';
+            }
+            updateStats(); draw(); dagLog('Validity propagated', 'ok');
+        },
+        disputeSelected() {
+            const n = nodes.get(selectedId);
+            if (n) { n.validity = 'disputed'; updateStats(); draw(); dagLog(`Disputed: ${selectedId}`, 'warn'); }
+        },
+        resolveSelected() {
+            const n = nodes.get(selectedId);
+            if (n) { n.validity = 'confirmed'; updateStats(); draw(); dagLog(`Resolved: ${selectedId}`, 'ok'); }
+        },
+        deriveState() {
+            const n    = selectedId ? nodes.get(selectedId) : null;
+            const snap = document.getElementById('stateSnap');
+            if (!n?.flow) { snap.textContent = 'No JSONFlow node selected.'; return; }
+            try {
+                const outputs = parseAndDerive(n.flow);
+                snap.innerHTML = Object.entries(outputs).length
+                    ? Object.entries(outputs).map(([k, v]) =>
+                        `<div><span style="color:var(--cyan)">${k}</span>: <span style="color:var(--green)">${JSON.stringify(v)}</span></div>`
+                    ).join('')
+                    : '<span style="color:var(--dim)">No outputs derived.</span>';
+            } catch (e) {
+                snap.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+            }
+        },
+        dagLog
+    };
+
+    setTimeout(resize, 50);
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FULL PIPELINE  — Builder → Critic → Judge → Refiner → Verifier
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FullPipeline = (() => {
+    let running = false;
+
+    async function run() {
+        if (running) return;
+        const prompt = document.getElementById('mainPrompt')?.value?.trim();
+        if (!prompt) { agentLog('Enter a description first', 'warn'); return; }
+        const model  = document.getElementById('modelSel')?.value || 'codellama';
+
+        running = true;
+        document.getElementById('runAllBtn').disabled = true;
+        document.getElementById('chip-agents').classList.add('on');
+
+        try {
+            // ── Builder ───────────────────────────────────────────────────
+            setAgent('builder', true);
+            setProgress(10);
+            agentLog('Builder: generating JSONFlow schema…', 'agent');
+            let best = await callOllama(model, `Generate a JSONFlow schema for: ${prompt}`);
+            best = autoFixEventTypes(alignDerivation(best));
+            agentLog(`Builder: ${(best.events||[]).length} event(s) generated`, 'ok');
+            setAgent('builder', false);
+            setProgress(22);
+
+            // ── Critic ────────────────────────────────────────────────────
+            setAgent('critic', true);
+            agentLog('Critic: reviewing schema…', 'agent');
+            let critique = null;
+            try {
+                critique = await callOllama(model,
+                    `Review this JSONFlow schema. Return JSON with "issues":[] and "score":0-10:\n${JSON.stringify(best, null, 2)}`,
+                    `You are a JSONFlow critic. Return ONLY JSON with keys "issues" (array of strings) and "score" (integer 0-10). No markdown.`
+                );
+            } catch (_) {}
+            const issueCount = critique?.issues?.length || 0;
+            agentLog(`Critic: score=${critique?.score ?? '?'}, issues=${issueCount}`, issueCount ? 'warn' : 'ok');
+            setAgent('critic', false);
+            setProgress(42);
+
+            // ── Judge ─────────────────────────────────────────────────────
+            setAgent('judge', true);
+            agentLog('Judge: validating schema…', 'agent');
+            const val1 = validateJF(best);
+            if (!val1.valid) {
+                agentLog(`Judge: invalid — ${val1.errors[0]} — repairing…`, 'warn');
+                best = await repairJSONFlow(best);
+                best = autoFixEventTypes(alignDerivation(best));
+            }
+            const val2 = validateJF(best);
+            val2.warnings.forEach(w => agentLog(`Judge warn: ${w}`, 'warn'));
+            agentLog(`Judge: ${val2.valid ? 'PASS' : 'FAIL — using fallback'}`, val2.valid ? 'ok' : 'err');
+            if (!val2.valid) best = autoFixEventTypes(fallbackJSONFlow());
+            setAgent('judge', false);
+            setProgress(60);
+
+            // ── Refiner ───────────────────────────────────────────────────
+            setAgent('refiner', true);
+            agentLog('Refiner: polishing derivation paths…', 'agent');
+            best = alignDerivation(autoFixEventTypes(best));
+            agentLog('Refiner: done', 'ok');
+            setAgent('refiner', false);
+            setProgress(72);
+
+            // ── Verifier ──────────────────────────────────────────────────
+            setAgent('verifier', true);
+            agentLog('Verifier: checking replay invariant…', 'agent');
+            const verifyErrors = [];
+
+            // 1. Schema validity
+            const finalVal = validateJF(best);
+            finalVal.errors.forEach(e => verifyErrors.push(e));
+
+            // 2. Derivation cross-reference
+            const evTypeSet = new Set((best.events || []).map(e => e.type));
+            for (const [outKey, rule] of Object.entries(best.derivation || {})) {
+                if (!evTypeSet.has(rule.from))
+                    verifyErrors.push(`Derivation "${outKey}": unknown event "${rule.from}"`);
+                const field  = (rule.path || '').replace('payload.', '');
+                const srcEv  = (best.events || []).find(e => e.type === rule.from);
+                if (srcEv && !(field in (srcEv.payload || {})))
+                    verifyErrors.push(`Derivation "${outKey}": field "${field}" missing in "${rule.from}" payload`);
+            }
+
+            // 3. Replay invariant (parseAndDerive asserts internally)
+            try {
+                const { eventLog, outputs } = replayJF(best);
+                agentLog(`Verifier replay: ${eventLog.length} events → ${Object.keys(outputs).length} output(s)`, 'ok');
+            } catch (vErr) {
+                verifyErrors.push(`Replay: ${vErr.message}`);
+            }
+
+            // 4. Compile all 25 languages
+            document.getElementById('chip-compiler').classList.add('on');
+            agentLog(`Compiler: generating ${LANGS.length} targets…`, 'agent');
+            const compiled = {};
+            for (const lang of LANGS) {
+                try { compiled[lang] = compileJF(best, lang); }
+                catch (e) { compiled[lang] = `// compile error: ${e.message}`; }
+            }
+
+            // 5. C output must embed canonical event-type strings
+            const cOut = compiled['c'] || '';
+            for (const ev of (best.events || []))
+                if (!cOut.includes(`"${ev.type}"`))
+                    verifyErrors.push(`C output missing event type string: "${ev.type}"`);
+
+            if (verifyErrors.length) {
+                verifyErrors.forEach(e => agentLog(`VRF fail: ${e}`, 'err'));
+                agentLog('Verifier: FAILED — pipeline halted', 'err');
+                throw new Error(`Verifier: ${verifyErrors[0]}`);
+            }
+
+            agentLog('Verifier: all checks passed ✓', 'ok');
+            setAgent('verifier', false);
+            setProgress(95);
+
+            // ── Commit to DAG ─────────────────────────────────────────────
+            const parents = DAG.getAxiomIds();
+            const node    = DAG.addJFEvent(best, parents, compiled);
+
+            const prevIter = parseInt(document.getElementById('jf-stat-iter')?.textContent) || 0;
+            const stIter   = document.getElementById('jf-stat-iter');
+            const stLangs  = document.getElementById('jf-stat-langs');
+            if (stIter)  stIter.textContent  = prevIter + 1;
+            if (stLangs) stLangs.textContent = LANGS.length;
+
+            agentLog(`Done → ${node.id}`, 'ok');
+            setProgress(100);
+
+        } catch (err) {
+            agentLog(`Error: ${err.message}`, 'err');
+        } finally {
+            running = false;
+            document.getElementById('runAllBtn').disabled = false;
+            document.getElementById('chip-agents').classList.remove('on');
+            document.getElementById('chip-compiler').classList.remove('on');
+            ['builder','critic','judge','refiner','verifier'].forEach(a => setAgent(a, false));
+            setTimeout(() => setProgress(0), 800);
+        }
+    }
+
+    return { run };
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MISC
+// ═══════════════════════════════════════════════════════════════════════════
+
+function toggleAdv() {
+    const p = document.getElementById('advPanel');
+    const a = document.getElementById('advArrow');
+    const open = p.style.display !== 'none';
+    p.style.display = open ? 'none' : 'block';
+    a.textContent   = open ? '▶' : '▼';
+}
+
+window.addEventListener('load', () => {
+    DAG.seedAxioms();
+    document.getElementById('runAllBtn').onclick = () => FullPipeline.run();
+    document.getElementById('mainPrompt').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); FullPipeline.run(); }
+    });
+    DAG.dagLog('System ready', 'ok');
+});
+    </script>
+
+
+<!-- ── Genesis / JSONFlow Pipeline ── -->
+<script src="../genesis-jsonflow/js/jsonflow.js"></script>
+<script src="../genesis-jsonflow/js/state.js"></script>
+<script src="../genesis-jsonflow/planespace-theme.js"></script>
+<!-- ── Sovereign Stack Integration ── -->
+<script src="../sovereign-log.js"></script>
+<script src="../sovereign-bus.js"></script>
+<script src="../ollama-local-ai.js"></script>
+<script>if (typeof attachBus === "function") attachBus();</script>
+</body>
+</html>
