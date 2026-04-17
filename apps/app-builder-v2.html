@@ -22,7 +22,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sovereign App Builder</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
 <style>
 /* ── Reset & Tokens ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1057,6 +1057,13 @@ ${animate?`@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacit
 </head>
 <body>
 ${renderer(data,T,A,title,animate,ad)}
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw/genesis_sw.js", { scope: "/" })
+    .then(() => console.log("[I-AM-IOS] ✅ Genesis SW ready"))
+    .catch(e => console.warn("[I-AM-IOS] SW failed:", e));
+}
+<\/script>
 </body>
 </html>`;
 
@@ -2357,6 +2364,13 @@ function toast(msg, type='info') {
   t.textContent = msg;
   wrap.appendChild(t);
   setTimeout(() => t.remove(), 3500);
+}
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw/genesis_sw.js", { scope: "/" })
+    .then(() => console.log("[I-AM-IOS] ✅ Genesis SW ready"))
+    .catch(e => console.warn("[I-AM-IOS] SW failed:", e));
 }
 </script>
 </body>

@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I-AM-AI — Ollama3.2 + Sub-Conscience</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void:    #050508;
+  --deep:    #090b14;
+  --surface: #0f1120;
+  --panel:   #131626;
+  --border:  #1e2340;
+  --muted:   #2a2f4a;
+  --text:    #c8ccdd;
+  --faint:   #4a5070;
+  --cyan:    #00e5ff;
+  --orange:  #ff6b35;
+  --green:   #39ff14;
+  --violet:  #7c5cfc;
+  --gold:    #ffd700;
+  --red:     #ff3d71;
+  --ff-head: 'Oxanium', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --glow-c:  0 0 12px rgba(0,229,255,0.5), 0 0 24px rgba(0,229,255,0.2);
+  --glow-o:  0 0 12px rgba(255,107,53,0.5), 0 0 24px rgba(255,107,53,0.2);
+  --glow-g:  0 0 12px rgba(57,255,20,0.5),  0 0 24px rgba(57,255,20,0.2);
+  --glow-v:  0 0 12px rgba(124,92,252,0.5), 0 0 24px rgba(124,92,252,0.2);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--ff-mono);
+  background: var(--void);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.logo-main {
+  font-family: var(--ff-head);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--cyan);
+  text-shadow: var(--glow-c);
+  letter-spacing: 0.08em;
+}
+
+.logo-sub {
+  font-size: 0.7rem;
+  color: var(--faint);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: var(--faint);
+  letter-spacing: 0.1em;
+}
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex-shrink: 0;
+}
+.dot.live  { background: var(--green);  box-shadow: var(--glow-g); animation: pulse 2s infinite; }
+.dot.warn  { background: var(--orange); box-shadow: var(--glow-o); }
+.dot.busy  { background: var(--violet); box-shadow: var(--glow-v); animation: pulse 1s infinite; }
+.dot.dead  { background: var(--red); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.config-bar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.config-bar label {
+  font-size: 0.65rem;
+  color: var(--faint);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.config-bar input, .config-bar select {
+  background: var(--deep);
+  border: 1px solid var(--muted);
+  border-radius: 5px;
+  color: var(--cyan);
+  font-family: var(--ff-mono);
+  font-size: 0.75rem;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.config-bar input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.config-bar input:focus, .config-bar select:focus { border-color: var(--cyan); }
+.config-bar input::placeholder { color: var(--faint); }
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin: 16px 0 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  font-family: var(--ff-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  background: transparent;
+  border: none;
+  padding: 10px 16px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  text-shadow: var(--glow-c);
+}
+
+.tab-panel { display: none; padding: 20px 0; }
+.tab-panel.active { display: block; }
+
+.section-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 8px;
+}
+
+.prompt-box {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+textarea.prompt-input {
+  width: 100%;
+  min-height: 80px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--ff-mono);
+  font-size: 0.85rem;
+  padding: 14px 120px 14px 16px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  line-height: 1.6;
+}
+textarea.prompt-input:focus { border-color: var(--cyan); }
+
+.prompt-buttons {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+button {
+  font-family: var(--ff-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--deep);
+  color: var(--cyan);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+button:hover {
+  background: var(--panel);
+  border-color: var(--cyan);
+  box-shadow: var(--glow-c);
+}
+button:active { transform: scale(0.98); }
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.response-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  min-height: 80px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.response-box.loading {
+  animation: pulse-text 1.5s infinite;
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.insight-box {
+  background: linear-gradient(135deg, rgba(124,92,252,0.1), rgba(0,229,255,0.05));
+  border: 1px solid var(--violet);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: var(--glow-v);
+}
+
+.insight-header {
+  color: var(--violet);
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+.insight-content {
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.insight-meta {
+  font-size: 0.6rem;
+  color: var(--faint);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 0.75rem;
+  color: var(--text);
+  animation: slide-in 0.3s ease-out;
+  max-width: 300px;
+}
+.toast.success { border-left: 3px solid var(--green); }
+.toast.error { border-left: 3px solid var(--red); }
+.toast.info { border-left: 3px solid var(--cyan); }
+.toast.insight { border-left: 3px solid var(--violet); }
+
+@keyframes slide-in {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.input-group {
+  margin-bottom: 16px;
+}
+
+.input-label {
+  font-size: 0.65rem;
+  color: var(--faint);
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+input[type="text"], input[type="number"] {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--ff-mono);
+  font-size: 0.8rem;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input[type="text"]:focus, input[type="number"]:focus { border-color: var(--cyan); }
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.analogy-chip {
+  background: var(--deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.chip-concept { color: var(--cyan); font-weight: bold; }
+.chip-relation { color: var(--orange); }
+.chip-domain { color: var(--gold); }
+
+.chip-strength {
+  width: 60px;
+  height: 6px;
+  background: var(--muted);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.chip-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.3s;
+}
+
+.empty-state {
+  color: var(--faint);
+  text-align: center;
+  padding: 24px 0;
+  font-size: 0.8rem;
+}
+
+.history-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  background: var(--deep);
+  border-left: 2px solid var(--border);
+  margin-bottom: 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.hi-a { color: var(--cyan); font-weight: bold; }
+.hi-rel { color: var(--faint); }
+.hi-b { color: var(--green); font-weight: bold; }
+.hi-dom { color: var(--gold); background: rgba(255,215,0,0.1); padding: 2px 6px; border-radius: 3px; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.stat-card {
+  background: var(--deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.6rem;
+  color: var(--faint);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: var(--cyan);
+}
+
+@media (max-width: 768px) {
+  .logo-main { font-size: 1.25rem; }
+  .tabs { gap: 0; }
+  .tab-btn { padding: 8px 12px; font-size: 0.65rem; }
+  .config-bar, .prompt-buttons { flex-direction: column; width: 100%; }
+  .config-bar input, .config-bar select { width: 100%; }
+  .stats-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-main">I-AM-AI</div>
+      <div class="logo-sub">Ollama3.2 + Sub-Conscience</div>
+    </div>
+    <div class="header-status">
+      <div class="status-pill">
+        <div id="ollamaDot" class="dot dead"></div>
+        <span id="ollamaLabel">OLLAMA OFFLINE</span>
+      </div>
+      <div class="status-pill">
+        <div id="subDot" class="dot dead"></div>
+        <span id="subLabel">SUB-CONSCIENCE IDLE</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="config-bar">
+    <label>Ollama URL:</label>
+    <input type="text" id="ollamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434">
+    
+    <label>Temperature:</label>
+    <input type="number" id="temperature" min="0" max="2" step="0.1" value="0.7" style="max-width:80px">
+    
+    <button onclick="App.testOllama()">Test Ollama3.2</button>
+    <button onclick="App.toggleSubConscience()">Enable Sub-Conscience</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('explain')">Explain</button>
+    <button class="tab-btn" onclick="switchTab('subconscience')">Sub-Conscience</button>
+    <button class="tab-btn" onclick="switchTab('builder')">Builder</button>
+    <button class="tab-btn" onclick="switchTab('stats')">Stats</button>
+  </div>
+
+  <!-- EXPLAIN TAB -->
+  <div id="explain" class="tab-panel active">
+    <div class="section-label">Concept Explainer (Ollama3.2)</div>
+    <div class="prompt-box">
+      <textarea id="explainInput" class="prompt-input" placeholder="Enter a concept to explain..."></textarea>
+      <div class="prompt-buttons">
+        <button onclick="Explainer.generate()">Explain</button>
+        <button onclick="Explainer.generateAnalogy()">Analogy</button>
+        <button onclick="Explainer.deepDive()">Deep Dive</button>
+      </div>
+    </div>
+    <div id="explainResponse" class="response-box"></div>
+  </div>
+
+  <!-- SUB-CONSCIENCE TAB -->
+  <div id="subconscience" class="tab-panel">
+    <div class="section-label">AI Sub-Conscience (Background Insights)</div>
+    <div class="btn-row">
+      <button onclick="SubConscienceUI.generateInsight()">Generate Insight Now</button>
+      <button onclick="SubConscienceUI.refreshInsights()">Refresh Insights</button>
+      <button onclick="SubConscienceUI.showPatterns()">Show Patterns</button>
+    </div>
+    
+    <div id="insightContainer"></div>
+    <div id="patternContainer"></div>
+  </div>
+
+  <!-- BUILDER TAB -->
+  <div id="builder" class="tab-panel">
+    <div class="section-label">Add Analogy Concept</div>
+    <div class="input-group">
+      <div class="input-label">Concept A</div>
+      <input type="text" id="bA" placeholder="e.g., Photosynthesis">
+    </div>
+    <div class="input-group">
+      <div class="input-label">Relation</div>
+      <input type="text" id="bRel" placeholder="e.g., requires">
+    </div>
+    <div class="input-group">
+      <div class="input-label">Concept B</div>
+      <input type="text" id="bB" placeholder="e.g., Sunlight">
+    </div>
+    <div class="input-group">
+      <div class="input-label">Domain</div>
+      <input type="text" id="bDom" placeholder="e.g., Biology">
+    </div>
+    <div class="btn-row">
+      <button onclick="Builder.add()">Add Concept</button>
+      <button onclick="Builder.clearHistory()">Clear History</button>
+    </div>
+
+    <div class="section-label" style="margin-top:24px">Analogy Completion</div>
+    <div class="input-group">
+      <div class="input-label">A</div>
+      <input type="text" id="cA" placeholder="e.g., Heart">
+    </div>
+    <div class="input-group">
+      <div class="input-label">B</div>
+      <input type="text" id="cB" placeholder="e.g., Blood">
+    </div>
+    <div class="input-group">
+      <div class="input-label">C</div>
+      <input type="text" id="cC" placeholder="e.g., Brain">
+    </div>
+    <button onclick="Builder.complete()">Solve: A:B :: C:?</button>
+
+    <div class="section-label" style="margin-top:24px">Concept History (<span id="analogyCountLabel">0</span>)</div>
+    <div id="analogyHistory"></div>
+    <div id="completeResult"></div>
+  </div>
+
+  <!-- STATS TAB -->
+  <div id="stats" class="tab-panel">
+    <div class="section-label">System Statistics</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Ollama</div>
+        <div class="stat-value" id="statOllama">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Sub-Conscience</div>
+        <div class="stat-value" id="statSub">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Memories</div>
+        <div class="stat-value" id="statMemories">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Insights</div>
+        <div class="stat-value" id="statInsights">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Patterns</div>
+        <div class="stat-value" id="statPatterns">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Concepts</div>
+        <div class="stat-value" id="statConcepts">0</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  MAIN APPLICATION STATE
+// ════════════════════════════════════════════════════════════
+
+const STATE = {
+  ollamaOnline: false,
+  subConscienceActive: false,
+  ollamaUrl: 'http://localhost:11434',
+  temperature: 0.7,
+  model: 'ollama3.2',
+  swRegistration: null,
+  localAnalogy: new Map(),
+  history: [],
+};
+
+let swPort = null;
+
+// ════════════════════════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION
+// ════════════════════════════════════════════════════════════
+
+async function registerServiceWorker() {
+  try {
+    if (!navigator.serviceWorker) {
+      console.warn('Service Worker not supported');
+      return;
+    }
+
+    const reg = await navigator.serviceWorker.register('sw-subconscience.js', {
+      scope: '/',
+    });
+    
+    STATE.swRegistration = reg;
+    console.log('✓ Service Worker registered');
+    
+    // Establish message channel
+    if (navigator.serviceWorker.controller) {
+      establishSWConnection();
+    } else {
+      navigator.serviceWorker.addEventListener('controllerchange', establishSWConnection);
+    }
+
+    return reg;
+  } catch (err) {
+    console.error('SW registration failed:', err);
+    toast('Service Worker setup failed', 'error');
+  }
+}
+
+function establishSWConnection() {
+  const channel = new MessageChannel();
+  swPort = channel.port1;
+
+  swPort.onmessage = (e) => {
+    const { type, data } = e.data;
+    console.log('[Main] Received from SW:', type);
+
+    switch (type) {
+      case 'subconscience-insight':
+        handleSubConscienceInsight(data);
+        break;
+      case 'subconscience-status':
+        updateSubConscienceUI(data);
+        break;
+      case 'memory-stored':
+        updateStats();
+        break;
+    }
+  };
+
+  swPort.start();
+  navigator.serviceWorker.controller.postMessage(
+    { type: 'init-port' },
+    [channel.port2]
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+//  MESSAGE TO SERVICE WORKER
+// ════════════════════════════════════════════════════════════
+
+function sendToSW(type, data) {
+  return new Promise((resolve, reject) => {
+    if (!swPort) {
+      reject(new Error('Service Worker not connected'));
+      return;
+    }
+
+    const channel = new MessageChannel();
+    channel.port1.onmessage = (e) => {
+      if (e.data.error) reject(new Error(e.data.error));
+      else resolve(e.data);
+    };
+
+    swPort.postMessage({ type, data }, [channel.port2]);
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  UI UTILITIES
+// ════════════════════════════════════════════════════════════
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function escHtml(txt) {
+  return (txt || '').replace(/[<>&"']/g, c => ({
+    '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// ════════════════════════════════════════════════════════════
+//  OLLAMA INTEGRATION
+// ════════════════════════════════════════════════════════════
+
+const Ollama = {
+  async testConnection() {
+    const url = document.getElementById('ollamaUrl').value.trim();
+    if (!url) {
+      toast('Enter Ollama URL', 'error');
+      return;
+    }
+
+    STATE.ollamaUrl = url;
+    try {
+      const res = await fetch(`${url}/api/tags`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      STATE.ollamaOnline = true;
+      this._updateUI(true);
+      const modelCount = data.models?.length || 0;
+      toast(`✓ Ollama3.2 online! (${modelCount} models)`, 'success');
+    } catch (err) {
+      STATE.ollamaOnline = false;
+      this._updateUI(false);
+      toast(`✗ Ollama offline: ${err.message}`, 'error');
+    }
+  },
+
+  _updateUI(online) {
+    const dot = document.getElementById('ollamaDot');
+    const label = document.getElementById('ollamaLabel');
+    dot.className = online ? 'dot live' : 'dot dead';
+    label.textContent = online ? 'OLLAMA ONLINE' : 'OLLAMA OFFLINE';
+    document.getElementById('statOllama').textContent = online ? 'online' : 'offline';
+  },
+
+  async generate(prompt) {
+    if (!STATE.ollamaOnline) {
+      throw new Error('Ollama not connected');
+    }
+
+    const temp = parseFloat(document.getElementById('temperature').value);
+
+    try {
+      const res = await fetch(`${STATE.ollamaUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'ollama3.2',
+          prompt,
+          temperature: temp,
+          stream: false,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data.response || '';
+    } catch (err) {
+      throw new Error(`Ollama error: ${err.message}`);
+    }
+  },
+};
+
+// ════════════════════════════════════════════════════════════
+//  EXPLAINER
+// ════════════════════════════════════════════════════════════
+
+const Explainer = {
+  async generate() {
+    const input = document.getElementById('explainInput').value.trim();
+    if (!input) {
+      toast('Enter a concept', 'error');
+      return;
+    }
+
+    const responseEl = document.getElementById('explainResponse');
+    responseEl.classList.add('loading');
+    responseEl.textContent = 'Generating...';
+
+    const prompt = `Explain this concept clearly:
+
+"${input}"
+
+Provide:
+1. Simple definition (1 sentence)
+2. Key components (3-5 bullets)
+3. Real-world example
+4. Why it matters`;
+
+    try {
+      const response = await Ollama.generate(prompt);
+      responseEl.textContent = response;
+      responseEl.classList.remove('loading');
+      
+      // Store in sub-conscience
+      if (swPort) {
+        await sendToSW('store-memory', {
+          memoryType: 'explanation',
+          content: input + '\n\n' + response,
+          metadata: { topic: input, timestamp: Date.now() },
+        });
+      }
+      
+      toast('✓ Explanation generated', 'success');
+    } catch (err) {
+      responseEl.textContent = `Error: ${err.message}`;
+      responseEl.classList.remove('loading');
+      toast('Generation failed', 'error');
+    }
+  },
+
+  async generateAnalogy() {
+    const input = document.getElementById('explainInput').value.trim();
+    if (!input) {
+      toast('Enter a concept', 'error');
+      return;
+    }
+
+    const responseEl = document.getElementById('explainResponse');
+    responseEl.classList.add('loading');
+    responseEl.textContent = 'Generating analogies...';
+
+    const prompt = `Create powerful analogies for: "${input}"
+
+For each:
+1. The analogy (simple metaphor)
+2. Structural similarity
+3. Where it breaks down
+4. Alternative analogy`;
+
+    try {
+      const response = await Ollama.generate(prompt);
+      responseEl.textContent = response;
+      responseEl.classList.remove('loading');
+      
+      if (swPort) {
+        await sendToSW('store-memory', {
+          memoryType: 'analogy',
+          content: input + '\n\n' + response,
+          metadata: { topic: input },
+        });
+      }
+      
+      toast('✓ Analogies generated', 'success');
+    } catch (err) {
+      responseEl.textContent = `Error: ${err.message}`;
+      responseEl.classList.remove('loading');
+      toast('Generation failed', 'error');
+    }
+  },
+
+  async deepDive() {
+    const input = document.getElementById('explainInput').value.trim();
+    if (!input) {
+      toast('Enter a concept', 'error');
+      return;
+    }
+
+    const responseEl = document.getElementById('explainResponse');
+    responseEl.classList.add('loading');
+    responseEl.textContent = 'Deep diving...';
+
+    const prompt = `Deep dive into "${input}":
+
+1. Origins & history
+2. Current understanding
+3. Cutting-edge research
+4. Open questions
+5. Future directions`;
+
+    try {
+      const response = await Ollama.generate(prompt);
+      responseEl.textContent = response;
+      responseEl.classList.remove('loading');
+      toast('✓ Deep dive complete', 'success');
+    } catch (err) {
+      responseEl.textContent = `Error: ${err.message}`;
+      responseEl.classList.remove('loading');
+      toast('Generation failed', 'error');
+    }
+  },
+};
+
+// ════════════════════════════════════════════════════════════
+//  SUB-CONSCIENCE UI
+// ════════════════════════════════════════════════════════════
+
+const SubConscienceUI = {
+  async generateInsight() {
+    if (!STATE.subConscienceActive) {
+      toast('Enable sub-conscience first', 'error');
+      return;
+    }
+
+    try {
+      await sendToSW('generate-insight', {});
+      toast('Insight generation triggered...', 'info');
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  async refreshInsights() {
+    try {
+      const { insights } = await sendToSW('get-insights', { limit: 10 });
+      this.renderInsights(insights);
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  renderInsights(insights) {
+    const container = document.getElementById('insightContainer');
+    container.innerHTML = '';
+
+    if (!insights || insights.length === 0) {
+      container.innerHTML = '<div class="empty-state">No insights yet. Keep exploring!</div>';
+      document.getElementById('statInsights').textContent = '0';
+      return;
+    }
+
+    insights.forEach((insight, idx) => {
+      const box = document.createElement('div');
+      box.className = 'insight-box';
+      const time = new Date(insight.timestamp).toLocaleTimeString();
+      box.innerHTML = `
+        <div class="insight-header">🧠 Insight #${insights.length - idx}</div>
+        <div class="insight-content">${escHtml(insight.content)}</div>
+        <div class="insight-meta">
+          Confidence: ${insight.confidence}% | Generated: ${time}
+        </div>`;
+      container.appendChild(box);
+    });
+
+    document.getElementById('statInsights').textContent = insights.length;
+  },
+
+  async showPatterns() {
+    try {
+      const { patterns } = await sendToSW('get-patterns', { limit: 10 });
+      this.renderPatterns(patterns);
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  renderPatterns(patterns) {
+    const container = document.getElementById('patternContainer');
+    container.innerHTML = '<div class="section-label" style="margin-top:24px">Detected Patterns</div>';
+
+    if (!patterns || patterns.length === 0) {
+      container.innerHTML += '<div class="empty-state">No patterns detected yet</div>';
+      document.getElementById('statPatterns').textContent = '0';
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(150px, 1fr))';
+    grid.style.gap = '12px';
+    grid.style.marginTop = '12px';
+
+    patterns.forEach(p => {
+      const card = document.createElement('div');
+      card.style.cssText = `
+        background: var(--deep);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 12px;
+        text-align: center;
+      `;
+      card.innerHTML = `
+        <div style="color:var(--cyan);font-weight:bold;font-size:0.75rem;margin-bottom:6px">${escHtml(p.pattern)}</div>
+        <div style="color:var(--orange);font-size:0.7rem">freq: ${p.frequency}</div>
+        <div style="color:var(--green);font-size:0.7rem">strength: ${(p.strength * 100).toFixed(0)}%</div>`;
+      grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+    document.getElementById('statPatterns').textContent = patterns.length;
+  },
+};
+
+function handleSubConscienceInsight(data) {
+  toast('🧠 Sub-conscience generated insight!', 'insight');
+  SubConscienceUI.refreshInsights();
+}
+
+function updateSubConscienceUI(data) {
+  const dot = document.getElementById('subDot');
+  const label = document.getElementById('subLabel');
+  
+  if (data.processing) {
+    dot.className = 'dot busy';
+    label.textContent = 'SUB-CONSCIENCE PROCESSING';
+  } else if (data.active) {
+    dot.className = 'dot live';
+    label.textContent = 'SUB-CONSCIENCE ACTIVE';
+  } else {
+    dot.className = 'dot dead';
+    label.textContent = 'SUB-CONSCIENCE IDLE';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  CONCEPT BUILDER
+// ════════════════════════════════════════════════════════════
+
+function addLocalEdge(a, b, relation, domain, strength = 0.75) {
+  const key = `${a}|${b}|${relation}`;
+  STATE.localAnalogy.set(key, { a, b, relation, domain, strength, concept: b });
+}
+
+function localFind(concept) {
+  const results = [];
+  STATE.localAnalogy.forEach(edge => {
+    if (edge.a === concept) results.push(edge);
+  });
+  return results;
+}
+
+const Builder = {
+  add() {
+    const a = document.getElementById('bA').value.trim();
+    const rel = document.getElementById('bRel').value.trim();
+    const b = document.getElementById('bB').value.trim();
+    const dom = document.getElementById('bDom').value.trim();
+
+    if (!a || !rel || !b || !dom) {
+      toast('Fill all fields', 'error');
+      return;
+    }
+
+    addLocalEdge(a, b, rel, dom, 0.75);
+    STATE.history.push({ a, rel, b, dom });
+    this.renderHistory();
+
+    document.getElementById('analogyCountLabel').textContent = STATE.localAnalogy.size;
+    ['bA', 'bRel', 'bB', 'bDom'].forEach(id => document.getElementById(id).value = '');
+
+    toast('✓ Concept added', 'success');
+    localStorage.setItem('analogies', JSON.stringify(Array.from(STATE.localAnalogy.entries())));
+    updateStats();
+  },
+
+  clearHistory() {
+    if (confirm('Clear all analogies?')) {
+      STATE.history = [];
+      STATE.localAnalogy.clear();
+      this.renderHistory();
+      document.getElementById('analogyCountLabel').textContent = '0';
+      localStorage.removeItem('analogies');
+      toast('History cleared', 'info');
+      updateStats();
+    }
+  },
+
+  renderHistory() {
+    const box = document.getElementById('analogyHistory');
+    box.innerHTML = '';
+    if (!STATE.history.length) {
+      box.innerHTML = '<div class="empty-state">No analogies yet</div>';
+      return;
+    }
+    [...STATE.history].reverse().forEach(h => {
+      const el = document.createElement('div');
+      el.className = 'history-item';
+      el.innerHTML = `
+        <span class="hi-a">${escHtml(h.a)}</span>
+        <span class="hi-rel">—[ ${escHtml(h.rel)} ]→</span>
+        <span class="hi-b">${escHtml(h.b)}</span>
+        <span class="hi-dom">${escHtml(h.dom)}</span>`;
+      box.appendChild(el);
+    });
+  },
+
+  complete() {
+    const a = document.getElementById('cA').value.trim();
+    const b = document.getElementById('cB').value.trim();
+    const c = document.getElementById('cC').value.trim();
+
+    if (!a || !b || !c) {
+      toast('Fill A, B, C fields', 'error');
+      return;
+    }
+
+    const aEdges = localFind(a);
+    const cEdges = localFind(c);
+    const aRels = new Set(aEdges.map(e => e.relation));
+    const completions = cEdges
+      .filter(e => aRels.has(e.relation))
+      .sort((x, y) => y.strength - x.strength)
+      .slice(0, 6);
+
+    const box = document.getElementById('completeResult');
+    if (!completions.length) {
+      box.innerHTML = '<div class="empty-state">No match found</div>';
+      return;
+    }
+
+    box.innerHTML = '';
+    completions.forEach(e => {
+      const chip = document.createElement('div');
+      chip.className = 'analogy-chip';
+      chip.innerHTML = `
+        <div>
+          <span class="chip-concept">${e.concept}</span>
+          <span class="chip-relation"> —[ ${e.relation} ]→</span>
+          <span class="chip-domain">${e.domain}</span>
+        </div>
+        <div class="chip-strength"><div class="chip-fill" style="width:${Math.round(e.strength * 100)}%"></div></div>`;
+      box.appendChild(chip);
+    });
+
+    toast(`✓ ${a}:${b} :: ${c}:${completions[0].concept}`, 'success');
+  },
+};
+
+// ════════════════════════════════════════════════════════════
+//  MAIN APP CONTROLLER
+// ════════════════════════════════════════════════════════════
+
+const App = {
+  async testOllama() {
+    await Ollama.testConnection();
+  },
+
+  toggleSubConscience() {
+    STATE.subConscienceActive = !STATE.subConscienceActive;
+    const btn = event.target;
+    
+    if (STATE.subConscienceActive) {
+      btn.textContent = 'Disable Sub-Conscience';
+      btn.style.borderColor = 'var(--violet)';
+      toast('✓ Sub-conscience enabled!', 'success');
+      SubConscienceUI.refreshInsights();
+    } else {
+      btn.textContent = 'Enable Sub-Conscience';
+      btn.style.borderColor = 'var(--border)';
+      toast('Sub-conscience disabled', 'info');
+    }
+  },
+};
+
+async function updateStats() {
+  document.getElementById('statConcepts').textContent = STATE.localAnalogy.size;
+  
+  if (swPort) {
+    try {
+      const { memories } = await sendToSW('get-memories', { limit: 1000 });
+      document.getElementById('statMemories').textContent = memories?.length || 0;
+    } catch {}
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  INITIALIZATION
+// ════════════════════════════════════════════════════════════
+
+(async () => {
+  // Seed analogies
+  const seeds = [
+    ['Heart', 'pumps', 'Blood', 'Cardiovascular'],
+    ['Root', 'absorbs', 'Water', 'Botany'],
+    ['CPU', 'processes', 'Data', 'Computing'],
+    ['River', 'flows', 'Ocean', 'Geography'],
+  ];
+  seeds.forEach(([a, b, c, d]) => addLocalEdge(a, c, b, d, 0.85));
+
+  // Load saved analogies
+  const saved = localStorage.getItem('analogies');
+  if (saved) {
+    try {
+      JSON.parse(saved).forEach(([k, v]) => STATE.localAnalogy.set(k, v));
+    } catch {}
+  }
+
+  Builder.renderHistory();
+  updateStats();
+
+  // Register Service Worker
+  await registerServiceWorker();
+
+  console.log('%c⚡ I-AM-AI loaded', 'color:#00e5ff;font-size:14px;font-weight:bold');
+  console.log('%cOllama3.2 + Sub-Conscience ready', 'color:#39ff14');
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw/genesis_sw.js", { scope: "/" })
+    .then(() => console.log("[I-AM-IOS] ✅ Genesis SW ready"))
+    .catch(e => console.warn("[I-AM-IOS] SW failed:", e));
+}
+</script>
+</body>
+</html>

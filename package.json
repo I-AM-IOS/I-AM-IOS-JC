@@ -1,22 +1,77 @@
 {
-  "name": "sovereign-compute-network",
+  "name": "i-am-ios-desktop",
   "version": "5.0.0",
-  "description": "I-AM-IOS v5 — Sovereign substrate: deterministic event-driven OS with rekernel, WASM kernel, JSONFlow, P2P fabric, and sovereign app suite",
-  "type": "module",
-  "main": "server.js",
-  "scripts": {
-    "start":           "node server.js",
-    "dev":             "node --watch server.js",
-    "build:rekernel":  "cd rekernel && npx tsc -p tsconfig.json 2>&1 || true",
-    "build:dmr":       "cd dmr-upgrade && npx tsc -p tsconfig.json 2>&1 || true",
-    "build":           "npm run build:rekernel && npm run build:dmr",
-    "test":            "node test-complete-system.js",
-    "test:kernel":     "node test-kernel.js",
-    "build:wasm":      "cd wasm-kernel && cargo build --release --target wasm32-unknown-unknown",
-    "test:wasm":       "cd wasm-kernel && cargo test",
-    "setup":           "rustup target add wasm32-unknown-unknown",
-    "check":           "node --input-type=module --eval \"import('./sovereign-network.js').then(m => console.log('[check] sovereign-network.js imports OK', Object.keys(m)))\""
+  "description": "I-AM-IOS v5 — Sovereign Compute Suite. Fully contained Electron desktop application with integrated local server.",
+  "main": "main.js",
+  "author": "I-AM-IOS Contributors",
+  "license": "Sovereign OS Community License",
+  "homepage": "./",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   },
-  "engines": { "node": ">=20.0.0" },
-  "license": "Sovereign OS Community License"
+  "scripts": {
+    "react-scripts": "react-scripts",
+    "start": "electron .",
+    "dev": "electron --dev .",
+    "dev:debug": "electron --inspect=5858 .",
+    "build": "npm run build:app && npm run build:dist",
+    "build:app": "node build-app.js",
+    "build:dist": "electron-builder",
+    "dist": "npm run build",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "pack": "electron-builder --dir",
+    "prepack": "npm run build:app",
+    "postinstall": "electron-builder install-app-deps",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.6.4",
+    "electron-is-dev": "^3.0.1"
+  },
+  "dependencies": {},
+  "build": {
+    "appId": "com.i-am-ios.desktop",
+    "productName": "I-AM-IOS",
+    "files": [
+      "main.js",
+      "preload.js",
+      "I-AM-IOS-V-Updated/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "certificateFile": null,
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    }
+  }
 }

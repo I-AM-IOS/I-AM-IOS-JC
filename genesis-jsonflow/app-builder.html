@@ -1903,7 +1903,7 @@ function hydrateTemplate(data) {
 '  ps.on("error", function (err) { console.warn("[Planespace]", err); });\n' +
 '})();\n' +
 '<\/script>\n' +
-'</body>\n</html>';
+'<scr' + 'ipt>\nif ("serviceWorker" in navigator) {\n  navigator.serviceWorker.register("/sw/genesis_sw.js", { scope: "/" })\n    .then(() => console.log("[I-AM-IOS] \u2705 Genesis SW ready"))\n    .catch(e => console.warn("[I-AM-IOS] SW failed:", e));\n}\n<\/script>\n</body>\n</html>';
 }
 
 // ── Main build ───────────────────────────────────────────────────────────────

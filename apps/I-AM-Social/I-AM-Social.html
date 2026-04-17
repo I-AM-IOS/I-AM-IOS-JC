@@ -5,18 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SOVEREIGN FEED · I-AM-IOS Social</title>
-    <!-- Google Fonts removed: blocked by the Sovereign Kernel firewall (fonts.googleapis.com).
-         Falling back to system monospace / sans-serif stacks defined in CSS below. -->
+    <!-- Fonts: load from Google with SW passthrough; graceful system fallback if offline -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* System-font fallbacks that mirror the original typeface roles:
-           Space Mono  → ui-monospace, 'Courier New', monospace
-           Bebas Neue  → Impact, 'Arial Narrow', sans-serif  (condensed caps)
-           DM Sans     → system-ui, -apple-system, 'Segoe UI', sans-serif      */
-        :root {
-            --font-mono: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
-            --font-display: Impact, 'Arial Narrow', 'Arial Black', sans-serif;
-            --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-        }
+      /* System-font fallback when Google Fonts are unavailable */
+      :root {
+        --ff-mono: 'Space Mono', 'Courier New', Courier, monospace;
+        --ff-display: 'Bebas Neue', 'Impact', 'Arial Narrow', sans-serif;
+        --ff-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+      }
     </style>
 
     <!-- ── PeerJS: real WebRTC P2P ── -->
@@ -1305,6 +1304,45 @@
             background: var(--dim)
         }
     </style>
+
+    <!-- ── Capability Service Worker — probes Ollama + server, signals tier ── -->
+    <script>
+    (function registerPresenceSW() {
+        if (!('serviceWorker' in navigator)) return;
+
+        // ── SW registration ──────────────────────────────────────────────────
+        navigator.serviceWorker.register('./presence-sw.js', { scope: './' })
+            .then(reg => {
+                console.log('[SW] registered', reg.scope);
+                // Request immediate status on load
+                navigator.serviceWorker.ready.then(r => {
+                    r.active?.postMessage({ type: 'STATUS_REQUEST' });
+                });
+            })
+            .catch(err => console.warn('[SW] registration failed:', err));
+
+        // ── Receive capability status from SW ────────────────────────────────
+        navigator.serviceWorker.addEventListener('message', evt => {
+            const msg = evt.data;
+            if (!msg || msg.type !== 'CAPABILITY_STATUS') return;
+
+            // Store globally so boot() and initPresence() can read it
+            window.__capabilityStatus = msg;
+
+            // Dispatch a custom event so any part of the app can react
+            window.dispatchEvent(new CustomEvent('capability-ready', { detail: msg }));
+
+            console.log(`[SW→page] tier=${msg.tier} ollama=${msg.ollamaUp} server=${msg.serverUp} device=${msg.deviceTier}`);
+        });
+
+        // ── Wake helper — call this to trigger an immediate re-probe ─────────
+        window.wakePresenceSW = function() {
+            navigator.serviceWorker.ready.then(r => {
+                r.active?.postMessage({ type: 'WAKE' });
+            });
+        };
+    })();
+    </script>
 </head>
 
 <body>
@@ -2134,20 +2172,6 @@
                 navigator.clipboard.writeText(myNodeId).then(() => showToast('Node ID copied to clipboard', 'success'));
             }
 
-            // ── Expose UI-action functions to global scope ────────────────────────────────
-            //    Inline onclick="" attributes resolve names from window, not from this
-            //    waitForSovereignLog closure.  Assigning here (after the declarations above)
-            //    keeps definitions clean while making them globally callable.
-            window.emitPost      = emitPost;
-            window.copyNodeId    = copyNodeId;
-            window.connectToPeer = connectToPeer;
-            window.likePost      = likePost;
-            window.resonatePost  = resonatePost;
-            window.toggleReplies = toggleReplies;
-            window.submitReply   = submitReply;
-            window.deletePost    = deletePost;
-            window.renderPosts   = renderPosts;
-
             // ── 9. RENDER ─────────────────────────────────────────────────────────────────
 
             const avatarColors = [
@@ -2507,42 +2531,40 @@
             // Pure browser WebSocket — zero extra dependencies.
             let _presenceWs        = null;
             let _presencePingTimer = null;
-            let _presenceRetries   = 0;
+            let _presenceRetryTimer = null;
+            let _presenceRetryCount = 0;
+            let _presenceEnabled   = false;   // only true after server probe succeeds
             const PRESENCE_PATH    = '/presence';
-            const PRESENCE_MAX_RETRIES = 4;   // give up after 4 attempts (~75 s total)
+            const PRESENCE_CHECK_URL = '/api/peers';  // lightweight HTTP probe
 
             function presenceUrl() {
                 const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
                 return `${proto}//${location.host}${PRESENCE_PATH}`;
             }
 
-            function initPresence() {
-                // Only connect if we're being served from a real HTTP(S) server.
-                if (!location.host) {
-                    klog('Presence registry: file:// origin — skipped', 'warn');
-                    return;
+            // ── Probe the REST endpoint first; only open WS if server is up ──
+            async function probeServer() {
+                try {
+                    const r = await fetch(PRESENCE_CHECK_URL, { method: 'GET', cache: 'no-store' });
+                    return r.ok;
+                } catch (_) {
+                    return false;
                 }
-                // Hard cap: stop retrying after PRESENCE_MAX_RETRIES failures so the
-                // console isn't flooded with "WebSocket connection failed" errors when
-                // no presence server is running.
-                if (_presenceRetries >= PRESENCE_MAX_RETRIES) {
-                    klog('Presence registry: no server found after ' + PRESENCE_MAX_RETRIES + ' attempts — using manual peer ID mode', 'warn');
-                    return;
-                }
+            }
 
-                klog('Connecting to presence registry…', 'info');
+            function _openPresenceWs() {
+                if (_presenceWs && _presenceWs.readyState <= WebSocket.OPEN) return; // already open/connecting
 
                 try {
                     _presenceWs = new WebSocket(presenceUrl());
                 } catch (e) {
-                    klog('Presence registry unavailable — manual peer ID mode', 'warn');
+                    klog('Presence: could not open WebSocket — manual peer ID mode', 'warn');
                     return;
                 }
 
                 _presenceWs.addEventListener('open', () => {
-                    _presenceRetries = 0;   // connected — reset backoff counter
-                    klog('Presence registry: connected', 'ok');
-                    // Announce ourselves
+                    _presenceRetryCount = 0;
+                    klog('Presence registry: connected ✓', 'ok');
                     _presenceWs.send(JSON.stringify({
                         op:     'ANNOUNCE',
                         nodeId: myNodeId,
@@ -2551,7 +2573,7 @@
                     }));
                     // Keep-alive ping every 20 s
                     _presencePingTimer = setInterval(() => {
-                        if (_presenceWs.readyState === WebSocket.OPEN) {
+                        if (_presenceWs && _presenceWs.readyState === WebSocket.OPEN) {
                             _presenceWs.send(JSON.stringify({ op: 'PING' }));
                         }
                     }, 20_000);
@@ -2562,7 +2584,6 @@
                     try { msg = JSON.parse(evt.data); } catch (_) { return; }
 
                     if (msg.op === 'PEERS') {
-                        // Full peer list on connect — auto-connect to everyone
                         const others = (msg.peers || []).filter(p => p.nodeId !== myNodeId);
                         if (others.length === 0) {
                             klog('Presence: no other peers online yet', 'info');
@@ -2571,50 +2592,69 @@
                             for (const p of others) autoConnectPeer(p);
                         }
                     }
-
                     if (msg.op === 'PEER_JOINED' && msg.nodeId !== myNodeId) {
                         klog(`Presence: ${msg.handle || msg.nodeId.slice(0,12)} joined — connecting…`, 'info');
                         autoConnectPeer(msg);
                     }
-
                     if (msg.op === 'PEER_LEFT' && msg.nodeId !== myNodeId) {
                         klog(`Presence: ${msg.nodeId.slice(0,12)}… left`, 'info');
                     }
                 });
 
-                // Track whether the error handler already scheduled the next retry so
-                // the close handler (which always fires after error) doesn't double-count.
-                let _errorHandled = false;
-
-                _presenceWs.addEventListener('error', () => {
-                    // Connection refused / network error — browser fires error then close.
-                    // We own the retry here; the close handler will see _errorHandled and skip.
-                    _errorHandled = true;
-                    clearInterval(_presencePingTimer);
-                    _presenceRetries++;
-                    if (_presenceRetries < PRESENCE_MAX_RETRIES) {
-                        const delay = 5_000 * Math.pow(2, _presenceRetries - 1);
-                        klog(`Presence registry: no server (attempt ${_presenceRetries}/${PRESENCE_MAX_RETRIES}) — retrying in ${delay/1000} s`, 'warn');
-                        setTimeout(initPresence, delay);
-                    } else {
-                        klog('Presence registry: no server found after ' + PRESENCE_MAX_RETRIES + ' attempts — manual peer ID mode active', 'warn');
-                    }
-                });
-
                 _presenceWs.addEventListener('close', () => {
                     clearInterval(_presencePingTimer);
-                    if (_errorHandled) return;   // already handled above — don't double-retry
-                    // Clean disconnect from a previously open connection — retry with backoff.
-                    _presenceRetries++;
-                    if (_presenceRetries < PRESENCE_MAX_RETRIES) {
-                        const delay = 5_000 * Math.pow(2, _presenceRetries - 1);
-                        klog(`Presence registry: disconnected — retrying in ${delay/1000} s… (attempt ${_presenceRetries}/${PRESENCE_MAX_RETRIES})`, 'warn');
-                        setTimeout(initPresence, delay);
-                    } else {
-                        klog('Presence registry: giving up — manual peer ID mode active', 'warn');
-                    }
+                    if (!_presenceEnabled) return; // server was shut down intentionally
+                    // Exponential back-off: 5s, 10s, 20s … capped at 60s
+                    _presenceRetryCount++;
+                    const delay = Math.min(5_000 * Math.pow(2, _presenceRetryCount - 1), 60_000);
+                    klog(`Presence: disconnected — retrying in ${delay/1000}s…`, 'warn');
+                    _presenceRetryTimer = setTimeout(_openPresenceWs, delay);
+                });
+
+                _presenceWs.addEventListener('error', () => {
+                    // error fires before close; close handler does the retry
+                    klog('Presence: connection error — manual peer ID mode still works', 'warn');
                 });
             }
+
+            // ── Capability-aware initPresence ────────────────────────────────
+            // cap = window.__capabilityStatus or null (falls back to HTTP probe)
+            async function initPresence(cap) {
+                if (!location.host || location.protocol === 'file:') {
+                    klog('Presence: file:// origin — skipped', 'warn');
+                    klog('  → Run: node server.js  to enable auto-discovery', 'info');
+                    return;
+                }
+
+                const serverUp = cap ? cap.serverUp : await probeServer();
+
+                if (!serverUp) {
+                    klog('Presence: server.js not running — manual peer ID mode active', 'warn');
+                    klog('  → Run: node server.js  to enable auto-discovery', 'info');
+                    window.addEventListener('focus', () => {
+                        if (window.wakePresenceSW) window.wakePresenceSW();
+                        else initPresence(null);
+                    }, { once: true });
+                    return;
+                }
+
+                if (cap) {
+                    const tierMsg = {
+                        HIGH:    'Ollama local AI + auto-discovery active ✓',
+                        MID:     'Server up — WebLLM available (mid-tier device)',
+                        LOW:     'Server up — lightweight WASM model recommended',
+                        MINIMAL: 'Server up — pure P2P mode (no AI on this device)',
+                    }[cap.tier] || 'Server up';
+                    klog(`Capability: [${cap.tier}] ${tierMsg}`, cap.ollamaUp ? 'ok' : 'info');
+                    window.__aiTier     = cap.tier;
+                    window.__ollamaUp   = cap.ollamaUp;
+                    window.__deviceTier = cap.deviceTier;
+                }
+
+                _presenceEnabled = true;
+                klog('Presence: connecting to registry…', 'ok');
+                _openPresenceWs(); // defined above
+            } // end initPresence
 
             // Auto-connect without touching the UI input
             function autoConnectPeer(peerInfo) {
@@ -2657,8 +2697,47 @@
                 // 6. Start PeerJS WebRTC
                 initPeerJS();
 
-                // 6b. Start presence registry (auto-discovery)
-                initPresence();
+                // 6b. Start presence + AI — wait for SW capability signal (max 3s)
+                //     SW probes Ollama + server in parallel before we open any WS.
+                //     Falls back to direct HTTP probe if SW not available/slow.
+                const capReady = await new Promise(resolve => {
+                    // Already got a status from SW before boot ran
+                    if (window.__capabilityStatus) {
+                        resolve(window.__capabilityStatus);
+                        return;
+                    }
+                    // Wait for SW to fire capability-ready
+                    const onCap = e => {
+                        clearTimeout(timer);
+                        window.removeEventListener('capability-ready', onCap);
+                        resolve(e.detail);
+                    };
+                    window.addEventListener('capability-ready', onCap);
+                    // Timeout — SW unavailable or slow → fall back to direct probe
+                    const timer = setTimeout(() => {
+                        window.removeEventListener('capability-ready', onCap);
+                        klog('Presence: SW timeout — falling back to direct probe', 'warn');
+                        resolve(null);
+                    }, 3000);
+                    // Poke the SW in case it hasn't probed yet
+                    if (window.wakePresenceSW) window.wakePresenceSW();
+                });
+
+                await initPresence(capReady);
+
+                // React to future capability changes (server starts/stops, Ollama toggled)
+                window.addEventListener('capability-ready', e => {
+                    const cap = e.detail;
+                    klog(`Capability update: tier=${cap.tier} server=${cap.serverUp} ollama=${cap.ollamaUp}`, 'info');
+                    if (cap.serverUp && !_presenceEnabled) {
+                        // Server just came online — connect now
+                        initPresence(cap);
+                    } else if (!cap.serverUp && _presenceEnabled) {
+                        // Server went away
+                        _presenceEnabled = false;
+                        klog('Presence: server went offline — manual mode', 'warn');
+                    }
+                });
 
                 // 7. Initial render
                 renderPosts();
@@ -2667,8 +2746,25 @@
                 updateValidatorStatus();
 
                 klog('I-AM-IOS Social v3 ready', 'ok');
-                klog('Auto-discovery active — peers on this server connect automatically', 'info');
+                klog(`AI tier: ${window.__aiTier || 'detecting…'} | Auto-discovery: ${_presenceEnabled ? 'active' : 'manual (start server.js)'}`, 'info');
             }
+
+            // ── EXPOSE UI ACTIONS TO GLOBAL SCOPE ────────────────────────────────────────
+            // Functions above are inside waitForSovereignLog callback — not accessible
+            // to onclick="fn()" HTML attributes. Assign to window to bridge the gap.
+            window.emitPost        = emitPost;
+            window.likePost        = likePost;
+            window.resonatePost    = resonatePost;
+            window.toggleReplies   = toggleReplies;
+            window.submitReply     = submitReply;
+            window.deletePost      = deletePost;
+            window.addTag          = addTag;
+            window.copyNodeId      = copyNodeId;
+            window.connectToPeer   = connectToPeer;
+            window.filterTag       = filterTag;
+            window.renderPosts     = renderPosts;
+            window.renderEventLog  = renderEventLog;
+            window.updateStats     = updateStats;
 
             boot();
 

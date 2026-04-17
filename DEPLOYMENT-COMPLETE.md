@@ -1,47 +1,9 @@
 # I-AM-IOS COMPLETE HYBRID UPGRADE + LOCAL OLLAMA AI
-## Production Deployment Guide v1.1 — Handshake Layer
+## Production Deployment Guide v1.0
 
 **Status:** ✅ PRODUCTION READY  
-**Last Updated:** April 16, 2026  
+**Last Updated:** April 13, 2026  
 **All components:** Fully implemented, tested, deployment-ready
-
----
-
-## What's New in v1.1
-
-### Identity-Routed Handshake (`sovereign-handshake.js`)
-
-Previously, peers connected and immediately began gossiping raw events. v1.1 adds a mandatory 3-phase handshake before any gossip traffic flows:
-
-```
-Node A connects to Node B
-  │
-  ├─ Phase 1 ──▶ HANDSHAKE_HELLO  { nodeId, caps, sig }
-  │            ◀── HANDSHAKE_ACK   { nodeId, caps, sig }
-  │
-  ├─ Phase 2 ──▶ HANDSHAKE_PEERS  { peers[0..7] }
-  │            ◀── HANDSHAKE_PEERS  { peers[0..7] }
-  │
-  └─ Phase 3 ── handshake complete → SYNC begins
-                 └─ auto-connect to introduced peers
-                    └─ graph expands without full mesh
-```
-
-**One handshake = entry into the entire graph.** Each node only maintains a slice of the network; deterministic routing fills the rest.
-
-**New `attachNetwork()` return fields:**
-```js
-const net = await attachNetwork({ ... });
-
-net.handshake        // HandshakeManager instance
-net.peerRegistry     // Map<peerId, PeerEntry> — all known peers
-net.getNetworkView() // full topology snapshot (for dashboards)
-net.getTrustedPeers()// only peers that completed the 3-phase handshake
-```
-
-**New sovereign-log events:**
-- `NET_HANDSHAKE_COMPLETE` — emitted when identity is confirmed and peer introductions are done
-- `NET_PEER_INTRODUCED` — emitted for each newly discovered peer from introductions
 
 ---
 

@@ -1,41 +1,29 @@
 # I-AM-IOS COMPLETE UPGRADE — DEPLOYMENT MANIFEST
 ## Status: ✅ PRODUCTION READY | All Files Complete | Zero To-Dos
 
-**Generated:** April 16, 2026  
-**Version:** 1.1 — Handshake Layer Added  
+**Generated:** April 13, 2026  
+**Version:** 1.0 Final  
 **Status:** Ready for immediate deployment
 
 ---
 
-## FILES PROVIDED (9 items, ~145 KB)
+## FILES PROVIDED (8 items, ~131 KB)
 
-### Core Implementation (4 files)
+### Core Implementation (3 files)
 
-1. **sovereign-handshake.js** (NEW — 7 KB)
-   - Identity-routed 3-phase connection handshake
-   - Phase 1: HANDSHAKE_HELLO — nodeId + capabilities + FNV-32 signature
-   - Phase 2: HANDSHAKE_ACK  — responding side confirms identity
-   - Phase 3: HANDSHAKE_PEERS — bidirectional peer introduction (up to 8 peers)
-   - Deterministic peer selection via epoch-windowed hash for topology stability
-   - Graph expansion: auto-connects to introduced peers after handshake
-   - Backwards compatible: falls back to direct SYNC if not injected
-   - Status: ✅ Complete, production-ready
-
-2. **sovereign-network-hybrid.js** (17 KB)
+1. **sovereign-network-hybrid.js** (17 KB)
    - L4.5 hybrid network transport layer
    - 410 lines of production code
    - Handles: validator routing, P2P fallback, reconnection sync
    - Status: ✅ Complete, tested, production-ready
 
-3. **sovereign-network.js** (v3.1 — 30 KB)
+2. **sovereign-network.js** (27 KB)
    - Integration harness that connects all layers
-   - Updated: HandshakeManager wired into SovereignPeer
-   - Updated: SYNC now fires only after 3-phase handshake completes
-   - Updated: attachNetwork() returns handshake, peerRegistry, getNetworkView(), getTrustedPeers()
-   - New events: NET_HANDSHAKE_COMPLETE, NET_PEER_INTRODUCED
+   - 670 lines of production code
+   - Wires: L3 state → L4.5 hybrid → L4 gossip → L5 consensus
    - Status: ✅ Complete, tested, production-ready
 
-4. **ollama-local-ai.js** (16 KB)
+3. **ollama-local-ai.js** (16 KB)
    - Local AI inference engine using Ollama
    - 500 lines of production code
    - Features: prompting, streaming, embeddings, function extraction, analysis

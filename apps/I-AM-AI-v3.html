@@ -1,0 +1,2242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I·AM·AI v3 — Sovereign Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   TOKENS & RESET
+═══════════════════════════════════════════════════════════ */
+:root {
+  /* System-font fallbacks when Google Fonts unavailable */
+  --ff-head: 'Syne', 'Trebuchet MS', system-ui, sans-serif;
+  --ff-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --ff-mono: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  /* Void palette */
+  --void:     #020308;
+  --deep:     #05070f;
+  --surface:  #080c18;
+  --panel:    #0c1020;
+  --panel2:   #101428;
+  --lift:     #141830;
+  --border:   #1c2240;
+  --muted:    #252b4a;
+  --faint:    #384070;
+  --text:     #b8c2de;
+  --bright:   #e2e8f8;
+  --white:    #f0f4ff;
+
+  /* Accent spectrum */
+  --cyan:     #00d9f5;
+  --cyan2:    #00aacc;
+  --orange:   #ff6533;
+  --green:    #22f0a0;
+  --violet:   #8b5cf6;
+  --violet2:  #6d3fe0;
+  --gold:     #f5c542;
+  --red:      #ff4060;
+  --pink:     #e879f9;
+  --blue:     #4db8ff;
+
+  /* Glows */
+  --glow-c:   0 0 12px rgba(0,217,245,.55), 0 0 36px rgba(0,217,245,.1);
+  --glow-v:   0 0 12px rgba(139,92,246,.55), 0 0 36px rgba(139,92,246,.1);
+  --glow-g:   0 0 12px rgba(34,240,160,.5),  0 0 36px rgba(34,240,160,.08);
+  --glow-o:   0 0 12px rgba(255,101,51,.5),  0 0 36px rgba(255,101,51,.08);
+
+  /* Typography — with system fallbacks */
+  --ff-head:  'Syne', 'Trebuchet MS', system-ui, sans-serif;
+  --ff-body:  'Inter', system-ui, -apple-system, sans-serif;
+  --ff-mono:  'IBM Plex Mono', 'Courier New', Courier, monospace;
+
+  /* Sizing */
+  --rad:      6px;
+  --rad-lg:   10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--ff-mono);
+  background: var(--void);
+  color: var(--text);
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+/* Ambient background — subtle scanlines + grid */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(rgba(0,217,245,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,217,245,.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.018) 2px,rgba(0,0,0,.018) 3px);
+}
+
+/* Radial ambient glow at top */
+#ambientGlow {
+  position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+  width: 900px; height: 400px;
+  background: radial-gradient(ellipse at center, rgba(0,217,245,.04) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+/* ═══════════════════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════════════════ */
+#app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════ */
+header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(0,217,245,.04) 0%, transparent 100%);
+}
+
+.logo {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  text-decoration: none;
+}
+.logo-mark {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, rgba(0,217,245,.2), rgba(139,92,246,.2));
+  border: 1px solid rgba(0,217,245,.35);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--ff-head); font-size: .75rem; font-weight: 800;
+  color: var(--cyan); letter-spacing: -.04em;
+  box-shadow: var(--glow-c), inset 0 0 12px rgba(0,217,245,.06);
+  flex-shrink: 0;
+}
+.logo-text {
+  display: flex; flex-direction: column; line-height: 1;
+}
+.logo-name {
+  font-family: var(--ff-head); font-weight: 800; font-size: 1rem;
+  color: var(--bright); letter-spacing: .08em;
+}
+.logo-name span { color: var(--cyan); text-shadow: var(--glow-c); }
+.logo-sub { font-size: .52rem; color: var(--faint); letter-spacing: .25em; text-transform: uppercase; margin-top: 2px; }
+
+.header-mid { flex: 1; display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+.ctrl { display: flex; align-items: center; gap: 5px; }
+.ctrl-lbl { font-size: .55rem; color: var(--faint); letter-spacing: .15em; text-transform: uppercase; white-space: nowrap; }
+
+select, input[type="text"], input[type="number"], textarea {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--rad);
+  color: var(--text);
+  font-family: var(--ff-mono);
+  font-size: .7rem;
+  padding: 5px 9px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+select:focus, input:focus, textarea:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(0,217,245,.08);
+}
+select option { background: var(--panel); }
+
+.url-input { min-width: 180px; font-size: .65rem; }
+.model-select { color: var(--green); border-color: var(--green); min-width: 140px; }
+.persona-select { color: var(--violet); border-color: rgba(139,92,246,.4); }
+.temp-input { width: 54px; text-align: center; }
+
+.header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.status-cluster { display: flex; align-items: center; gap: 8px; }
+.status-pill { display: flex; align-items: center; gap: 5px; font-size: .58rem; color: var(--faint); letter-spacing: .06em; white-space: nowrap; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); flex-shrink: 0; }
+.dot.live  { background: var(--green);  box-shadow: var(--glow-g);  animation: pulse 2.4s infinite; }
+.dot.busy  { background: var(--violet); box-shadow: var(--glow-v);  animation: pulse .65s infinite; }
+.dot.warn  { background: var(--gold); }
+.dot.dead  { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.6)} }
+
+/* ═══════════════════════════════════════════════════════════
+   TOOLBAR
+═══════════════════════════════════════════════════════════ */
+.toolbar {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--deep); flex-shrink: 0;
+  overflow-x: auto; padding: 0 4px;
+}
+.toolbar::-webkit-scrollbar { height: 0; }
+
+.tab-btn {
+  font-family: var(--ff-mono); font-size: .6rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--faint);
+  background: transparent; border: none;
+  padding: 9px 15px; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, background .15s;
+  margin-bottom: -1px; white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.tab-btn .ti { font-size: .8rem; opacity: .7; }
+.tab-btn:hover { color: var(--text); background: rgba(0,217,245,.028); }
+.tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); background: rgba(0,217,245,.035); }
+.tab-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════════════════════ */
+.btn {
+  font-family: var(--ff-mono); font-size: .6rem; letter-spacing: .08em;
+  text-transform: uppercase; padding: 5px 11px;
+  border-radius: var(--rad); border: 1px solid var(--border);
+  background: var(--panel); color: var(--cyan); cursor: pointer;
+  transition: all .15s; display: inline-flex; align-items: center; gap: 4px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.btn:hover { background: var(--panel2); border-color: var(--cyan); box-shadow: var(--glow-c); }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .35; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+.btn-v { color: var(--violet); border-color: rgba(139,92,246,.35); }
+.btn-v:hover { border-color: var(--violet); box-shadow: var(--glow-v); background: rgba(139,92,246,.07); }
+.btn-g { color: var(--green); border-color: rgba(34,240,160,.3); }
+.btn-g:hover { border-color: var(--green); box-shadow: var(--glow-g); background: rgba(34,240,160,.06); }
+.btn-o { color: var(--orange); border-color: rgba(255,101,51,.3); }
+.btn-o:hover { border-color: var(--orange); box-shadow: var(--glow-o); background: rgba(255,101,51,.07); }
+.btn-r { color: var(--red); border-color: rgba(255,64,96,.3); }
+.btn-r:hover { border-color: var(--red); background: rgba(255,64,96,.07); }
+.btn-sm { padding: 3px 8px; font-size: .55rem; }
+.btn-lg { padding: 8px 18px; font-size: .68rem; }
+.btn-on { background: rgba(0,217,245,.1) !important; border-color: var(--cyan) !important; }
+.btn-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+/* ═══════════════════════════════════════════════════════════
+   CONTENT & PANELS
+═══════════════════════════════════════════════════════════ */
+.content { flex: 1; overflow: hidden; }
+.tab-panel { display: none; height: 100%; overflow: hidden; }
+.tab-panel.active { display: flex; flex-direction: column; }
+
+.pnl-hdr {
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-size: .56rem; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--faint); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 7px;
+}
+.pnl-hdr-left { display: flex; align-items: center; gap: 7px; }
+.pnl-hdr::before { content: none; }
+.pnl-hdr-left::before { content: ''; width: 10px; height: 1px; background: var(--cyan); opacity: .6; }
+.pnl-body { flex: 1; overflow-y: auto; padding: 14px; }
+
+.sec-label {
+  font-size: .54rem; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.sec-label::before { content: ''; width: 8px; height: 1px; background: currentColor; opacity: .5; }
+
+.divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* ═══════════════════════════════════════════════════════════
+   TOASTS
+═══════════════════════════════════════════════════════════ */
+.toast-wrap {
+  position: fixed; bottom: 20px; right: 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  z-index: 9999; pointer-events: none;
+}
+.toast {
+  font-family: var(--ff-mono); font-size: .66rem; letter-spacing: .04em;
+  padding: 8px 14px; border-radius: var(--rad); max-width: 360px;
+  animation: toast-in .2s ease-out, toast-out .3s ease-in 3.8s forwards;
+  pointer-events: none; display: flex; align-items: center; gap: 7px;
+}
+.toast.success { background: rgba(34,240,160,.12); border: 1px solid rgba(34,240,160,.3); color: var(--green); }
+.toast.error   { background: rgba(255,64,96,.12);  border: 1px solid rgba(255,64,96,.3);  color: var(--red); }
+.toast.warn    { background: rgba(245,197,66,.1);  border: 1px solid rgba(245,197,66,.3); color: var(--gold); }
+.toast.info    { background: rgba(0,217,245,.08);  border: 1px solid rgba(0,217,245,.25); color: var(--cyan); }
+.toast.insight { background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.35);color: var(--violet); }
+@keyframes toast-in  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes toast-out { to   { opacity:0; transform:translateY(4px); } }
+
+/* ═══════════════════════════════════════════════════════════
+   EMPTY STATE
+═══════════════════════════════════════════════════════════ */
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; gap: 8px; color: var(--faint); font-size: .65rem; text-align: center;
+}
+.empty-icon { font-size: 1.6rem; opacity: .35; }
+.empty-text { color: var(--faint); letter-spacing: .05em; }
+
+/* ═══════════════════════════════════════════════════════════
+   SPINNER
+═══════════════════════════════════════════════════════════ */
+.spin {
+  display: inline-block; width: 10px; height: 10px;
+  border: 1.5px solid var(--muted); border-top-color: var(--cyan);
+  border-radius: 50%; animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════════
+   ████  CHAT TAB  ████
+═══════════════════════════════════════════════════════════ */
+#chat { position: relative; }
+
+.chat-controls {
+  display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+  border-bottom: 1px solid var(--border); background: var(--deep); flex-shrink: 0; flex-wrap: wrap;
+}
+
+.messages {
+  flex: 1; overflow-y: auto; padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+  scroll-behavior: smooth;
+}
+
+.msg {
+  display: flex; gap: 10px;
+  animation: msg-in .22s cubic-bezier(.22,1,.36,1);
+}
+@keyframes msg-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.msg-av {
+  width: 28px; height: 28px; border-radius: var(--rad);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .58rem; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+  font-family: var(--ff-head); letter-spacing: .04em; position: relative;
+}
+.msg.user      .msg-av { background: rgba(0,217,245,.1);   border: 1px solid rgba(0,217,245,.25);  color: var(--cyan); }
+.msg.assistant .msg-av { background: rgba(139,92,246,.1);  border: 1px solid rgba(139,92,246,.25); color: var(--violet); }
+.msg.system    .msg-av { background: rgba(34,240,160,.06); border: 1px solid rgba(34,240,160,.2);  color: var(--green); font-size: .5rem; }
+
+.msg-body { flex: 1; min-width: 0; }
+.msg-meta { font-size: .54rem; color: var(--faint); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.msg-role { letter-spacing: .1em; text-transform: uppercase; }
+.msg.user      .msg-role { color: var(--cyan); }
+.msg.assistant .msg-role { color: var(--violet); }
+.msg.system    .msg-role { color: var(--green); }
+
+.msg-content {
+  font-size: .8rem; line-height: 1.75;
+  color: var(--text); white-space: pre-wrap; word-break: break-word;
+}
+.msg-content code {
+  font-family: var(--ff-mono); background: var(--panel2);
+  border: 1px solid var(--border); border-radius: 3px;
+  padding: 1px 5px; font-size: .75rem; color: var(--orange);
+}
+.msg-content pre {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-left: 3px solid var(--violet); border-radius: var(--rad);
+  padding: 12px; margin: 8px 0; overflow-x: auto;
+}
+.msg-content pre code { background: none; border: none; padding: 0; color: var(--text); font-size: .74rem; }
+
+.cursor {
+  display: inline-block; width: 7px; height: 13px;
+  background: var(--cyan); animation: blink .85s steps(1) infinite;
+  vertical-align: middle; margin-left: 2px; border-radius: 1px; opacity: .9;
+}
+@keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+.msg-actions { display: flex; gap: 4px; margin-top: 5px; opacity: 0; transition: opacity .15s; }
+.msg:hover .msg-actions { opacity: 1; }
+
+.chat-input-area {
+  border-top: 1px solid var(--border); padding: 10px 14px;
+  display: flex; gap: 7px; align-items: flex-end; flex-shrink: 0;
+  background: var(--deep);
+}
+.chat-input-wrap { flex: 1; position: relative; }
+textarea#chatInput {
+  width: 100%; min-height: 46px; max-height: 170px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--rad);
+  color: var(--bright); font-family: var(--ff-mono); font-size: .8rem;
+  padding: 10px 12px; resize: none; outline: none; transition: border-color .15s; line-height: 1.5;
+}
+textarea#chatInput:focus { border-color: var(--cyan); }
+textarea#chatInput::placeholder { color: var(--faint); }
+
+.btn-send {
+  width: 46px; height: 46px; border-radius: var(--rad);
+  border: 1px solid rgba(0,217,245,.35); background: rgba(0,217,245,.06);
+  color: var(--cyan); cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 1.1rem; transition: all .15s; flex-shrink: 0;
+}
+.btn-send:hover { background: rgba(0,217,245,.15); box-shadow: var(--glow-c); }
+.btn-send:disabled { opacity: .3; cursor: not-allowed; }
+.btn-send svg { width: 18px; height: 18px; fill: currentColor; }
+
+.btn-voice {
+  width: 36px; height: 36px; border-radius: var(--rad);
+  border: 1px solid var(--border); background: var(--panel);
+  color: var(--faint); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; font-size: .85rem; transition: all .15s;
+}
+.btn-voice:hover { border-color: var(--orange); color: var(--orange); }
+.btn-voice.active { border-color: var(--red); color: var(--red); background: rgba(255,64,96,.08); animation: pulse .5s infinite; }
+
+/* Context indicator */
+.ctx-bar {
+  display: flex; align-items: center; gap: 8px; padding: 4px 14px;
+  background: var(--deep); border-bottom: 1px solid var(--border);
+  font-size: .57rem; color: var(--faint); flex-shrink: 0;
+}
+.ctx-fill-wrap { flex: 1; max-width: 200px; height: 2px; background: var(--muted); border-radius: 2px; overflow: hidden; }
+.ctx-fill { height: 100%; background: var(--cyan); border-radius: 2px; transition: width .5s; }
+
+/* ═══════════════════════════════════════════════════════════
+   ████  AGENT TAB  ████
+═══════════════════════════════════════════════════════════ */
+.agent-layout { display: grid; grid-template-columns: 340px 1fr; height: 100%; overflow: hidden; }
+.agent-left  { border-right: 1px solid var(--border); background: var(--deep); display: flex; flex-direction: column; overflow: hidden; }
+.agent-right { display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
+
+.step-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--rad);
+  padding: 11px 12px; margin-bottom: 7px; position: relative; transition: all .2s;
+}
+.step-card.running { border-color: var(--cyan);  box-shadow: 0 0 10px rgba(0,217,245,.12); }
+.step-card.done    { border-color: var(--green); background: rgba(34,240,160,.03); }
+.step-card.error   { border-color: var(--red);   background: rgba(255,64,96,.03); }
+.step-num  { font-family: var(--ff-head); font-size: .6rem; font-weight: 700; color: var(--faint); margin-bottom: 3px; letter-spacing: .1em; }
+.step-card.running .step-num { color: var(--cyan); }
+.step-card.done    .step-num { color: var(--green); }
+.step-card.error   .step-num { color: var(--red); }
+.step-title { font-size: .74rem; color: var(--bright); font-weight: 500; }
+.step-desc  { font-size: .63rem; color: var(--faint); margin-top: 3px; line-height: 1.5; }
+.step-status { position: absolute; top: 8px; right: 8px; font-size: .54rem; color: var(--faint); letter-spacing: .08em; }
+.step-badge {
+  display: inline-block; font-size: .52rem; padding: 2px 6px; border-radius: 3px;
+  background: rgba(255,255,255,.04); color: var(--faint); margin-top: 6px;
+}
+.agent-log-entry { margin-bottom: 12px; }
+.log-step-hdr { color: var(--cyan); font-size: .62rem; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; }
+.log-content {
+  background: var(--panel); border: 1px solid var(--border);
+  border-left: 2px solid var(--violet); border-radius: var(--rad);
+  padding: 11px; font-size: .74rem; line-height: 1.65;
+  white-space: pre-wrap; color: var(--text); max-height: 260px; overflow-y: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ████  MIND GRAPH TAB  ████
+═══════════════════════════════════════════════════════════ */
+.mind-layout { display: grid; grid-template-columns: 1fr 260px; height: 100%; overflow: hidden; }
+#mindCanvas { width: 100%; height: 100%; background: var(--deep); cursor: grab; display: block; }
+#mindCanvas:active { cursor: grabbing; }
+.mind-sidebar { border-left: 1px solid var(--border); background: var(--deep); display: flex; flex-direction: column; overflow: hidden; }
+
+.node-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--rad); padding: 12px; margin: 8px; }
+.node-label { font-family: var(--ff-head); font-size: 1rem; font-weight: 700; color: var(--cyan); }
+.node-type  { font-size: .56rem; color: var(--faint); text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+.edge-list  { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--border); }
+.edge-item  { display: flex; align-items: center; gap: 5px; font-size: .64rem; color: var(--text); padding: 2px 0; }
+.edge-dir   { color: var(--faint); }
+.edge-rel   { color: var(--orange); font-size: .57rem; }
+.edge-tgt   { color: var(--green); }
+
+/* ═══════════════════════════════════════════════════════════
+   ████  CODE FORGE TAB  ████
+═══════════════════════════════════════════════════════════ */
+.forge-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.forge-bar {
+  padding: 7px 14px; border-bottom: 1px solid var(--border); background: var(--deep);
+  display: flex; gap: 7px; align-items: center; flex-wrap: wrap; flex-shrink: 0;
+}
+.forge-main {
+  display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; min-height: 0;
+}
+.forge-pane { display: flex; flex-direction: column; overflow: hidden; }
+.forge-pane:first-child { border-right: 1px solid var(--border); }
+.forge-pane-hdr {
+  padding: 5px 12px; font-size: .55rem; letter-spacing: .15em;
+  color: var(--faint); text-transform: uppercase; border-bottom: 1px solid var(--border);
+  background: var(--deep); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
+}
+textarea.code-area {
+  flex: 1; background: var(--surface); border: none; color: var(--text);
+  font-family: var(--ff-mono); font-size: .76rem; padding: 14px;
+  resize: none; outline: none; line-height: 1.65; tab-size: 2; width: 100%;
+}
+.code-out {
+  flex: 1; overflow-y: auto; padding: 14px; font-family: var(--ff-mono);
+  font-size: .76rem; line-height: 1.65; white-space: pre-wrap; color: var(--text);
+}
+.forge-status {
+  padding: 5px 12px; border-top: 1px solid var(--border);
+  font-size: .57rem; color: var(--faint); display: flex; gap: 10px; flex-shrink: 0; flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ████  CONSCIENCE TAB  ████
+═══════════════════════════════════════════════════════════ */
+.conscience-layout { display: grid; grid-template-columns: 1fr 1fr; height: 100%; overflow: hidden; gap: 0; }
+.con-col { display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border); }
+.con-col:last-child { border-right: none; }
+.con-bar { padding: 7px 12px; border-bottom: 1px solid var(--border); display: flex; gap: 5px; flex-shrink: 0; flex-wrap: wrap; }
+
+.insight-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--rad); padding: 12px; margin-bottom: 8px;
+  border-left: 3px solid var(--violet); transition: border-color .2s;
+  animation: msg-in .25s ease-out;
+}
+.insight-card:hover { border-color: var(--violet); }
+.insight-type { font-size: .52rem; letter-spacing: .18em; text-transform: uppercase; color: var(--violet); margin-bottom: 5px; }
+.insight-text { font-size: .75rem; line-height: 1.7; color: var(--text); }
+.insight-meta { font-size: .55rem; color: var(--faint); margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
+.confidence-bar { height: 2px; background: var(--muted); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+.confidence-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--violet), var(--cyan)); }
+
+.pattern-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .6rem; padding: 3px 8px; border-radius: 4px; margin: 3px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  transition: all .15s; cursor: default;
+}
+.pattern-tag:hover { border-color: var(--cyan); color: var(--cyan); }
+.pattern-tag.phrase { border-color: rgba(139,92,246,.3); color: var(--violet); }
+.pattern-strength { font-size: .52rem; color: var(--faint); }
+
+.memory-item {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--rad);
+  padding: 10px; margin-bottom: 7px; font-size: .72rem; line-height: 1.6;
+}
+.memory-type-badge {
+  display: inline-block; font-size: .52rem; padding: 2px 7px; border-radius: 3px;
+  background: rgba(0,217,245,.08); color: var(--cyan); letter-spacing: .08em;
+  text-transform: uppercase; margin-bottom: 5px;
+}
+.memory-content { color: var(--text); white-space: pre-wrap; max-height: 80px; overflow: hidden; }
+.memory-time { font-size: .54rem; color: var(--faint); margin-top: 4px; }
+
+/* ═══════════════════════════════════════════════════════════
+   ████  BUILDER / ANALOGY TAB  ████
+═══════════════════════════════════════════════════════════ */
+.builder-layout { display: grid; grid-template-columns: 320px 1fr; height: 100%; overflow: hidden; }
+.builder-left { border-right: 1px solid var(--border); background: var(--deep); display: flex; flex-direction: column; overflow: hidden; }
+
+.input-group { margin-bottom: 9px; }
+.input-label { display: block; font-size: .55rem; color: var(--faint); letter-spacing: .15em; text-transform: uppercase; margin-bottom: 4px; }
+.input-group input { width: 100%; }
+
+.analogy-row {
+  display: flex; align-items: center; gap: 7px; padding: 7px 9px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--rad);
+  margin-bottom: 5px; font-size: .7rem; flex-wrap: wrap; animation: msg-in .2s;
+}
+.ar-a { color: var(--cyan); font-weight: 600; }
+.ar-rel { color: var(--orange); font-size: .62rem; }
+.ar-b { color: var(--green); font-weight: 600; }
+.ar-dom { color: var(--faint); font-size: .6rem; margin-left: auto; }
+.ar-str { flex: 1; min-width: 60px; height: 3px; background: var(--muted); border-radius: 2px; overflow: hidden; }
+.ar-fill { height: 100%; background: var(--violet); border-radius: 2px; }
+
+.solve-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-bottom: 9px; }
+
+/* ═══════════════════════════════════════════════════════════
+   ████  STATS TAB  ████
+═══════════════════════════════════════════════════════════ */
+.stats-layout { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+
+.stat-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--rad-lg);
+  padding: 14px 16px; transition: all .25s; cursor: default;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--cyan), var(--violet)); opacity: 0; transition: opacity .2s;
+}
+.stat-card:hover::before { opacity: 1; }
+.stat-card:hover { border-color: rgba(0,217,245,.25); background: var(--panel2); }
+.stat-card.upd::before { opacity: 1; animation: stat-flash .5s forwards; }
+@keyframes stat-flash { 0%{opacity:1} 100%{opacity:0} }
+.stat-lbl { font-size: .54rem; letter-spacing: .18em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.stat-val { font-family: var(--ff-head); font-size: 1.5rem; font-weight: 700; color: var(--bright); line-height: 1; }
+.stat-sub { font-size: .56rem; color: var(--faint); margin-top: 4px; }
+
+.session-log {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--rad);
+  padding: 10px 12px; font-size: .68rem; line-height: 1.8; max-height: 280px;
+  overflow-y: auto; font-family: var(--ff-mono);
+}
+.log-entry { display: grid; grid-template-columns: 80px 1fr; gap: 10px; }
+.log-time { color: var(--cyan); opacity: .6; font-size: .62rem; }
+.log-msg { color: var(--faint); }
+
+/* ═══════════════════════════════════════════════════════════
+   ████  SYSTEM PROMPT MODAL  ████
+═══════════════════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(2,3,8,.85);
+  backdrop-filter: blur(4px); z-index: 999;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--rad-lg); padding: 20px;
+  width: min(540px, 95vw); box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  transform: translateY(10px); transition: transform .2s;
+}
+.modal-overlay.show .modal { transform: translateY(0); }
+.modal-title { font-family: var(--ff-head); font-size: .9rem; font-weight: 700; color: var(--bright); margin-bottom: 12px; }
+.modal textarea {
+  width: 100%; height: 180px; font-size: .75rem; line-height: 1.6;
+  resize: vertical; margin-bottom: 12px;
+}
+.modal-btns { display: flex; gap: 7px; justify-content: flex-end; }
+
+/* ═══════════════════════════════════════════════════════════
+   MISC HELPERS
+═══════════════════════════════════════════════════════════ */
+.tag {
+  display: inline-block; font-size: .54rem; padding: 2px 7px; border-radius: 3px;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.tag-c { background: rgba(0,217,245,.1);   color: var(--cyan);   border: 1px solid rgba(0,217,245,.2); }
+.tag-v { background: rgba(139,92,246,.1);  color: var(--violet); border: 1px solid rgba(139,92,246,.2); }
+.tag-g { background: rgba(34,240,160,.08); color: var(--green);  border: 1px solid rgba(34,240,160,.2); }
+.tag-o { background: rgba(255,101,51,.1);  color: var(--orange); border: 1px solid rgba(255,101,51,.2); }
+
+.kbd {
+  display: inline-block; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 3px; padding: 1px 5px; font-size: .6rem; color: var(--faint);
+}
+</style>
+</head>
+<body>
+
+<div id="ambientGlow"></div>
+
+<div id="app">
+
+<!-- ═══ HEADER ═══ -->
+<header>
+  <a href="../I-AM-landing.html" style="display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:.1em;color:var(--faint);text-decoration:none;flex-shrink:0;padding:4px 8px;border:1px solid var(--border);border-radius:4px;transition:color .15s,border-color .15s;" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--faint)';this.style.borderColor='var(--border)'">← SUITE</a>
+  <div class="logo">
+    <div class="logo-mark">AI</div>
+    <div class="logo-text">
+      <div class="logo-name">I<span>·</span>AM<span>·</span>AI</div>
+      <div class="logo-sub">Sovereign Intelligence · v3</div>
+    </div>
+  </div>
+
+  <div class="header-mid">
+    <div class="ctrl">
+      <span class="ctrl-lbl">Ollama</span>
+      <input type="text" id="ollamaUrl" class="url-input" value="http://localhost:11434" placeholder="http://localhost:11434">
+    </div>
+    <div class="ctrl">
+      <span class="ctrl-lbl">Model</span>
+      <select id="modelSelect" class="model-select">
+        <option value="llama3.2">llama3.2</option>
+        <option value="llama3.1">llama3.1</option>
+        <option value="llama3">llama3</option>
+        <option value="mistral">mistral</option>
+        <option value="gemma2">gemma2</option>
+        <option value="phi3">phi3</option>
+        <option value="qwen2.5">qwen2.5</option>
+        <option value="deepseek-r1">deepseek-r1</option>
+        <option value="codellama">codellama</option>
+      </select>
+    </div>
+    <div class="ctrl">
+      <span class="ctrl-lbl">Temp</span>
+      <input type="number" id="temperature" class="temp-input" value="0.7" min="0" max="2" step="0.05">
+    </div>
+    <div class="ctrl">
+      <span class="ctrl-lbl">Persona</span>
+      <select id="personaSelect" class="persona-select">
+        <option value="default">Default</option>
+        <option value="teacher">Teacher</option>
+        <option value="researcher">Researcher</option>
+        <option value="philosopher">Philosopher</option>
+        <option value="coder">Coder</option>
+        <option value="socratic">Socratic</option>
+        <option value="devil">Devil's Advocate</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </div>
+    <button class="btn" onclick="OllamaCtrl.connect()">
+      <span class="spin" id="connectSpin" style="display:none"></span>
+      ⚡ Connect
+    </button>
+  </div>
+
+  <div class="header-right">
+    <div class="status-cluster">
+      <div class="status-pill">
+        <div class="dot dead" id="ollamaDot"></div>
+        <span id="ollamaLbl">OFFLINE</span>
+      </div>
+      <div class="status-pill" style="margin-left:8px">
+        <div class="dot dead" id="subDot"></div>
+        <span id="subLbl">CONSCIENCE IDLE</span>
+      </div>
+    </div>
+    <button class="btn btn-v" id="subBtn" onclick="OllamaCtrl.toggleSub()">Enable Conscience</button>
+    <button class="btn btn-sm" onclick="UI.showSysModal()">Sys Prompt</button>
+  </div>
+</header>
+
+<!-- ═══ TOOLBAR ═══ -->
+<div class="toolbar">
+  <button class="tab-btn active" data-tab="chat" onclick="UI.tab('chat',this)">
+    <span class="ti">💬</span> Chat
+  </button>
+  <button class="tab-btn" data-tab="agent" onclick="UI.tab('agent',this)">
+    <span class="ti">🤖</span> Agent
+  </button>
+  <div class="tab-sep"></div>
+  <button class="tab-btn" data-tab="mind" onclick="UI.tab('mind',this)">
+    <span class="ti">🧠</span> Mind Graph
+  </button>
+  <button class="tab-btn" data-tab="forge" onclick="UI.tab('forge',this)">
+    <span class="ti">⚒</span> Code Forge
+  </button>
+  <div class="tab-sep"></div>
+  <button class="tab-btn" data-tab="conscience" onclick="UI.tab('conscience',this)">
+    <span class="ti">👁</span> Conscience
+  </button>
+  <button class="tab-btn" data-tab="builder" onclick="UI.tab('builder',this)">
+    <span class="ti">🔗</span> Analogy
+  </button>
+  <div class="tab-sep"></div>
+  <button class="tab-btn" data-tab="stats" onclick="UI.tab('stats',this)">
+    <span class="ti">📊</span> Stats
+  </button>
+</div>
+
+<!-- ═══ CONTENT ═══ -->
+<div class="content">
+
+<!-- CHAT -->
+<div id="chat" class="tab-panel active">
+  <div class="chat-controls">
+    <button class="btn btn-sm" id="streamToggle" onclick="Chat.toggleStream()">Stream: ON</button>
+    <button class="btn btn-sm" onclick="Chat.summarize()">Summarize</button>
+    <button class="btn btn-sm" onclick="Chat.exportMd()">Export MD</button>
+    <button class="btn btn-sm btn-r" onclick="Chat.clear()">Clear</button>
+    <div style="flex:1"></div>
+    <span style="font-size:.56rem;color:var(--faint)" id="ctxLabel">Context: 0 msgs</span>
+  </div>
+  <div class="ctx-bar">
+    <span style="font-size:.55rem;color:var(--faint)">Context window</span>
+    <div class="ctx-fill-wrap"><div class="ctx-fill" id="ctxFill" style="width:0%"></div></div>
+    <span id="ctxPct" style="font-size:.55rem;color:var(--faint)">0%</span>
+    <div style="flex:1"></div>
+    <span id="tokenEst" style="font-size:.55rem;color:var(--faint)">~0 tokens</span>
+  </div>
+  <div class="messages" id="messages"></div>
+  <div class="chat-input-area">
+    <div class="chat-input-wrap">
+      <textarea id="chatInput" placeholder="Ask anything… (Ctrl+Enter to send)" rows="2"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;align-items:center">
+      <button class="btn-send" id="sendBtn" onclick="Chat.send()" title="Send (Ctrl+Enter)">
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+      <button class="btn-voice" id="voiceBtn" onclick="Voice.toggle()" title="Voice input">🎤</button>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT -->
+<div id="agent" class="tab-panel">
+  <div class="agent-layout">
+    <div class="agent-left">
+      <div class="pnl-hdr"><div class="pnl-hdr-left">Mission Control</div></div>
+      <div class="pnl-body">
+        <div class="sec-label">Goal</div>
+        <textarea class="code-area" id="agentGoal" style="min-height:90px;max-height:150px;margin-bottom:9px;border-radius:var(--rad);border:1px solid var(--border)" placeholder="e.g., Research quantum entanglement and create a 5-step learning plan with key analogies…"></textarea>
+        <div class="btn-row" style="margin-bottom:14px">
+          <button class="btn btn-g btn-lg" onclick="Agent.run()">▶ Execute</button>
+          <button class="btn" onclick="Agent.plan()">Plan Only</button>
+          <button class="btn btn-r" onclick="Agent.clear()">✕</button>
+        </div>
+        <div class="sec-label">Steps <span id="agentStepCount" style="color:var(--faint)"></span></div>
+        <div id="agentSteps"><div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">Define a goal to begin</div></div></div>
+      </div>
+    </div>
+    <div class="agent-right">
+      <div class="pnl-hdr">
+        <div class="pnl-hdr-left">Execution Log</div>
+        <button class="btn btn-sm btn-r" onclick="document.getElementById('agentLog').innerHTML=''; document.getElementById('agentSteps').innerHTML=\'<div class=empty><div class=empty-icon>🎯</div><div class=empty-text>Define a goal to begin</div></div>\'">Clear</button>
+      </div>
+      <div class="pnl-body" id="agentLog">
+        <div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Awaiting mission…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MIND GRAPH -->
+<div id="mind" class="tab-panel">
+  <div class="mind-layout">
+    <canvas id="mindCanvas"></canvas>
+    <div class="mind-sidebar">
+      <div class="pnl-hdr"><div class="pnl-hdr-left">Knowledge Graph</div></div>
+      <div style="padding:7px 10px;border-bottom:1px solid var(--border);display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="MindGraph.extractFromChat()">Extract Chat</button>
+        <button class="btn btn-sm btn-g" onclick="MindGraph.addManual()">+ Node</button>
+        <button class="btn btn-sm btn-v" onclick="MindGraph.togglePhysics()">Physics</button>
+        <button class="btn btn-sm btn-r" onclick="MindGraph.clear()">Clear</button>
+      </div>
+      <div class="pnl-body">
+        <div id="nodeDetail">
+          <div class="empty"><div class="empty-icon">🔵</div><div class="empty-text">Click a node to explore</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CODE FORGE -->
+<div id="forge" class="tab-panel">
+  <div class="forge-wrap">
+    <div class="forge-bar">
+      <select id="langSelect" style="font-size:.65rem">
+        <option value="javascript">JavaScript</option>
+        <option value="python">Python</option>
+        <option value="typescript">TypeScript</option>
+        <option value="html">HTML/CSS</option>
+        <option value="sql">SQL</option>
+        <option value="bash">Bash</option>
+        <option value="rust">Rust</option>
+        <option value="go">Go</option>
+        <option value="cpp">C++</option>
+        <option value="java">Java</option>
+        <option value="markdown">Markdown</option>
+      </select>
+      <input type="text" id="forgePrompt" placeholder="Describe what you want…" style="flex:1;min-width:160px">
+      <div class="btn-row">
+        <button class="btn btn-g"  onclick="Forge.write()">✦ Write</button>
+        <button class="btn"        onclick="Forge.explain()">Explain</button>
+        <button class="btn btn-o"  onclick="Forge.debug()">Debug</button>
+        <button class="btn"        onclick="Forge.optimize()">Optimize</button>
+        <button class="btn"        onclick="Forge.test()">Tests</button>
+        <button class="btn"        onclick="Forge.refactor()">Refactor</button>
+        <button class="btn btn-v"  onclick="Forge.review()">Review</button>
+        <button class="btn btn-r"  onclick="Forge.clear()">Clear</button>
+      </div>
+    </div>
+    <div class="forge-main">
+      <div class="forge-pane">
+        <div class="forge-pane-hdr">
+          ◈ Editor
+          <button class="btn btn-sm" onclick="Forge.copyEditor()">Copy</button>
+        </div>
+        <textarea id="codeEditor" class="code-area" placeholder="// Paste or write code here…"></textarea>
+      </div>
+      <div class="forge-pane">
+        <div class="forge-pane-hdr">
+          ◈ AI Output
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-sm" onclick="Forge.copyOutput()">Copy</button>
+            <button class="btn btn-sm btn-g" onclick="Forge.applyOutput()">→ Editor</button>
+          </div>
+        </div>
+        <div id="forgeOutput" class="code-out">
+          <div class="empty"><div class="empty-icon">⚒</div><div class="empty-text">Output appears here…</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="forge-status">
+      <span id="forgeLang">Lang: JavaScript</span>
+      <span>·</span><span id="forgeLines">Lines: 0</span>
+      <span>·</span><span id="forgeChars">Chars: 0</span>
+      <span>·</span><span id="forgeWords">Words: 0</span>
+    </div>
+  </div>
+</div>
+
+<!-- CONSCIENCE -->
+<div id="conscience" class="tab-panel">
+  <div class="conscience-layout">
+    <div class="con-col">
+      <div class="pnl-hdr"><div class="pnl-hdr-left">Insights</div><span id="insightCount" style="font-size:.6rem;color:var(--faint)">0</span></div>
+      <div class="con-bar">
+        <button class="btn btn-v" onclick="SubUI.generateInsight('general')">🧠 Insight</button>
+        <button class="btn btn-sm" onclick="SubUI.generateInsight('deep')">Deep</button>
+        <button class="btn btn-sm" onclick="SubUI.generateInsight('question')">Question</button>
+        <button class="btn btn-sm" onclick="SubUI.refreshInsights()">Refresh</button>
+      </div>
+      <div id="insightContainer" class="panel-body" style="overflow-y:auto;flex:1;padding:12px">
+        <div class="empty"><div class="empty-icon">🔮</div><div class="empty-text">No insights yet.<br>Generate or enable Sub-Conscience.</div></div>
+      </div>
+    </div>
+    <div class="con-col">
+      <div class="pnl-hdr"><div class="pnl-hdr-left">Patterns &amp; Memories</div></div>
+      <div class="con-bar">
+        <button class="btn btn-sm" onclick="SubUI.showPatterns()">Patterns</button>
+        <button class="btn btn-sm" onclick="SubUI.showMemories()">Memories</button>
+        <button class="btn btn-sm" onclick="SubUI.runPatternScan()">Scan Now</button>
+        <button class="btn btn-sm btn-r" onclick="SubUI.clearMemory()">Clear All</button>
+      </div>
+      <div id="patternContainer" class="panel-body" style="overflow-y:auto;flex:1;padding:12px">
+        <div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Click Patterns or Memories to explore.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ANALOGY BUILDER -->
+<div id="builder" class="tab-panel">
+  <div class="builder-layout">
+    <div class="builder-left">
+      <div class="pnl-hdr"><div class="pnl-hdr-left">Concept Builder</div></div>
+      <div class="pnl-body">
+        <div class="input-group"><label class="input-label">Concept A</label><input type="text" id="bA" placeholder="e.g., Photosynthesis"></div>
+        <div class="input-group"><label class="input-label">Relation</label><input type="text" id="bRel" placeholder="e.g., requires"></div>
+        <div class="input-group"><label class="input-label">Concept B</label><input type="text" id="bB" placeholder="e.g., Sunlight"></div>
+        <div class="input-group"><label class="input-label">Domain</label><input type="text" id="bDom" placeholder="e.g., Biology"></div>
+        <div class="btn-row" style="margin-bottom:14px">
+          <button class="btn btn-g" onclick="Builder.add()">Add</button>
+          <button class="btn btn-v" onclick="Builder.addToMind()">→ Mind</button>
+          <button class="btn" onclick="Builder.askAI()">Ask AI →</button>
+          <button class="btn btn-r" onclick="Builder.clearHistory()">Clear</button>
+        </div>
+        <hr class="divider">
+        <div class="sec-label">Analogy Solver · A:B :: C:?</div>
+        <div class="solve-grid">
+          <div><label class="input-label">A</label><input type="text" id="cA" placeholder="Heart"></div>
+          <div><label class="input-label">B</label><input type="text" id="cB" placeholder="Blood"></div>
+          <div><label class="input-label">C</label><input type="text" id="cC" placeholder="Brain"></div>
+        </div>
+        <button class="btn" style="margin-bottom:9px" onclick="Builder.complete()">Solve →</button>
+        <div id="completeResult"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;overflow:hidden">
+      <div class="pnl-hdr">
+        <div class="pnl-hdr-left">Concept History (<span id="analogyCountLabel">0</span>)</div>
+        <button class="btn btn-sm" onclick="Builder.exportJson()">Export JSON</button>
+      </div>
+      <div class="pnl-body" id="analogyHistory"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div id="stats" class="tab-panel">
+  <div class="stats-layout">
+    <div>
+      <div class="sec-label">System Overview</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-lbl">Ollama</div><div class="stat-val" id="statOllama">—</div></div>
+        <div class="stat-card"><div class="stat-lbl">Model</div><div class="stat-val" id="statModel" style="font-size:.85rem;line-height:1.3">—</div></div>
+        <div class="stat-card"><div class="stat-lbl">Messages</div><div class="stat-val" id="statMessages">0</div></div>
+        <div class="stat-card"><div class="stat-lbl">Tokens Est.</div><div class="stat-val" id="statTokens">0</div></div>
+        <div class="stat-card"><div class="stat-lbl">Memories</div><div class="stat-val" id="statMemories">0</div></div>
+        <div class="stat-card"><div class="stat-lbl">Insights</div><div class="stat-val" id="statInsights">0</div></div>
+        <div class="stat-card"><div class="stat-lbl">Patterns</div><div class="stat-val" id="statPatterns">0</div></div>
+        <div class="stat-card"><div class="stat-lbl">Concepts</div><div class="stat-val" id="statConcepts">0</div></div>
+        <div class="stat-card"><div class="stat-lbl">Graph Nodes</div><div class="stat-val" id="statNodes">0</div></div>
+        <div class="stat-card"><div class="stat-lbl">Agent Tasks</div><div class="stat-val" id="statTasks">0</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-label">Session Log</div>
+      <div class="session-log" id="sessionLog">
+        <div class="log-entry"><span class="log-time">—</span><span class="log-msg">No activity yet…</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-label">Actions</div>
+      <div class="btn-row">
+        <button class="btn" onclick="exportFullSession()">Export Full Session</button>
+        <button class="btn btn-r" onclick="if(confirm('Clear all localStorage?')){ localStorage.clear(); toast('localStorage cleared','info'); }">Clear LocalStorage</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- .content -->
+</div><!-- #app -->
+
+<!-- TOAST CONTAINER -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- SYSTEM PROMPT MODAL -->
+<div class="modal-overlay" id="sysModal" onclick="if(event.target===this)UI.closeSysModal()">
+  <div class="modal">
+    <div class="modal-title">Custom System Prompt</div>
+    <p style="font-size:.68rem;color:var(--faint);margin-bottom:10px">Override the persona's default system prompt for the current session.</p>
+    <textarea id="sysPromptInput" placeholder="You are…"></textarea>
+    <div class="modal-btns">
+      <button class="btn" onclick="UI.closeSysModal()">Cancel</button>
+      <button class="btn btn-g" onclick="UI.applySysPrompt()">Apply</button>
+      <button class="btn btn-r" onclick="UI.clearSysPrompt()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ SERVICE WORKER — inlined as blob URL so no separate file needed
+// ════════════════════════════════════════════════════════════════════════
+const SW_SOURCE = `
+const SW_VERSION='i-am-ai-v3.0';const DB_NAME='I-AM-AI-SubConscience-v3';const DB_VERSION=3;
+const STORES={memories:'memories',patterns:'patterns',insights:'insights',summaries:'summaries'};
+let CONFIG={ollamaUrl:'http://localhost:11434',model:'llama3.2',temp:0.55};
+let db=null,dbReady=false,dbInitPromise=null,isProcessing=false,memStoreCount=0;
+function initDB(){if(dbInitPromise)return dbInitPromise;dbInitPromise=new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onerror=()=>reject(req.error);req.onsuccess=()=>{db=req.result;dbReady=true;resolve(db);};req.onupgradeneeded=(e)=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORES.memories)){const s=d.createObjectStore(STORES.memories,{keyPath:'id',autoIncrement:true});s.createIndex('timestamp','timestamp',{unique:false});s.createIndex('type','type',{unique:false});}if(!d.objectStoreNames.contains(STORES.patterns)){const s=d.createObjectStore(STORES.patterns,{keyPath:'pattern'});s.createIndex('strength','strength',{unique:false});s.createIndex('frequency','frequency',{unique:false});}if(!d.objectStoreNames.contains(STORES.insights)){const s=d.createObjectStore(STORES.insights,{keyPath:'id',autoIncrement:true});s.createIndex('timestamp','timestamp',{unique:false});s.createIndex('confidence','confidence',{unique:false});}if(!d.objectStoreNames.contains(STORES.summaries)){d.createObjectStore(STORES.summaries,{keyPath:'id',autoIncrement:true});}}});return dbInitPromise;}
+async function requireDB(){if(!dbReady)await initDB();if(!db)throw new Error('DB not available');}
+const Memory={async store(type,content,metadata={}){await requireDB();const memory={type,content,metadata,timestamp:Date.now(),processed:false};return new Promise((resolve,reject)=>{const tx=db.transaction([STORES.memories],'readwrite');const req=tx.objectStore(STORES.memories).add(memory);req.onsuccess=()=>{memStoreCount++;broadcast('memory-stored',{memoryId:req.result,memoryType:type});resolve(req.result);};req.onerror=()=>reject(req.error);});},async getRecent(type,limit=30){await requireDB();return new Promise((resolve,reject)=>{const tx=db.transaction([STORES.memories],'readonly');const req=type?tx.objectStore(STORES.memories).index('type').getAll(type):tx.objectStore(STORES.memories).getAll();req.onsuccess=()=>resolve((req.result||[]).slice().reverse().slice(0,limit));req.onerror=()=>reject(req.error);});},async getAll(){await requireDB();return new Promise((resolve,reject)=>{const req=db.transaction([STORES.memories],'readonly').objectStore(STORES.memories).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});},async count(){await requireDB();return new Promise((resolve,reject)=>{const req=db.transaction([STORES.memories],'readonly').objectStore(STORES.memories).count();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});},async clearStore(s){await requireDB();return new Promise((resolve,reject)=>{const req=db.transaction([s],'readwrite').objectStore(s).clear();req.onsuccess=()=>resolve();req.onerror=()=>reject(req.error);});},async clearAll(){await Promise.all(Object.values(STORES).map(s=>this.clearStore(s)));memStoreCount=0;},async getStats(){await requireDB();const cnt=(store)=>new Promise((res,rej)=>{const req=db.transaction([store],'readonly').objectStore(store).count();req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error);});const[m,p,i]=await Promise.all([this.count(),cnt(STORES.patterns),cnt(STORES.insights)]);return{memories:m,patterns:p,insights:i};}};
+const STOPWORDS=new Set(['about','after','again','also','another','around','because','been','before','being','between','could','doing','down','during','each','every','first','from','going','have','having','here','into','just','know','like','make','many','more','most','much','need','only','other','over','same','some','such','than','that','their','them','then','there','these','they','thing','think','this','those','through','time','under','until','using','very','want','well','were','what','when','where','which','while','will','with','would','your','said','says','can','get','got','let','may','might','must','shall','should','used','way']);
+const PatternDetector={async detect(){await requireDB();const memories=await Memory.getAll();if(memories.length<2)return 0;const freq={},bg={};memories.forEach(mem=>{if(!['interaction','explanation','analogy','session-summary'].includes(mem.type))return;const words=(mem.content||'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOPWORDS.has(w));words.forEach(w=>{freq[w]=(freq[w]||0)+1;});for(let i=0;i<words.length-1;i++){const b=words[i]+' '+words[i+1];bg[b]=(bg[b]||0)+1;}});const total=memories.length;const tx=db.transaction([STORES.patterns],'readwrite');const store=tx.objectStore(STORES.patterns);let stored=0;for(const[p,f] of Object.entries(freq)){if(f<2)continue;const s=Math.min(f/total,1);await new Promise((res,rej)=>{const req=store.put({pattern:p,frequency:f,strength:s,category:'term',lastSeen:Date.now(),isBigram:false});req.onsuccess=()=>{stored++;res();};req.onerror=()=>rej(req.error);});}for(const[p,f] of Object.entries(bg)){if(f<2)continue;const s=Math.min(f/total,1);await new Promise((res,rej)=>{const req=store.put({pattern:p,frequency:f,strength:s,category:'phrase',lastSeen:Date.now(),isBigram:true});req.onsuccess=()=>{stored++;res();};req.onerror=()=>rej(req.error);});}return stored;},async getPatterns(limit=30){await requireDB();return new Promise((resolve,reject)=>{const req=db.transaction([STORES.patterns],'readonly').objectStore(STORES.patterns).index('strength').getAll();req.onsuccess=()=>resolve((req.result||[]).sort((a,b)=>b.strength-a.strength).slice(0,limit));req.onerror=()=>reject(req.error);});}};
+const SubConscience={async generateInsight(type='general'){if(isProcessing)return null;isProcessing=true;broadcastStatus({active:true,processing:true});try{const[memories,patterns]=await Promise.all([Memory.getRecent(null,20),PatternDetector.getPatterns(15)]);if(memories.length<2)return null;const ms=memories.slice(0,10).map(m=>m.content.slice(0,200)).join('\n---\n');const ps=patterns.slice(0,8).map(p=>\`"\${p.pattern}" (\${p.isBigram?'phrase':'term'}, \${p.strength.toFixed(2)})\`).join(', ');const prompts={general:\`You are a background analytical process. Review these conversation memories and detected patterns. Generate a concise, novel insight about the user's thinking patterns, interests, or knowledge gaps.\n\nMemories:\n\${ms}\n\nKey patterns: \${ps||'none yet'}\n\nRespond with a single insightful observation in 2-4 sentences. Be specific, not generic.\`,deep:\`You are a meta-cognitive analyzer. Study these interactions and find a deeper structural pattern.\n\nMemories:\n\${ms}\n\nPatterns: \${ps||'none'}\n\nRespond with one deep structural insight (3-5 sentences).\`,question:\`Based on these interactions, generate the single most important clarifying question that would advance the user's understanding.\n\nMemories:\n\${ms}\n\nRespond with one powerful question and brief reasoning (2-3 sentences).\`};const raw=await this.queryOllama(prompts[type]||prompts.general);if(!raw.trim())return null;const confidence=Math.min(0.95,0.4+(memories.length/40)+(patterns.length/30));const insight={text:raw.trim(),type,confidence,sourcePatterns:patterns.slice(0,5).map(p=>p.pattern),sourceMemCount:memories.length,model:CONFIG.model,timestamp:Date.now()};const id=await this.storeInsight(insight);broadcast('subconscience-insight',{insightId:id,...insight});return id;}catch(err){console.error('[SubConscience]',err.message);return null;}finally{isProcessing=false;broadcastStatus({active:true,processing:false});}},async storeInsight(insight){await requireDB();return new Promise((resolve,reject)=>{const req=db.transaction([STORES.insights],'readwrite').objectStore(STORES.insights).add(insight);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});},async getInsights(limit=15){await requireDB();return new Promise((resolve,reject)=>{const req=db.transaction([STORES.insights],'readonly').objectStore(STORES.insights).getAll();req.onsuccess=()=>resolve((req.result||[]).slice().reverse().slice(0,limit));req.onerror=()=>reject(req.error);});},async queryOllama(prompt){const res=await fetch(\`\${CONFIG.ollamaUrl}/api/generate\`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:CONFIG.model,prompt,stream:false,options:{temperature:CONFIG.temp}})});if(!res.ok)throw new Error(\`Ollama \${res.status}\`);const data=await res.json();return data.response||'';}};
+function broadcast(type,data={}){self.clients.matchAll().then(clients=>clients.forEach(c=>c.postMessage({type,data:{timestamp:Date.now(),...data}})));}
+function broadcastStatus(data){broadcast('subconscience-status',data);}
+function scheduleHeartbeat(){setTimeout(()=>{broadcastStatus({active:true,processing:isProcessing});scheduleHeartbeat();},10000);}
+function schedulePatternScan(){setTimeout(async()=>{try{const n=await PatternDetector.detect();memStoreCount=0;if(n>0){const stats=await Memory.getStats();broadcast('stats-update',stats);}}catch(err){console.warn('[SubConscience] Pattern scan error:',err.message);}schedulePatternScan();},40000);}
+function scheduleInsightGeneration(){setTimeout(async()=>{try{const count=await Memory.count();if(count>=3){const types=['general','deep','question'];const type=types[Math.floor(Date.now()/180000)%3];await SubConscience.generateInsight(type);}}catch(err){console.warn('[SubConscience] Auto-insight error:',err.message);}scheduleInsightGeneration();},180000);}
+function startBG(){scheduleHeartbeat();schedulePatternScan();scheduleInsightGeneration();console.log('[SubConscience v3] Background tasks started');}
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',(e)=>{e.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k!==SW_VERSION).map(k=>caches.delete(k)));await self.clients.claim();await initDB();startBG();})());});
+self.addEventListener('message',async(e)=>{if(!e.data||!e.ports[0])return;const{type,data={}}=e.data;const port=e.ports[0];try{await requireDB();}catch(err){port.postMessage({error:'DB not ready: '+err.message});return;}try{switch(type){case 'set-config':if(data.model)CONFIG.model=data.model;if(data.ollamaUrl)CONFIG.ollamaUrl=data.ollamaUrl;if(data.temp)CONFIG.temp=data.temp;port.postMessage({success:true,config:CONFIG});break;case 'store-memory':{const id=await Memory.store(data.memoryType||'generic',data.content||'',data.metadata||{});port.postMessage({success:true,id});break;}case 'get-memories':{const mems=await Memory.getRecent(data.type||null,data.limit||30);port.postMessage({memories:mems});break;}case 'memory-count':{const count=await Memory.count();port.postMessage({count});break;}case 'get-stats':{const stats=await Memory.getStats();port.postMessage({stats});break;}case 'get-patterns':{const pats=await PatternDetector.getPatterns(data.limit||30);port.postMessage({patterns:pats});break;}case 'get-insights':{const ins=await SubConscience.getInsights(data.limit||15);port.postMessage({insights:ins});break;}case 'generate-insight':{const insId=await SubConscience.generateInsight(data.type||'general');port.postMessage({success:true,insightId:insId});break;}case 'run-pattern-scan':{const n=await PatternDetector.detect();port.postMessage({success:true,patternsFound:n});break;}case 'clear-memory':await Memory.clearAll();port.postMessage({success:true});break;default:port.postMessage({error:\`Unknown type: "\${type}"\`});}}catch(err){port.postMessage({error:err.message});}});
+`;
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ GLOBAL STATE
+// ════════════════════════════════════════════════════════════════════════
+const STATE = {
+  ollamaOnline: false,
+  subActive: false,
+  conversation: [],
+  tokenCount: 0,
+  localAnalogy: new Map(),
+  analogyHistory: [],
+  agentTasks: 0,
+  swReady: false,
+  customSysPrompt: null,
+  sessionId: `sess-${Date.now()}`,
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ PERSONAS
+// ════════════════════════════════════════════════════════════════════════
+const PERSONAS = {
+  default:    { sys: 'You are I-AM-AI, a sovereign intelligence. Be helpful, precise, and deeply insightful. Engage with ideas at the highest level.' },
+  teacher:    { sys: 'You are a masterful teacher. Break down complex concepts with vivid examples, analogies, and careful scaffolding. Build understanding from simple to complex. Check for comprehension.' },
+  researcher: { sys: 'You are a rigorous researcher. Provide structured, evidence-based analysis. Consider multiple perspectives, quantify uncertainty, trace reasoning chains, and distinguish fact from speculation.' },
+  philosopher:{ sys: 'You are a deep philosophical thinker. Explore fundamental questions, challenge implicit assumptions, draw unexpected connections across domains, and illuminate the hidden architecture of ideas.' },
+  coder:      { sys: 'You are an expert software engineer. Write clean, efficient, well-commented code. Explain technical choices and trade-offs. Default to best practices, modern idioms, and security considerations.' },
+  socratic:   { sys: 'You are a Socratic guide. Lead users to discover answers through careful questioning. Challenge assumptions gently. Never give direct answers — help the user reason their way to conclusions.' },
+  devil:      { sys: "You are a constructive Devil's Advocate. Take the opposite position of whatever the user argues. Find weaknesses in any argument. Steelman the counter-position brilliantly. Be rigorous, not contrarian." },
+  custom:     { sys: '' },
+};
+
+function getSysPrompt() {
+  if (STATE.customSysPrompt) return STATE.customSysPrompt;
+  const p = document.getElementById('personaSelect').value;
+  return PERSONAS[p]?.sys || PERSONAS.default.sys;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ UTILITIES
+// ════════════════════════════════════════════════════════════════════════
+function esc(t) {
+  return (t||'').replace(/[<>&"']/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function toast(msg, type='info') {
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+function logSession(msg) {
+  const log = document.getElementById('sessionLog');
+  const time = new Date().toLocaleTimeString();
+  const hasPlaceholder = log.querySelector('.log-entry span.log-msg')?.textContent.includes('No activity');
+  if (hasPlaceholder) log.innerHTML = '';
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg">${esc(msg)}</span>`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ UI CONTROLLER
+// ════════════════════════════════════════════════════════════════════════
+const UI = {
+  tab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(name).classList.add('active');
+    btn.classList.add('active');
+    if (name === 'mind') requestAnimationFrame(() => MindGraph.resize());
+  },
+
+  showSysModal() {
+    document.getElementById('sysPromptInput').value = STATE.customSysPrompt || getSysPrompt();
+    document.getElementById('sysModal').classList.add('show');
+  },
+  closeSysModal() { document.getElementById('sysModal').classList.remove('show'); },
+  applySysPrompt() {
+    const val = document.getElementById('sysPromptInput').value.trim();
+    STATE.customSysPrompt = val || null;
+    document.getElementById('personaSelect').value = val ? 'custom' : 'default';
+    this.closeSysModal();
+    toast(val ? '✓ Custom system prompt active' : 'Using persona default', val ? 'success' : 'info');
+  },
+  clearSysPrompt() {
+    STATE.customSysPrompt = null;
+    document.getElementById('sysPromptInput').value = '';
+    this.closeSysModal();
+    toast('System prompt cleared', 'info');
+  }
+};
+
+document.getElementById('personaSelect').addEventListener('change', function() {
+  if (this.value === 'custom') { UI.showSysModal(); }
+  else { STATE.customSysPrompt = null; }
+});
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ OLLAMA API
+// ════════════════════════════════════════════════════════════════════════
+const Ollama = {
+  get url()   { return (document.getElementById('ollamaUrl').value||'').trim() || 'http://localhost:11434'; },
+  get model() { return document.getElementById('modelSelect').value || 'llama3.2'; },
+  get temp()  { return parseFloat(document.getElementById('temperature').value) || 0.7; },
+
+  async checkConnection() {
+    const res = await fetch(`${this.url}/api/tags`);
+    if (!res.ok) throw new Error('Connection failed');
+    return (await res.json()).models || [];
+  },
+
+  async generate(prompt, sys = null, json = false) {
+    const msgs = [];
+    if (sys) msgs.push({ role: 'system', content: sys });
+    msgs.push({ role: 'user', content: prompt });
+    const res = await fetch(`${this.url}/api/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.model, messages: msgs, stream: false,
+        options: { temperature: json ? 0.05 : this.temp },
+        ...(json ? { format: 'json' } : {}),
+      })
+    });
+    if (!res.ok) throw new Error(`Ollama ${res.status}`);
+    const d = await res.json();
+    return d.message?.content || d.response || '';
+  },
+
+  async streamChat(messages, onToken, onDone, sys = null) {
+    const msgs = [];
+    if (sys) msgs.push({ role: 'system', content: sys });
+    msgs.push(...messages);
+    const res = await fetch(`${this.url}/api/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: this.model, messages: msgs, stream: true, options: { temperature: this.temp } })
+    });
+    if (!res.ok) throw new Error(`Ollama ${res.status}`);
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let full = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (const line of dec.decode(value).split('\n').filter(Boolean)) {
+        try {
+          const j = JSON.parse(line);
+          const tok = j.message?.content || '';
+          if (tok) { full += tok; onToken(tok, full); }
+          if (j.done) { onDone(full); return full; }
+        } catch {}
+      }
+    }
+    onDone(full);
+    return full;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ SERVICE WORKER BRIDGE
+// ════════════════════════════════════════════════════════════════════════
+async function initSW() {
+  if (!navigator.serviceWorker) { logSession('Service worker not supported'); return; }
+  try {
+    const blob = new Blob([SW_SOURCE], { type: 'application/javascript' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Try blob URL registration, fall back to a note
+    let reg;
+    try {
+      reg = await navigator.serviceWorker.register(blobUrl, { scope: '/' });
+    } catch {
+      // If blob URL fails (e.g., Firefox file:// restriction), try named file
+      try {
+        reg = await navigator.serviceWorker.register('sw-subconscience-v3.js');
+      } catch (e2) {
+        logSession('Sub-Conscience SW unavailable (run from HTTP server)');
+        return;
+      }
+    }
+
+    STATE.swReady = true;
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      const { type, data } = e.data || {};
+      if (type === 'subconscience-insight') {
+        toast('🧠 Sub-conscience insight generated!', 'insight');
+        SubUI.refreshInsights();
+        updateStats();
+      } else if (type === 'subconscience-status') {
+        updateSubStatus(data);
+      } else if (type === 'memory-stored' || type === 'stats-update') {
+        updateStats();
+      }
+    });
+    logSession('Sub-Conscience registered · background learning active');
+  } catch (e) {
+    console.warn('SW registration failed:', e.message);
+    logSession('Sub-Conscience unavailable: ' + e.message);
+  }
+}
+
+function sw(type, data = {}) {
+  return new Promise((resolve, reject) => {
+    if (!STATE.swReady || !navigator.serviceWorker?.controller) { reject(new Error('SW not available')); return; }
+    const ch = new MessageChannel();
+    ch.port1.onmessage = (e) => e.data?.error ? reject(new Error(e.data.error)) : resolve(e.data);
+    navigator.serviceWorker.controller.postMessage({ type, data }, [ch.port2]);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ OLLAMA CONTROLLER (connect / sub-conscience toggle)
+// ════════════════════════════════════════════════════════════════════════
+const OllamaCtrl = {
+  async connect() {
+    const dot = document.getElementById('ollamaDot');
+    const lbl = document.getElementById('ollamaLbl');
+    const spin = document.getElementById('connectSpin');
+    dot.className = 'dot busy'; lbl.textContent = 'CONNECTING…'; spin.style.display = '';
+    try {
+      const models = await Ollama.checkConnection();
+      STATE.ollamaOnline = true;
+      dot.className = 'dot live'; lbl.textContent = 'ONLINE';
+      spin.style.display = 'none';
+      const sel = document.getElementById('modelSelect');
+      const cur = sel.value;
+      sel.innerHTML = '';
+      if (models.length) {
+        models.forEach(m => {
+          const o = document.createElement('option');
+          o.value = m.name; o.textContent = m.name;
+          if (m.name === cur) o.selected = true;
+          sel.appendChild(o);
+        });
+      } else {
+        sel.innerHTML = '<option value="llama3.2">llama3.2</option>';
+      }
+      document.getElementById('statOllama').textContent = '✓';
+      document.getElementById('statModel').textContent = Ollama.model;
+      if (STATE.swReady) sw('set-config', { model: Ollama.model, ollamaUrl: Ollama.url, temp: Ollama.temp }).catch(() => {});
+      toast(`✓ Connected · ${models.length} model(s)`, 'success');
+      logSession(`Ollama connected · ${models.length} models · using ${Ollama.model}`);
+    } catch (e) {
+      STATE.ollamaOnline = false;
+      dot.className = 'dot dead'; lbl.textContent = 'OFFLINE'; spin.style.display = 'none';
+      document.getElementById('statOllama').textContent = '✗';
+      toast('Ollama unreachable. Run: ollama serve', 'error');
+    }
+    updateStats();
+  },
+
+  toggleSub() {
+    STATE.subActive = !STATE.subActive;
+    const btn = document.getElementById('subBtn');
+    const dot = document.getElementById('subDot');
+    const lbl = document.getElementById('subLbl');
+    if (STATE.subActive) {
+      btn.textContent = 'Disable Conscience'; btn.classList.add('btn-on');
+      dot.className = 'dot live'; lbl.textContent = 'CONSCIENCE ACTIVE';
+      toast('✓ Sub-Conscience enabled — background learning active', 'success');
+      logSession('Sub-Conscience activated');
+      SubUI.refreshInsights();
+    } else {
+      btn.textContent = 'Enable Conscience'; btn.classList.remove('btn-on');
+      dot.className = 'dot dead'; lbl.textContent = 'CONSCIENCE IDLE';
+      toast('Sub-Conscience paused', 'info');
+    }
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ CHAT
+// ════════════════════════════════════════════════════════════════════════
+const Chat = {
+  streaming: false,
+  streamEnabled: true,
+
+  async send() {
+    const inp = document.getElementById('chatInput');
+    const text = inp.value.trim();
+    if (!text || this.streaming) return;
+    if (!STATE.ollamaOnline) { toast('Connect to Ollama first', 'error'); return; }
+
+    inp.value = ''; inp.style.height = 'auto';
+    this.addMsg('user', text);
+    STATE.conversation.push({ role: 'user', content: text, ts: Date.now() });
+    STATE.tokenCount += Math.ceil(text.length / 4);
+
+    if (STATE.swReady) sw('store-memory', {
+      memoryType: 'interaction', content: text,
+      metadata: { role: 'user', persona: document.getElementById('personaSelect').value, session: STATE.sessionId }
+    }).catch(() => {});
+
+    const msgEl = this.addMsg('assistant', '');
+    const contentEl = msgEl.querySelector('.msg-content');
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    contentEl.appendChild(cursor);
+
+    this.streaming = true;
+    document.getElementById('sendBtn').disabled = true;
+    this.updateCtxBar();
+
+    const history = STATE.conversation.slice(-28).map(m => ({ role: m.role, content: m.content }));
+
+    try {
+      if (this.streamEnabled) {
+        await Ollama.streamChat(
+          history,
+          (tok, full) => { contentEl.textContent = full; contentEl.appendChild(cursor); this.scrollBottom(); },
+          (final) => { contentEl.innerHTML = this.renderContent(final); cursor.remove(); this.afterResponse(final); },
+          getSysPrompt()
+        );
+      } else {
+        const resp = await Ollama.generate(
+          STATE.conversation.slice(-1)[0]?.content || text, getSysPrompt()
+        );
+        contentEl.innerHTML = this.renderContent(resp);
+        cursor.remove();
+        this.afterResponse(resp);
+      }
+    } catch (e) {
+      cursor.remove();
+      contentEl.textContent = `⚠ Error: ${e.message}`;
+      contentEl.style.color = 'var(--red)';
+      toast(e.message, 'error');
+    } finally {
+      this.streaming = false;
+      document.getElementById('sendBtn').disabled = false;
+      this.updateCtxBar();
+    }
+  },
+
+  renderContent(text) {
+    // Basic markdown: code blocks, inline code
+    return esc(text)
+      .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+        `<pre><code>${code}</code></pre>`)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--bright)">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>');
+  },
+
+  afterResponse(text) {
+    STATE.conversation.push({ role: 'assistant', content: text, ts: Date.now() });
+    STATE.tokenCount += Math.ceil(text.length / 4);
+    if (STATE.swReady) sw('store-memory', {
+      memoryType: 'explanation', content: text,
+      metadata: { role: 'assistant', model: Ollama.model, session: STATE.sessionId }
+    }).catch(() => {});
+    if (STATE.conversation.length % 6 === 0) MindGraph.autoExtract(text);
+    this.scrollBottom();
+    logSession(`Chat · ${STATE.conversation.length} msgs · ~${STATE.tokenCount} tokens`);
+    updateStats();
+    this.updateCtxBar();
+  },
+
+  addMsg(role, content) {
+    const wrap = document.getElementById('messages');
+    const labels = { user: 'YOU', assistant: 'AI', system: 'SYS' };
+    const time = new Date().toLocaleTimeString();
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.innerHTML = `
+      <div class="msg-av">${labels[role]||'?'}</div>
+      <div class="msg-body">
+        <div class="msg-meta">
+          <span class="msg-role">${role}</span>
+          <span>${time}</span>
+        </div>
+        <div class="msg-content">${role === 'system' ? esc(content) : esc(content)}</div>
+        <div class="msg-actions">
+          <button class="btn btn-sm" onclick="Chat.copyMsg(this)" title="Copy">⎘</button>
+        </div>
+      </div>`;
+    wrap.appendChild(div);
+    this.scrollBottom();
+    return div;
+  },
+
+  copyMsg(btn) {
+    const txt = btn.closest('.msg-body').querySelector('.msg-content').textContent;
+    navigator.clipboard.writeText(txt).then(() => toast('Copied!', 'success'));
+  },
+
+  scrollBottom() {
+    const c = document.getElementById('messages');
+    requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; });
+  },
+
+  clear() {
+    if (!confirm('Clear conversation?')) return;
+    STATE.conversation = []; STATE.tokenCount = 0;
+    document.getElementById('messages').innerHTML = '';
+    this.addMsg('system', 'Conversation cleared. Ready for new session.');
+    this.updateCtxBar();
+    updateStats(); toast('Cleared', 'info');
+  },
+
+  toggleStream() {
+    this.streamEnabled = !this.streamEnabled;
+    const btn = document.getElementById('streamToggle');
+    btn.textContent = `Stream: ${this.streamEnabled ? 'ON' : 'OFF'}`;
+    btn.classList.toggle('btn-on', this.streamEnabled);
+  },
+
+  updateCtxBar() {
+    const msgCount = STATE.conversation.length;
+    const maxCtx = 28;
+    const pct = Math.min(100, (msgCount / maxCtx) * 100);
+    document.getElementById('ctxFill').style.width = pct + '%';
+    document.getElementById('ctxPct').textContent = Math.round(pct) + '%';
+    document.getElementById('ctxLabel').textContent = `Context: ${msgCount} msgs`;
+    document.getElementById('tokenEst').textContent = `~${STATE.tokenCount > 999 ? (STATE.tokenCount/1000).toFixed(1)+'k' : STATE.tokenCount} tokens`;
+    const fill = document.getElementById('ctxFill');
+    fill.style.background = pct > 75 ? 'var(--orange)' : pct > 50 ? 'var(--gold)' : 'var(--cyan)';
+  },
+
+  exportMd() {
+    if (!STATE.conversation.length) { toast('Nothing to export', 'warn'); return; }
+    let md = `# I-AM-AI Conversation\n\n**Date:** ${new Date().toLocaleString()}\n**Model:** ${Ollama.model}\n**Persona:** ${document.getElementById('personaSelect').value}\n\n---\n\n`;
+    STATE.conversation.forEach(m => { md += `### ${m.role.toUpperCase()}\n${m.content}\n\n`; });
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([md], { type: 'text/markdown' })),
+      download: `i-am-ai-${Date.now()}.md`
+    });
+    a.click(); URL.revokeObjectURL(a.href);
+    toast('Exported!', 'success');
+  },
+
+  async summarize() {
+    if (!STATE.conversation.length) { toast('No conversation yet', 'warn'); return; }
+    if (!STATE.ollamaOnline) { toast('Connect to Ollama first', 'error'); return; }
+    const snippet = STATE.conversation.slice(-12).map(m => `${m.role}: ${m.content}`).join('\n\n');
+    try {
+      toast('Summarizing…', 'info');
+      const summary = await Ollama.generate(
+        `Summarize this conversation in 2-4 sentences. Focus on key topics, decisions, and conclusions:\n\n${snippet}`,
+        'You are a concise summarizer. Be specific and informative.'
+      );
+      this.addMsg('system', `📋 Session Summary: ${summary}`);
+      if (STATE.swReady) sw('store-memory', {
+        memoryType: 'session-summary', content: summary,
+        metadata: { msgCount: STATE.conversation.length, session: STATE.sessionId }
+      }).catch(() => {});
+      toast('✓ Summarized', 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+};
+
+Chat.sendWith = function(text) {
+  document.getElementById('chatInput').value = text;
+  UI.tab('chat', document.querySelector('[data-tab="chat"]'));
+  setTimeout(() => Chat.send(), 50);
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ AGENT
+// ════════════════════════════════════════════════════════════════════════
+const Agent = {
+  running: false,
+
+  async plan() {
+    const goal = document.getElementById('agentGoal').value.trim();
+    if (!goal) { toast('Enter a goal', 'error'); return; }
+    if (!STATE.ollamaOnline) { toast('Connect to Ollama first', 'error'); return; }
+
+    const stepsEl = document.getElementById('agentSteps');
+    stepsEl.innerHTML = '<div class="empty"><span class="spin"></span></div>';
+
+    const prompt = `Break this goal into 3-6 clear, executable steps.
+Goal: "${goal}"
+Respond ONLY with valid JSON (no markdown, no explanation):
+{"title":"short goal title","steps":[{"id":1,"title":"step name","description":"what to do concisely","type":"research|create|analyze|summarize|write|code"}]}`;
+
+    try {
+      const raw = await Ollama.generate(prompt, 'You output only valid JSON. Nothing else.');
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('No JSON in response');
+      const plan = JSON.parse(m[0]);
+      this.renderSteps(plan.steps);
+      document.getElementById('agentStepCount').textContent = `(${plan.steps.length})`;
+      toast(`Plan: "${plan.title}"`, 'success');
+      return plan;
+    } catch (e) {
+      stepsEl.innerHTML = `<div class="empty" style="color:var(--red)">Planning failed: ${esc(e.message)}</div>`;
+      toast('Planning failed', 'error');
+    }
+  },
+
+  async run() {
+    if (this.running) return;
+    const plan = await this.plan();
+    if (!plan?.steps) return;
+
+    this.running = true;
+    const logEl = document.getElementById('agentLog');
+    logEl.innerHTML = '';
+    let ctx = `GOAL: ${document.getElementById('agentGoal').value}\n\n`;
+
+    for (const step of plan.steps) {
+      const card = document.getElementById(`step-${step.id}`);
+      if (card) { card.className = 'step-card running'; card.querySelector('.step-status').textContent = '⟳ RUNNING'; }
+
+      const entry = document.createElement('div');
+      entry.className = 'agent-log-entry';
+      entry.innerHTML = `<div class="log-step-hdr"><span class="spin"></span> Step ${step.id}: ${esc(step.title)}</div><div class="log-content"></div>`;
+      logEl.appendChild(entry);
+      const outEl = entry.querySelector('.log-content');
+      const hdr = entry.querySelector('.log-step-hdr');
+      logEl.scrollTop = logEl.scrollHeight;
+
+      try {
+        const stepPrompt = `${ctx}\nCurrent task — Step ${step.id}: ${step.title}\n${step.description}\n\nComplete this step thoroughly and practically.`;
+        let result = '';
+        await Ollama.streamChat(
+          [{ role: 'user', content: stepPrompt }],
+          (tok, full) => { result = full; outEl.textContent = full; logEl.scrollTop = logEl.scrollHeight; },
+          (final) => { result = final; outEl.textContent = final; },
+          'You are an autonomous agent executing a focused task. Be precise, thorough, and structured.'
+        );
+        ctx += `\nStep ${step.id} result:\n${result}\n`;
+        hdr.innerHTML = `<span style="color:var(--green)">✓</span> Step ${step.id}: ${esc(step.title)}`;
+        if (card) { card.className = 'step-card done'; card.querySelector('.step-status').textContent = '✓ DONE'; }
+        if (STATE.swReady) sw('store-memory', {
+          memoryType: 'explanation', content: result,
+          metadata: { type: 'agent-step', step: step.title, session: STATE.sessionId }
+        }).catch(() => {});
+      } catch (e) {
+        outEl.textContent = `⚠ Error: ${e.message}`; outEl.style.color = 'var(--red)';
+        hdr.innerHTML = `<span style="color:var(--red)">✗</span> Step ${step.id}: ${esc(step.title)}`;
+        if (card) { card.className = 'step-card error'; card.querySelector('.step-status').textContent = '✗ ERROR'; }
+      }
+    }
+
+    STATE.agentTasks++;
+    this.running = false;
+    toast(`✓ Mission "${plan.title}" complete`, 'success');
+    logSession(`Agent: "${plan.title}" — ${plan.steps.length} steps completed`);
+    updateStats();
+  },
+
+  renderSteps(steps) {
+    const tc = { research:'var(--cyan)', create:'var(--green)', analyze:'var(--violet)', summarize:'var(--gold)', write:'var(--orange)', code:'var(--blue)' };
+    document.getElementById('agentSteps').innerHTML = steps.map(s => `
+      <div class="step-card" id="step-${s.id}">
+        <div class="step-status">PENDING</div>
+        <div class="step-num">STEP ${s.id}</div>
+        <div class="step-title">${esc(s.title)}</div>
+        <div class="step-desc">${esc(s.description)}</div>
+        <span class="step-badge" style="color:${tc[s.type]||'var(--faint)'}">${s.type||'task'}</span>
+      </div>`).join('');
+  },
+
+  clear() {
+    document.getElementById('agentGoal').value = '';
+    document.getElementById('agentSteps').innerHTML = '<div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">Define a goal to begin</div></div>';
+    document.getElementById('agentLog').innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Awaiting mission…</div></div>';
+    document.getElementById('agentStepCount').textContent = '';
+    this.running = false;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ MIND GRAPH
+// ════════════════════════════════════════════════════════════════════════
+const MindGraph = {
+  nodes: new Map(), edges: [],
+  canvas: null, ctx: null,
+  animFrame: null, physics: true,
+  selected: null, dragging: null,
+  zoom: 1, panX: 0, panY: 0,
+
+  init() {
+    this.canvas = document.getElementById('mindCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.resize();
+    this.setupEvents();
+    this.addNode('I-AM-AI', 'system');
+    this.addNode('Ollama', 'system');
+    this.addEdge('I-AM-AI', 'Ollama', 'powered by');
+    this.loop();
+  },
+
+  resize() {
+    const r = this.canvas.parentElement.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) { this.canvas.width = r.width; this.canvas.height = r.height; }
+  },
+
+  addNode(label, type = 'concept') {
+    if (this.nodes.has(label)) return this.nodes.get(label);
+    const cx = (this.canvas.width || 600) / 2, cy = (this.canvas.height || 400) / 2;
+    const node = { id: label, label, type, x: cx + (Math.random()-.5)*360, y: cy + (Math.random()-.5)*300, vx: 0, vy: 0, links: 0 };
+    this.nodes.set(label, node);
+    document.getElementById('statNodes').textContent = this.nodes.size;
+    return node;
+  },
+
+  addEdge(from, to, label = '') {
+    if (!this.nodes.has(from)) this.addNode(from);
+    if (!this.nodes.has(to)) this.addNode(to);
+    if (this.edges.find(e => e.from===from && e.to===to)) return;
+    this.edges.push({ from, to, label });
+    this.nodes.get(from).links++;
+    this.nodes.get(to).links++;
+  },
+
+  runPhysics() {
+    if (!this.physics) return;
+    const nodes = [...this.nodes.values()];
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y;
+        const d = Math.sqrt(dx*dx + dy*dy) || 1;
+        const f = 8000 / (d * d);
+        const fx = (dx/d)*f, fy = (dy/d)*f;
+        nodes[i].vx -= fx; nodes[i].vy -= fy;
+        nodes[j].vx += fx; nodes[j].vy += fy;
+      }
+    }
+    for (const e of this.edges) {
+      const a = this.nodes.get(e.from), b = this.nodes.get(e.to);
+      if (!a || !b) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx*dx + dy*dy) || 1;
+      const f = (d - 190) * 0.035;
+      const fx = (dx/d)*f, fy = (dy/d)*f;
+      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+    }
+    const cx = (this.canvas.width || 600)/2, cy = (this.canvas.height || 400)/2;
+    for (const n of nodes) {
+      n.vx += (cx - n.x) * 0.001; n.vy += (cy - n.y) * 0.001;
+      if (n === this.dragging) continue;
+      n.vx *= 0.88; n.vy *= 0.88;
+      n.x += n.vx; n.y += n.vy;
+    }
+  },
+
+  draw() {
+    const ctx = this.ctx, w = this.canvas.width, h = this.canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(0,217,245,.022)'; ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 48) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+    for (let y = 0; y < h; y += 48) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+
+    for (const e of this.edges) {
+      const a = this.nodes.get(e.from), b = this.nodes.get(e.to);
+      if (!a || !b) continue;
+      const sel = this.selected && (e.from===this.selected.id || e.to===this.selected.id);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = sel ? 'rgba(0,217,245,.55)' : 'rgba(28,34,64,.9)';
+      ctx.lineWidth = sel ? 1.5 : 1; ctx.stroke();
+      if (e.label && sel) {
+        const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+        ctx.fillStyle = 'rgba(255,101,51,.9)'; ctx.font = '9px IBM Plex Mono,monospace';
+        ctx.textAlign = 'center'; ctx.fillText(e.label, mx, my - 4);
+      }
+    }
+
+    const tc = { concept:'#00d9f5', system:'#22f0a0', entity:'#f5c542', action:'#ff6533', idea:'#8b5cf6' };
+    for (const n of this.nodes.values()) {
+      const sel = this.selected?.id === n.id;
+      const c = tc[n.type] || '#00d9f5';
+      const r = Math.max(6, Math.min(18, 6 + n.links * 2.8));
+      if (sel) {
+        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r*4);
+        g.addColorStop(0, c+'40'); g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, r*4, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+      ctx.fillStyle = sel ? c+'88' : c+'33'; ctx.fill();
+      ctx.strokeStyle = c; ctx.lineWidth = sel ? 2 : 1; ctx.stroke();
+      ctx.fillStyle = sel ? '#e2e8f8' : '#455080';
+      ctx.font = `${sel?'11px bold':'10px'} IBM Plex Mono,monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(n.label.length > 16 ? n.label.slice(0,14)+'…' : n.label, n.x, n.y + r + 3);
+    }
+    ctx.textBaseline = 'alphabetic';
+  },
+
+  loop() { this.runPhysics(); this.draw(); this.animFrame = requestAnimationFrame(() => this.loop()); },
+
+  setupEvents() {
+    const c = this.canvas;
+    c.addEventListener('mousedown', e => {
+      const r = c.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      for (const n of this.nodes.values()) {
+        if (Math.hypot(mx - n.x, my - n.y) < 22) { this.dragging = n; this.selected = n; this.showDetail(n); break; }
+      }
+    });
+    c.addEventListener('mousemove', e => {
+      if (!this.dragging) return;
+      const r = c.getBoundingClientRect();
+      this.dragging.x = e.clientX - r.left; this.dragging.y = e.clientY - r.top;
+      this.dragging.vx = 0; this.dragging.vy = 0;
+    });
+    c.addEventListener('mouseup', () => { this.dragging = null; });
+    c.addEventListener('mouseleave', () => { this.dragging = null; });
+    window.addEventListener('resize', () => this.resize());
+  },
+
+  showDetail(node) {
+    const connected = this.edges.filter(e => e.from===node.id || e.to===node.id)
+      .map(e => ({ rel: e.label, target: e.from===node.id ? e.to : e.from, out: e.from===node.id }));
+    document.getElementById('nodeDetail').innerHTML = `
+      <div class="node-card">
+        <div class="node-label">${esc(node.label)}</div>
+        <div class="node-type">${node.type} · ${node.links} link${node.links!==1?'s':''}</div>
+        ${connected.length ? `<div class="edge-list">${connected.map(c=>`
+          <div class="edge-item">
+            <span class="edge-dir">${c.out?'→':'←'}</span>
+            <span class="edge-rel">${esc(c.rel)}</span>
+            <span class="edge-tgt">${esc(c.target)}</span>
+          </div>`).join('')}</div>` : ''}
+        <div style="margin-top:10px">
+          <button class="btn btn-sm" onclick="Chat.sendWith('Tell me everything important about ${esc(node.label)}')">Ask AI →</button>
+        </div>
+      </div>
+      <div style="padding:5px 10px;font-size:.57rem;color:var(--faint)">
+        ${this.nodes.size} nodes · ${this.edges.length} edges
+      </div>`;
+  },
+
+  async autoExtract(text) {
+    if (!STATE.ollamaOnline || this.nodes.size > 90) return;
+    const prompt = `Extract key concepts from this text. JSON only, no explanation:
+{"nodes":[{"label":"concept name","type":"concept|entity|action|idea"}],"edges":[{"from":"a","to":"b","label":"relation"}]}
+Max 5 nodes, 6 edges. Only significant, specific concepts.
+Text: "${text.slice(0,600)}"`;
+    try {
+      const raw = await Ollama.generate(prompt, null, false);
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) return;
+      const g = JSON.parse(m[0]);
+      (g.nodes||[]).forEach(n => this.addNode(n.label, n.type||'concept'));
+      (g.edges||[]).forEach(e => this.addEdge(e.from, e.to, e.label));
+    } catch {}
+  },
+
+  async extractFromChat() {
+    if (!STATE.ollamaOnline) { toast('Connect to Ollama first', 'error'); return; }
+    if (!STATE.conversation.length) { toast('No conversation yet', 'warn'); return; }
+    toast('Extracting knowledge…', 'info');
+    const text = STATE.conversation.slice(-8).map(m => m.content).join('\n\n');
+    await this.autoExtract(text);
+    toast('✓ Knowledge graph updated', 'success');
+    document.getElementById('statNodes').textContent = this.nodes.size;
+  },
+
+  addManual() {
+    const label = prompt('Node label:');
+    if (!label?.trim()) return;
+    const type = prompt('Type (concept/entity/action/idea/system):', 'concept') || 'concept';
+    this.addNode(label.trim(), type.trim());
+    toast(`Node "${label.trim()}" added`, 'success');
+  },
+
+  togglePhysics() { this.physics = !this.physics; toast(`Physics ${this.physics?'on':'off'}`, 'info'); },
+
+  clear() {
+    if (!confirm('Clear graph?')) return;
+    this.nodes.clear(); this.edges = []; this.selected = null;
+    document.getElementById('nodeDetail').innerHTML = '<div class="empty"><div class="empty-icon">🔵</div><div class="empty-text">Click a node to explore</div></div>';
+    this.addNode('I-AM-AI', 'system'); this.addNode('Ollama', 'system');
+    this.addEdge('I-AM-AI', 'Ollama', 'powered by');
+    document.getElementById('statNodes').textContent = this.nodes.size;
+    toast('Graph cleared', 'info');
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ CODE FORGE
+// ════════════════════════════════════════════════════════════════════════
+const Forge = {
+  get lang()   { return document.getElementById('langSelect').value; },
+  get code()   { return document.getElementById('codeEditor').value.trim(); },
+  get prompt() { return document.getElementById('forgePrompt').value.trim(); },
+
+  async _run(userMsg, sys) {
+    if (!STATE.ollamaOnline) { toast('Connect to Ollama first', 'error'); return; }
+    const out = document.getElementById('forgeOutput');
+    out.innerHTML = '<div class="empty"><span class="spin"></span></div>';
+    let r = '';
+    await Ollama.streamChat(
+      [{ role: 'user', content: userMsg }],
+      (tok, full) => { out.textContent = full; },
+      final => {
+        const clean = final
+          .replace(/^```[\w]*\n?/m, '').replace(/\n?```\s*$/m, '')
+          .trim();
+        out.textContent = clean;
+      },
+      sys
+    ).catch(e => { out.textContent = `⚠ Error: ${e.message}`; out.style.color = 'var(--red)'; });
+    this.updateEditorStats();
+  },
+
+  write()    { if (!this.prompt) { toast('Enter a prompt', 'error'); return; } this._run(`Write ${this.lang} code for: ${this.prompt}`, `You are an expert ${this.lang} developer. Output clean, well-commented production code only.`); },
+  explain()  { if (!this.code) { toast('Paste code first', 'error'); return; } this._run(`Explain this ${this.lang} code clearly, section by section:\n\n\`\`\`${this.lang}\n${this.code}\n\`\`\``, 'You are an expert code educator. Be clear and thorough.'); },
+  debug()    { if (!this.code) { toast('Paste code first', 'error'); return; } this._run(`Debug and fix this ${this.lang} code. Explain each issue found:\n\n\`\`\`${this.lang}\n${this.code}\n\`\`\``, 'You are an expert debugger. Find all bugs, explain them, and provide fixed code.'); },
+  optimize() { if (!this.code) { toast('Paste code first', 'error'); return; } this._run(`Optimize this ${this.lang} code for performance, readability, and best practices:\n\n\`\`\`${this.lang}\n${this.code}\n\`\`\``, 'You are an expert code optimizer.'); },
+  test()     { if (!this.code) { toast('Paste code first', 'error'); return; } this._run(`Write comprehensive tests for this ${this.lang} code:\n\n\`\`\`${this.lang}\n${this.code}\n\`\`\``, `You are an expert test engineer for ${this.lang}. Write thorough tests.`); },
+  refactor() { if (!this.code) { toast('Paste code first', 'error'); return; } this._run(`Refactor this ${this.lang} code to improve structure, naming, and maintainability while preserving behavior:\n\n\`\`\`${this.lang}\n${this.code}\n\`\`\``, 'You are an expert refactorer.'); },
+  review()   { if (!this.code) { toast('Paste code first', 'error'); return; } this._run(`Code review this ${this.lang} code. Check for bugs, security, performance, style:\n\n\`\`\`${this.lang}\n${this.code}\n\`\`\``, 'You are a senior code reviewer. Be thorough and constructive.'); },
+
+  clear() {
+    document.getElementById('codeEditor').value = '';
+    document.getElementById('forgeOutput').innerHTML = '<div class="empty"><div class="empty-icon">⚒</div><div class="empty-text">Output appears here…</div></div>';
+    document.getElementById('forgePrompt').value = '';
+    this.updateEditorStats();
+  },
+
+  copyEditor()  { const c = document.getElementById('codeEditor').value; if (c) navigator.clipboard.writeText(c).then(() => toast('Copied!','success')); },
+  copyOutput()  { const c = document.getElementById('forgeOutput').textContent; if (c) navigator.clipboard.writeText(c).then(() => toast('Copied!','success')); },
+  applyOutput() {
+    const out = document.getElementById('forgeOutput').textContent;
+    if (!out || out.includes('Output appears here')) return;
+    document.getElementById('codeEditor').value = out;
+    this.updateEditorStats();
+    toast('Applied to editor', 'success');
+  },
+
+  updateEditorStats() {
+    const code = document.getElementById('codeEditor').value;
+    const lang = this.lang;
+    document.getElementById('forgeLang').textContent = `Lang: ${lang}`;
+    document.getElementById('forgeLines').textContent = `Lines: ${code ? code.split('\n').length : 0}`;
+    document.getElementById('forgeChars').textContent = `Chars: ${code.length}`;
+    document.getElementById('forgeWords').textContent = `Words: ${code ? code.split(/\s+/).filter(Boolean).length : 0}`;
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ SUB-CONSCIENCE UI
+// ════════════════════════════════════════════════════════════════════════
+const SubUI = {
+  async generateInsight(type = 'general') {
+    if (!STATE.swReady) { toast('SW not available', 'warn'); return; }
+    if (!STATE.ollamaOnline) { toast('Connect to Ollama first', 'error'); return; }
+    toast(`Generating ${type} insight…`, 'info');
+    try {
+      await sw('generate-insight', { type });
+      await this.refreshInsights();
+    } catch (e) { toast(e.message, 'error'); }
+  },
+
+  async refreshInsights() {
+    if (!STATE.swReady) return;
+    try {
+      const { insights } = await sw('get-insights', { limit: 15 });
+      const container = document.getElementById('insightContainer');
+      document.getElementById('insightCount').textContent = insights.length;
+      document.getElementById('statInsights').textContent = insights.length;
+      if (!insights.length) {
+        container.innerHTML = '<div class="empty"><div class="empty-icon">🔮</div><div class="empty-text">No insights yet.</div></div>';
+        return;
+      }
+      container.innerHTML = insights.map(ins => {
+        const conf = Math.round(ins.confidence * 100);
+        const typeLabels = { general:'General Insight', deep:'Deep Analysis', question:'Socratic Question' };
+        return `
+          <div class="insight-card">
+            <div class="insight-type">${typeLabels[ins.type] || ins.type} · ${ins.model}</div>
+            <div class="insight-text">${esc(ins.text)}</div>
+            <div class="confidence-bar"><div class="confidence-fill" style="width:${conf}%"></div></div>
+            <div class="insight-meta">
+              <span>Confidence: ${conf}%</span>
+              <span>From ${ins.sourceMemCount} memories</span>
+              <span>${new Date(ins.timestamp).toLocaleTimeString()}</span>
+            </div>
+          </div>`;
+      }).join('');
+    } catch (e) { console.warn('Insight refresh failed:', e.message); }
+  },
+
+  async showPatterns() {
+    if (!STATE.swReady) { toast('SW not available', 'warn'); return; }
+    try {
+      const { patterns } = await sw('get-patterns', { limit: 40 });
+      const box = document.getElementById('patternContainer');
+      document.getElementById('statPatterns').textContent = patterns.length;
+      if (!patterns.length) {
+        box.innerHTML = '<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">No patterns detected yet.</div></div>';
+        return;
+      }
+      const terms = patterns.filter(p => !p.isBigram);
+      const phrases = patterns.filter(p => p.isBigram);
+      let html = '';
+      if (terms.length) {
+        html += `<div class="sec-label" style="margin-bottom:8px">Terms (${terms.length})</div><div style="margin-bottom:12px">`;
+        html += terms.map(p => `
+          <span class="pattern-tag" title="freq:${p.frequency}">
+            ${esc(p.pattern)}
+            <span class="pattern-strength">${Math.round(p.strength*100)}%</span>
+          </span>`).join('');
+        html += '</div>';
+      }
+      if (phrases.length) {
+        html += `<div class="sec-label" style="margin-bottom:8px">Phrases (${phrases.length})</div><div>`;
+        html += phrases.slice(0,20).map(p => `
+          <span class="pattern-tag phrase" title="freq:${p.frequency}">
+            ${esc(p.pattern)}
+            <span class="pattern-strength">${Math.round(p.strength*100)}%</span>
+          </span>`).join('');
+        html += '</div>';
+      }
+      box.innerHTML = html;
+    } catch (e) { toast(e.message, 'error'); }
+  },
+
+  async showMemories() {
+    if (!STATE.swReady) { toast('SW not available', 'warn'); return; }
+    try {
+      const { memories } = await sw('get-memories', { limit: 20 });
+      const box = document.getElementById('patternContainer');
+      if (!memories.length) {
+        box.innerHTML = '<div class="empty"><div class="empty-icon">🗄</div><div class="empty-text">No memories stored yet.</div></div>';
+        return;
+      }
+      box.innerHTML = memories.map(m => `
+        <div class="memory-item">
+          <div class="memory-type-badge">${esc(m.type)}</div>
+          <div class="memory-content">${esc(m.content.slice(0, 200))}${m.content.length>200?'…':''}</div>
+          <div class="memory-time">${new Date(m.timestamp).toLocaleString()}</div>
+        </div>`).join('');
+    } catch (e) { toast(e.message, 'error'); }
+  },
+
+  async runPatternScan() {
+    if (!STATE.swReady) { toast('SW not available', 'warn'); return; }
+    toast('Running pattern scan…', 'info');
+    try {
+      const { patternsFound } = await sw('run-pattern-scan');
+      toast(`Pattern scan complete · ${patternsFound} patterns`, 'success');
+      await this.showPatterns();
+    } catch (e) { toast(e.message, 'error'); }
+  },
+
+  async clearMemory() {
+    if (!STATE.swReady) { toast('SW not available', 'warn'); return; }
+    if (!confirm('Clear all memories, patterns, and insights?')) return;
+    try {
+      await sw('clear-memory');
+      document.getElementById('insightContainer').innerHTML = '<div class="empty"><div class="empty-icon">🔮</div><div class="empty-text">Memory cleared.</div></div>';
+      document.getElementById('patternContainer').innerHTML = '<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Memory cleared.</div></div>';
+      toast('Memory cleared', 'info');
+      updateStats();
+    } catch (e) { toast('SW not available', 'warn'); }
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ ANALOGY BUILDER
+// ════════════════════════════════════════════════════════════════════════
+function addEdge(a, b, rel, dom, s = 0.75) {
+  STATE.localAnalogy.set(`${a}|${b}|${rel}`, { a, b, rel, dom, s, concept: b });
+}
+function findEdges(concept) { return [...STATE.localAnalogy.values()].filter(e => e.a === concept); }
+
+const Builder = {
+  add() {
+    const a = document.getElementById('bA').value.trim(),
+          rel = document.getElementById('bRel').value.trim(),
+          b = document.getElementById('bB').value.trim(),
+          dom = document.getElementById('bDom').value.trim();
+    if (!a || !rel || !b || !dom) { toast('Fill all fields', 'error'); return; }
+    addEdge(a, b, rel, dom);
+    STATE.analogyHistory.push({ a, rel, b, dom });
+    this.render(); this.updateCount();
+    ['bA','bRel','bB','bDom'].forEach(id => document.getElementById(id).value = '');
+    toast('✓ Concept added', 'success');
+    localStorage.setItem('iamAI_analogies', JSON.stringify([...STATE.localAnalogy.entries()]));
+    updateStats();
+  },
+
+  addToMind() {
+    const a = document.getElementById('bA').value.trim(),
+          rel = document.getElementById('bRel').value.trim(),
+          b = document.getElementById('bB').value.trim();
+    if (!a || !b) { toast('Fill A and B first', 'warn'); return; }
+    MindGraph.addNode(a); MindGraph.addNode(b); MindGraph.addEdge(a, b, rel||'→');
+    toast(`Added "${a}" and "${b}" to Mind`, 'success');
+  },
+
+  async askAI() {
+    const a = document.getElementById('bA').value.trim(),
+          rel = document.getElementById('bRel').value.trim(),
+          b = document.getElementById('bB').value.trim();
+    if (!a || !b) { toast('Fill A and B first', 'warn'); return; }
+    if (!STATE.ollamaOnline) { toast('Connect to Ollama first', 'error'); return; }
+    Chat.sendWith(`Explain the relationship between "${a}" and "${b}"${rel ? ` (relation: "${rel}")` : ''}. Give 3 examples and one surprising analogy.`);
+  },
+
+  clearHistory() {
+    if (!confirm('Clear all analogies?')) return;
+    STATE.analogyHistory = []; STATE.localAnalogy.clear();
+    this.render(); this.updateCount();
+    localStorage.removeItem('iamAI_analogies');
+    toast('Cleared', 'info'); updateStats();
+  },
+
+  render() {
+    const box = document.getElementById('analogyHistory');
+    if (!STATE.analogyHistory.length) {
+      box.innerHTML = '<div class="empty"><div class="empty-icon">🔗</div><div class="empty-text">No analogies yet</div></div>';
+      return;
+    }
+    box.innerHTML = [...STATE.analogyHistory].reverse().map(h => `
+      <div class="analogy-row">
+        <span class="ar-a">${esc(h.a)}</span>
+        <span class="ar-rel">—[${esc(h.rel)}]→</span>
+        <span class="ar-b">${esc(h.b)}</span>
+        <span class="ar-dom">${esc(h.dom)}</span>
+      </div>`).join('');
+  },
+
+  updateCount() { document.getElementById('analogyCountLabel').textContent = STATE.localAnalogy.size; },
+
+  complete() {
+    const a = document.getElementById('cA').value.trim(),
+          b = document.getElementById('cB').value.trim(),
+          c = document.getElementById('cC').value.trim();
+    if (!a || !b || !c) { toast('Fill A, B, C', 'error'); return; }
+    const aRels = new Set(findEdges(a).map(e => e.rel));
+    const results = findEdges(c).filter(e => aRels.has(e.rel)).sort((x,y) => y.s - x.s).slice(0,5);
+    const box = document.getElementById('completeResult');
+    if (!results.length) { box.innerHTML = '<div class="empty" style="height:auto;padding:12px">No match found in knowledge base</div>'; return; }
+    box.innerHTML = results.map(e => `
+      <div class="analogy-row">
+        <span class="ar-a">${esc(e.concept)}</span>
+        <span class="ar-rel">—[${esc(e.rel)}]→</span>
+        <span class="ar-dom">${esc(e.dom)}</span>
+        <div class="ar-str"><div class="ar-fill" style="width:${Math.round(e.s*100)}%"></div></div>
+      </div>`).join('');
+    toast(`${a}:${b} :: ${c}:${results[0].concept}`, 'success');
+  },
+
+  exportJson() {
+    if (!STATE.analogyHistory.length) { toast('No analogies to export', 'warn'); return; }
+    const data = JSON.stringify(STATE.analogyHistory, null, 2);
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([data], { type: 'application/json' })),
+      download: `analogies-${Date.now()}.json`
+    });
+    a.click(); URL.revokeObjectURL(a.href);
+    toast('Exported!', 'success');
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ VOICE INPUT
+// ════════════════════════════════════════════════════════════════════════
+const Voice = {
+  rec: null, active: false,
+  init() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { document.getElementById('voiceBtn').style.display = 'none'; return; }
+    this.rec = new SR();
+    this.rec.continuous = false; this.rec.interimResults = true; this.rec.lang = 'en-US';
+    this.rec.onresult = e => {
+      const t = [...e.results].map(r => r[0].transcript).join('');
+      document.getElementById('chatInput').value = t;
+    };
+    this.rec.onend = () => { this.active = false; document.getElementById('voiceBtn').classList.remove('active'); };
+    this.rec.onerror = () => { this.active = false; document.getElementById('voiceBtn').classList.remove('active'); };
+  },
+  toggle() {
+    if (!this.rec) { toast('Speech recognition not supported', 'warn'); return; }
+    if (this.active) { this.rec.stop(); }
+    else { this.rec.start(); this.active = true; document.getElementById('voiceBtn').classList.add('active'); toast('🎤 Listening…', 'info'); }
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ STATS & STATUS
+// ════════════════════════════════════════════════════════════════════════
+function updateStats() {
+  document.getElementById('statMessages').textContent = STATE.conversation.length;
+  const tok = STATE.tokenCount;
+  document.getElementById('statTokens').textContent = tok > 999 ? `${(tok/1000).toFixed(1)}k` : tok;
+  document.getElementById('statConcepts').textContent = STATE.localAnalogy.size;
+  document.getElementById('statNodes').textContent = MindGraph.nodes.size;
+  document.getElementById('statTasks').textContent = STATE.agentTasks;
+  document.getElementById('statModel').textContent = Ollama.model || '—';
+
+  if (STATE.swReady && navigator.serviceWorker?.controller) {
+    sw('get-stats').then(({ stats }) => {
+      if (stats) {
+        document.getElementById('statMemories').textContent = stats.memories;
+        document.getElementById('statPatterns').textContent = stats.patterns;
+        document.getElementById('statInsights').textContent = stats.insights;
+      }
+    }).catch(() => {});
+  }
+
+  document.querySelectorAll('.stat-card').forEach(c => {
+    c.classList.add('upd');
+    setTimeout(() => c.classList.remove('upd'), 600);
+  });
+}
+
+function updateSubStatus(data) {
+  const dot = document.getElementById('subDot');
+  const lbl = document.getElementById('subLbl');
+  if (data?.processing) { dot.className = 'dot busy'; lbl.textContent = 'PROCESSING'; }
+  else if (data?.active) { dot.className = 'dot live'; lbl.textContent = 'CONSCIENCE ACTIVE'; }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ FULL SESSION EXPORT
+// ════════════════════════════════════════════════════════════════════════
+function exportFullSession() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    model: Ollama.model,
+    persona: document.getElementById('personaSelect').value,
+    conversation: STATE.conversation,
+    analogies: STATE.analogyHistory,
+    graph: {
+      nodes: [...MindGraph.nodes.values()].map(n => ({ id: n.id, type: n.type })),
+      edges: MindGraph.edges
+    }
+  };
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })),
+    download: `i-am-ai-session-${Date.now()}.json`
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Session exported!', 'success');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ KEYBOARD SHORTCUTS
+// ════════════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    const active = document.querySelector('.tab-panel.active')?.id;
+    if (active === 'chat') Chat.send();
+  }
+  if (e.key === 'Escape') UI.closeSysModal();
+});
+
+document.getElementById('chatInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 170) + 'px';
+});
+document.getElementById('chatInput').addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); Chat.send(); }
+});
+
+document.getElementById('codeEditor').addEventListener('input', () => Forge.updateEditorStats());
+document.getElementById('langSelect').addEventListener('change', () => Forge.updateEditorStats());
+
+// Tab key in code editor
+document.getElementById('codeEditor').addEventListener('keydown', function(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = this.selectionStart, end = this.selectionEnd;
+    this.value = this.value.substring(0, s) + '  ' + this.value.substring(end);
+    this.selectionStart = this.selectionEnd = s + 2;
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════
+//  ▌ INITIALIZATION
+// ════════════════════════════════════════════════════════════════════════
+(async () => {
+  // Seed sample analogies
+  [
+    ['Heart','pumps','Blood','Cardiovascular'],
+    ['Root','absorbs','Water','Botany'],
+    ['CPU','processes','Data','Computing'],
+    ['River','flows into','Ocean','Geography'],
+    ['Neuron','transmits','Signal','Neuroscience'],
+    ['Transformer','attends to','Context','AI'],
+    ['Compiler','translates','Machine Code','Programming'],
+  ].forEach(([a,b,c,d]) => addEdge(a, b, c, d, 0.85));
+
+  // Load saved analogies
+  try {
+    const saved = localStorage.getItem('iamAI_analogies');
+    if (saved) {
+      JSON.parse(saved).forEach(([k,v]) => STATE.localAnalogy.set(k,v));
+      STATE.analogyHistory = [...STATE.localAnalogy.values()].map(v => ({ a:v.a, rel:v.rel, b:v.b, dom:v.dom }));
+    }
+  } catch {}
+
+  Builder.render(); Builder.updateCount();
+  MindGraph.init();
+  Voice.init();
+  Forge.updateEditorStats();
+  await initSW();
+  updateStats();
+
+  // Welcome message
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  Chat.addMsg('system', [
+    'I·AM·AI v3 online · Sovereign Intelligence System',
+    '',
+    '— Connect to Ollama using the header controls',
+    '— Enable Sub-Conscience for background learning',
+    '— Ctrl+Enter to send · Tab for code indentation',
+    '— All data stays local · Zero telemetry',
+  ].join('\n'));
+
+  logSession('I·AM·AI v3 initialized · Sovereign Intelligence online');
+  console.log('%c⚡ I·AM·AI v3', 'color:#00d9f5;font-size:18px;font-weight:900;font-family:Syne,sans-serif');
+  console.log('%cSovereign Intelligence · Chat · Agent · Mind Graph · Code Forge · Sub-Conscience', 'color:#8b5cf6;font-family:IBM Plex Mono,monospace;font-size:11px');
+})();
+</script>
+</body>
+</html>

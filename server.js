@@ -191,6 +191,10 @@ const MIME = {
   '.svg':  'image/svg+xml',
   '.ico':  'image/x-icon',
   '.png':  'image/png',
+  '.wasm': 'application/wasm',
+  '.map':  'application/json; charset=utf-8',
+  '.txt':  'text/plain; charset=utf-8',
+  '.pdf':  'application/pdf',
 };
 
 const server = http.createServer((req, res) => {
@@ -209,10 +213,35 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Favicon handler (prevent 404) ───────────────────────────────────────
+  if (relPath === '/favicon.ico') {
+    const svg = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23070b0f' width='100' height='100'/><circle fill='%2322d3ee' cx='50' cy='50' r='35'/></svg>`;
+    res.writeHead(301, { 'Location': svg });
+    res.end();
+    return;
+  }
+
   if (relPath === '/') relPath = '/index.html';
 
   const absPath = path.join(ROOT, relPath);
   if (!absPath.startsWith(ROOT)) { res.writeHead(403); res.end('Forbidden'); return; }
+
+  // ── Directory router — /apps/foo/ or /apps/foo → /apps/foo/index.html ────
+  // If the path has no extension and resolves to a directory that contains
+  // an index.html, redirect to it. This must run before the fs.stat file check.
+  if (!path.extname(relPath)) {
+    let dirStat;
+    try { dirStat = fs.statSync(absPath); } catch (_) {}
+    if (dirStat?.isDirectory()) {
+      const target    = relPath.replace(/\/$/, '') + '/index.html';
+      const indexPath = path.join(ROOT, target);
+      if (fs.existsSync(indexPath)) {
+        res.writeHead(301, { Location: target });
+        res.end();
+        return;
+      }
+    }
+  }
 
   fs.stat(absPath, (err, stat) => {
     if (err || !stat.isFile()) {
