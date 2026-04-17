@@ -5,8 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SOVEREIGN FEED · I-AM-IOS Social</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Google Fonts removed: blocked by the Sovereign Kernel firewall (fonts.googleapis.com).
+         Falling back to system monospace / sans-serif stacks defined in CSS below. -->
+    <style>
+        /* System-font fallbacks that mirror the original typeface roles:
+           Space Mono  → ui-monospace, 'Courier New', monospace
+           Bebas Neue  → Impact, 'Arial Narrow', sans-serif  (condensed caps)
+           DM Sans     → system-ui, -apple-system, 'Segoe UI', sans-serif      */
+        :root {
+            --font-mono: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+            --font-display: Impact, 'Arial Narrow', 'Arial Black', sans-serif;
+            --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+    </style>
 
     <!-- ── PeerJS: real WebRTC P2P ── -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
@@ -2123,6 +2134,20 @@
                 navigator.clipboard.writeText(myNodeId).then(() => showToast('Node ID copied to clipboard', 'success'));
             }
 
+            // ── Expose UI-action functions to global scope ────────────────────────────────
+            //    Inline onclick="" attributes resolve names from window, not from this
+            //    waitForSovereignLog closure.  Assigning here (after the declarations above)
+            //    keeps definitions clean while making them globally callable.
+            window.emitPost      = emitPost;
+            window.copyNodeId    = copyNodeId;
+            window.connectToPeer = connectToPeer;
+            window.likePost      = likePost;
+            window.resonatePost  = resonatePost;
+            window.toggleReplies = toggleReplies;
+            window.submitReply   = submitReply;
+            window.deletePost    = deletePost;
+            window.renderPosts   = renderPosts;
+
             // ── 9. RENDER ─────────────────────────────────────────────────────────────────
 
             const avatarColors = [
@@ -2482,7 +2507,9 @@
             // Pure browser WebSocket — zero extra dependencies.
             let _presenceWs        = null;
             let _presencePingTimer = null;
+            let _presenceRetries   = 0;
             const PRESENCE_PATH    = '/presence';
+            const PRESENCE_MAX_RETRIES = 4;   // give up after 4 attempts (~75 s total)
 
             function presenceUrl() {
                 const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -2490,9 +2517,16 @@
             }
 
             function initPresence() {
-                // Only connect if we're being served from a server (not file://)
+                // Only connect if we're being served from a real HTTP(S) server.
                 if (!location.host) {
                     klog('Presence registry: file:// origin — skipped', 'warn');
+                    return;
+                }
+                // Hard cap: stop retrying after PRESENCE_MAX_RETRIES failures so the
+                // console isn't flooded with "WebSocket connection failed" errors when
+                // no presence server is running.
+                if (_presenceRetries >= PRESENCE_MAX_RETRIES) {
+                    klog('Presence registry: no server found after ' + PRESENCE_MAX_RETRIES + ' attempts — using manual peer ID mode', 'warn');
                     return;
                 }
 
@@ -2506,6 +2540,7 @@
                 }
 
                 _presenceWs.addEventListener('open', () => {
+                    _presenceRetries = 0;   // connected — reset backoff counter
                     klog('Presence registry: connected', 'ok');
                     // Announce ourselves
                     _presenceWs.send(JSON.stringify({
@@ -2547,14 +2582,37 @@
                     }
                 });
 
-                _presenceWs.addEventListener('close', () => {
-                    clearInterval(_presencePingTimer);
-                    klog('Presence registry: disconnected — retrying in 5 s…', 'warn');
-                    setTimeout(initPresence, 5_000);
-                });
+                // Track whether the error handler already scheduled the next retry so
+                // the close handler (which always fires after error) doesn't double-count.
+                let _errorHandled = false;
 
                 _presenceWs.addEventListener('error', () => {
-                    klog('Presence registry: error — manual peer ID mode still works', 'warn');
+                    // Connection refused / network error — browser fires error then close.
+                    // We own the retry here; the close handler will see _errorHandled and skip.
+                    _errorHandled = true;
+                    clearInterval(_presencePingTimer);
+                    _presenceRetries++;
+                    if (_presenceRetries < PRESENCE_MAX_RETRIES) {
+                        const delay = 5_000 * Math.pow(2, _presenceRetries - 1);
+                        klog(`Presence registry: no server (attempt ${_presenceRetries}/${PRESENCE_MAX_RETRIES}) — retrying in ${delay/1000} s`, 'warn');
+                        setTimeout(initPresence, delay);
+                    } else {
+                        klog('Presence registry: no server found after ' + PRESENCE_MAX_RETRIES + ' attempts — manual peer ID mode active', 'warn');
+                    }
+                });
+
+                _presenceWs.addEventListener('close', () => {
+                    clearInterval(_presencePingTimer);
+                    if (_errorHandled) return;   // already handled above — don't double-retry
+                    // Clean disconnect from a previously open connection — retry with backoff.
+                    _presenceRetries++;
+                    if (_presenceRetries < PRESENCE_MAX_RETRIES) {
+                        const delay = 5_000 * Math.pow(2, _presenceRetries - 1);
+                        klog(`Presence registry: disconnected — retrying in ${delay/1000} s… (attempt ${_presenceRetries}/${PRESENCE_MAX_RETRIES})`, 'warn');
+                        setTimeout(initPresence, delay);
+                    } else {
+                        klog('Presence registry: giving up — manual peer ID mode active', 'warn');
+                    }
                 });
             }
 
