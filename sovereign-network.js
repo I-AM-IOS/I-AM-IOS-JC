@@ -1,38 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  sovereign-network.js  —  The Sovereign Compute Network Wiring Harness
-//  v3.1 — PRODUCTION READY
-//
-//  What changed from v3.0:
-//    6. Identity-Routed Handshake (sovereign-handshake.js) — peers no longer
-//       connect and immediately start gossiping.  Every connection now runs a
-//       3-phase handshake before the SYNC flow begins:
-//
-//         Phase 1 — HANDSHAKE_HELLO  : nodeId + capabilities + FNV-32 sig
-//         Phase 2 — HANDSHAKE_ACK   : responding side confirms identity
-//         Phase 3 — HANDSHAKE_PEERS : both sides exchange up to 8 peer
-//                                     introductions with transport hints +
-//                                     optional latency/reliability scores
-//
-//       Result: one handshake = entry into the full graph.  New peers
-//       discovered in Phase 3 are connected automatically, expanding the
-//       network without a full mesh.
-//
-//       Deterministic peer selection: peer introductions use
-//       hash(peerId + 30s-epoch) so all nodes converge on stable topology
-//       slices instead of random churn.
-//
-//       Backwards compatible: if no HandshakeManager is set, SovereignPeer
-//       falls back to the original direct-SYNC behaviour.
-//
-//    New events emitted to sovereign-log:
-//       NET_HANDSHAKE_COMPLETE  — identity confirmed + peer introductions done
-//       NET_PEER_INTRODUCED     — a new peer was discovered via introduction
-//
-//    New attachNetwork() return fields:
-//       handshake        — HandshakeManager instance
-//       peerRegistry     — Map<peerId, PeerEntry> of all known peers
-//       getNetworkView() — snapshot of full known network topology
-//       getTrustedPeers()— only peers that completed 3-phase handshake
+//  v3.0 — PRODUCTION READY
 //
 //  What changed from v2:
 //    1. ESA (Event Set Agreement) — quorum acks now run through the full
@@ -80,7 +48,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { emit, getLog, subscribe, restore, deriveState, EVENT_TYPES } from './sovereign-log.js';
-import { HandshakeManager, makePeerEntry }                            from './sovereign-handshake.js';
 import { attachBus, broadcastRestore } from './sovereign-bus.js';
 import { createHybridNetwork }         from './sovereign-network-hybrid.js';
 
@@ -134,10 +101,6 @@ export const NETWORK_EVENT_TYPES = {
   // Hybrid network layer
   HYBRID_MODE_CHANGED:    'HYBRID_MODE_CHANGED',
   HYBRID_RESYNC:          'HYBRID_RESYNC',
-
-  // Handshake layer
-  NET_HANDSHAKE_COMPLETE: 'NET_HANDSHAKE_COMPLETE',   // identity confirmed + peers introduced
-  NET_PEER_INTRODUCED:    'NET_PEER_INTRODUCED',       // new peer discovered via introduction
 };
 
 // ── FNV-32 (local — no dep on sovereign-log internals) ───────────────────────
@@ -360,31 +323,11 @@ class ESAConsensusManager {
 
 class SovereignPeer {
   constructor(nodeId, opts = {}) {
-    this._id             = nodeId;
-    this._peers          = new Map();    // peerId → DataConnection
-    this._seen           = new Set();    // dedup by contentHash
-    this._esa            = opts.esa;     // ESAConsensusManager — injected after construction
-    this._peer           = null;
-    this._handshake      = null;         // HandshakeManager — injected via setHandshakeManager()
-    this._handshakeDone  = new Set();    // peerIds that have completed handshake
-  }
-
-  /** Inject the HandshakeManager after construction. */
-  setHandshakeManager(hm) {
-    this._handshake = hm;
-  }
-
-  /**
-   * Called by HandshakeManager after phase 3 completes.
-   * Triggers the normal SYNC flow that previously ran immediately on open.
-   */
-  _triggerSyncAfterHandshake(peerId) {
-    this._handshakeDone.add(peerId);
-    if (this._esa) this._esa.setPeerCount(this._peers.size);
-    const conn = this._peers.get(peerId);
-    if (conn) {
-      conn.send({ type: 'SYNC', senderId: this._id, height: getLog().length, ts: Date.now() });
-    }
+    this._id       = nodeId;
+    this._peers    = new Map();    // peerId → DataConnection
+    this._seen     = new Set();    // dedup by contentHash
+    this._esa      = opts.esa;     // ESAConsensusManager — injected after construction
+    this._peer     = null;
   }
 
   async init() {
@@ -411,16 +354,7 @@ class SovereignPeer {
   connect(remotePeerId) {
     if (!this._peer || this._peers.has(remotePeerId)) return;
     const conn = this._peer.connect(remotePeerId, { reliable: true });
-    conn.on('open', () => {
-      this._registerConnection(conn);
-      // Phase 1: initiate handshake (outbound side)
-      if (this._handshake) {
-        this._handshake.initiateHandshake(conn);
-      } else {
-        // No handshake manager — fall back to direct SYNC (old behaviour)
-        this._triggerSyncAfterHandshake(remotePeerId);
-      }
-    });
+    conn.on('open',  () => this._registerConnection(conn));
     conn.on('error', err => console.warn('[sovereign-network] conn error:', err));
   }
 
@@ -476,15 +410,7 @@ class SovereignPeer {
   // ── Private ──────────────────────────────────────────────────────────────
 
   _handleIncoming(conn) {
-    conn.on('open',  () => {
-      this._registerConnection(conn);
-      // Accepting side: handshake is driven by the HANDSHAKE_HELLO message
-      // that the initiating side will send momentarily.  No action needed here
-      // unless no handshake manager is set, in which case fall back to SYNC.
-      if (!this._handshake) {
-        this._triggerSyncAfterHandshake(conn.peer);
-      }
-    });
+    conn.on('open',  () => this._registerConnection(conn));
     conn.on('data',  data => this._handleMessage(data, conn.peer));
     conn.on('close', ()   => this._peers.delete(conn.peer));
     conn.on('error', err  => console.warn('[sovereign-network] incoming conn error:', err));
@@ -493,13 +419,9 @@ class SovereignPeer {
   _registerConnection(conn) {
     this._peers.set(conn.peer, conn);
     conn.on('data',  data => this._handleMessage(data, conn.peer));
-    conn.on('close', ()   => {
-      this._peers.delete(conn.peer);
-      this._handshakeDone.delete(conn.peer);
-    });
-    // NOTE: SYNC is now sent by _triggerSyncAfterHandshake() after the
-    //       3-phase handshake completes.  If no handshake manager is
-    //       present, connect() calls _triggerSyncAfterHandshake() directly.
+    conn.on('close', ()   => this._peers.delete(conn.peer));
+    if (this._esa) this._esa.setPeerCount(this._peers.size);
+    conn.send({ type: 'SYNC', senderId: this._id, height: getLog().length, ts: Date.now() });
   }
 
   _broadcast(msg) {
@@ -510,20 +432,6 @@ class SovereignPeer {
 
   _handleMessage(msg, fromPeerId) {
     if (!msg?.type) return;
-
-    // ── Handshake layer (phases 1-3) — intercept before gossip ───────────
-    const conn = this._peers.get(fromPeerId);
-    if (this._handshake && conn) {
-      const consumed = this._handshake.handleMessage(msg, fromPeerId, conn);
-      if (consumed) return;
-    }
-
-    // ── Guard: don't process gossip messages before handshake is done ─────
-    //    (unless no handshake manager, i.e. old behaviour)
-    if (this._handshake && !this._handshakeDone.has(fromPeerId)) {
-      // Allow only handshake types (already handled above); drop everything else
-      return;
-    }
 
     switch (msg.type) {
 
@@ -772,40 +680,6 @@ export async function attachNetwork(opts = {}) {
 
   await gossipPeer.init();
 
-  // ── 7b. Init Handshake Manager ───────────────────────────────────────────
-  const peerRegistry = new Map();
-
-  const handshakeManager = new HandshakeManager(nodeId, gossipPeer, {
-    peerRegistry,
-    deterministicEpoch: true,
-    onHandshakeComplete: (peerId, peerInfo) => {
-      // Emit identity-confirmed event to sovereign-log surfaces
-      try {
-        emit({
-          type:             NETWORK_EVENT_TYPES.NET_HANDSHAKE_COMPLETE,
-          peerId,
-          caps:             peerInfo.caps,
-          introducedPeers:  peerInfo.introducedPeers,
-          completedAt:      Date.now(),
-        });
-      } catch (_) {}
-
-      // Emit one NET_PEER_INTRODUCED per newly discovered peer
-      for (const newPeerId of (peerInfo.introducedPeers ?? [])) {
-        try {
-          emit({
-            type:          NETWORK_EVENT_TYPES.NET_PEER_INTRODUCED,
-            peerId:        newPeerId,
-            introducedBy:  peerId,
-            discoveredAt:  Date.now(),
-          });
-        } catch (_) {}
-      }
-    },
-  });
-
-  gossipPeer.setHandshakeManager(handshakeManager);
-
   // Wire hybrid peer map
   if (hybrid) {
     hybrid._peerId = gossipPeer.peerId;
@@ -910,13 +784,6 @@ export async function attachNetwork(opts = {}) {
     // Expose ESA introspection for dashboards / tests
     getCanonicalSet: () => esa.canonicalEventSet,
     getESAHeight:    () => esa.height,
-    // ── Handshake layer ──────────────────────────────────────────────────
-    handshake:       handshakeManager,
-    peerRegistry,
-    getNetworkView:  () => handshakeManager.getNetworkView(),
-    // Returns only peers that have completed the full 3-phase handshake
-    getTrustedPeers: () => handshakeManager.getNetworkView()
-                              .filter(p => gossipPeer._handshakeDone.has(p.peerId)),
   };
 
   console.log(`[sovereign-network] v3.0 attached. nodeId=${gossipPeer.peerId}` +

@@ -1540,5 +1540,12 @@ updateDebt();
 updateUI();
 </script>
 
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw/genesis_sw.js", { scope: "/" })
+    .then(() => console.log("[I-AM-IOS] ✅ Genesis SW ready"))
+    .catch(e => console.warn("[I-AM-IOS] SW failed:", e));
+}
+</script>
 </body>
 </html>
